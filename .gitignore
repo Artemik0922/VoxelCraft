@@ -1,0 +1,14 @@
+build/
+saves/
+lib/
+*.log
+*.err.txt
+*.out.txt
+error.log
+build_result.txt
+output.log
+game*.txt
+server_*.txt
+debug_results.txt
+datagen_check.txt
+debug_commands.txt

@@ -1,0 +1,1856 @@
+{
+ "stone": {
+  "x": 0,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.0,
+  "emissive": false
+ },
+ "granite": {
+  "x": 64,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.0,
+  "emissive": false
+ },
+ "polished_granite": {
+  "x": 128,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.0,
+  "emissive": false
+ },
+ "diorite": {
+  "x": 192,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.0,
+  "emissive": false
+ },
+ "polished_diorite": {
+  "x": 256,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.0,
+  "emissive": false
+ },
+ "andesite": {
+  "x": 320,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.0,
+  "emissive": false
+ },
+ "polished_andesite": {
+  "x": 384,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.0,
+  "emissive": false
+ },
+ "cobblestone": {
+  "x": 448,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.0,
+  "emissive": false
+ },
+ "mossy_cobblestone": {
+  "x": 512,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.0,
+  "emissive": false
+ },
+ "deepslate": {
+  "x": 576,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.0,
+  "emissive": false
+ },
+ "bedrock": {
+  "x": 640,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.0,
+  "emissive": false
+ },
+ "dirt": {
+  "x": 704,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.0,
+  "emissive": false
+ },
+ "coarse_dirt": {
+  "x": 768,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.0,
+  "emissive": false
+ },
+ "podzol": {
+  "x": 832,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.0,
+  "emissive": false
+ },
+ "mycelium_top": {
+  "x": 896,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.0,
+  "emissive": false
+ },
+ "sand": {
+  "x": 960,
+  "y": 0,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.0,
+  "emissive": false
+ },
+ "red_sand": {
+  "x": 0,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "gravel": {
+  "x": 64,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "clay": {
+  "x": 128,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "terracotta": {
+  "x": 192,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "salt": {
+  "x": 256,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "ash": {
+  "x": 320,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "basalt": {
+  "x": 384,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "obsidian": {
+  "x": 448,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "glowing_obsidian": {
+  "x": 512,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.071429,
+  "emissive": true
+ },
+ "snow": {
+  "x": 576,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "ice": {
+  "x": 640,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "packed_ice": {
+  "x": 704,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "blue_ice": {
+  "x": 768,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "white_wool": {
+  "x": 832,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "glass": {
+  "x": 896,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "stone#1": {
+  "x": 960,
+  "y": 64,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.071429,
+  "emissive": false
+ },
+ "stone#2": {
+  "x": 0,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "stone#3": {
+  "x": 64,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "sand#1": {
+  "x": 128,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "sand#2": {
+  "x": 192,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "sand#3": {
+  "x": 256,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "oak_log": {
+  "x": 320,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "oak_log_top": {
+  "x": 384,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "oak_planks": {
+  "x": 448,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "oak_raw_planks": {
+  "x": 512,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "oak_dried_planks": {
+  "x": 576,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "oak_sealed_planks": {
+  "x": 640,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "oak_charred_planks": {
+  "x": 704,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "oak_reinforced_planks": {
+  "x": 768,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "oak_composite_planks": {
+  "x": 832,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "oak_waxed_planks": {
+  "x": 896,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "oak_lacquered_planks": {
+  "x": 960,
+  "y": 128,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.142857,
+  "emissive": false
+ },
+ "spruce_log": {
+  "x": 0,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "spruce_log_top": {
+  "x": 64,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "spruce_planks": {
+  "x": 128,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "spruce_raw_planks": {
+  "x": 192,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "spruce_dried_planks": {
+  "x": 256,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "spruce_sealed_planks": {
+  "x": 320,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "spruce_charred_planks": {
+  "x": 384,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "spruce_reinforced_planks": {
+  "x": 448,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "spruce_composite_planks": {
+  "x": 512,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "spruce_waxed_planks": {
+  "x": 576,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "spruce_lacquered_planks": {
+  "x": 640,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "birch_log": {
+  "x": 704,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "birch_log_top": {
+  "x": 768,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "birch_planks": {
+  "x": 832,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "birch_raw_planks": {
+  "x": 896,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "birch_dried_planks": {
+  "x": 960,
+  "y": 192,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.214286,
+  "emissive": false
+ },
+ "birch_sealed_planks": {
+  "x": 0,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "birch_charred_planks": {
+  "x": 64,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "birch_reinforced_planks": {
+  "x": 128,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "birch_composite_planks": {
+  "x": 192,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "birch_waxed_planks": {
+  "x": 256,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "birch_lacquered_planks": {
+  "x": 320,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "jungle_log": {
+  "x": 384,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "jungle_log_top": {
+  "x": 448,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "jungle_planks": {
+  "x": 512,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "jungle_raw_planks": {
+  "x": 576,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "jungle_dried_planks": {
+  "x": 640,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "jungle_sealed_planks": {
+  "x": 704,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "jungle_charred_planks": {
+  "x": 768,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "jungle_reinforced_planks": {
+  "x": 832,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "jungle_composite_planks": {
+  "x": 896,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "jungle_waxed_planks": {
+  "x": 960,
+  "y": 256,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.285714,
+  "emissive": false
+ },
+ "jungle_lacquered_planks": {
+  "x": 0,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "birch_log_side": {
+  "x": 64,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "acacia_planks": {
+  "x": 128,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "dark_oak_planks": {
+  "x": 192,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "oak_door_bottom": {
+  "x": 256,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "oak_door_top": {
+  "x": 320,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "sliding_door_bottom": {
+  "x": 384,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "sliding_door_top": {
+  "x": 448,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "bookshelf": {
+  "x": 512,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "crafting_table": {
+  "x": 576,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "hay_bale": {
+  "x": 640,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "hay_bale_top": {
+  "x": 704,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "charred_log": {
+  "x": 768,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "charred_log_top": {
+  "x": 832,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "petrified_log": {
+  "x": 896,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "petrified_log_top": {
+  "x": 960,
+  "y": 320,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.357143,
+  "emissive": false
+ },
+ "ore_coal": {
+  "x": 0,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "ore_iron": {
+  "x": 64,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "ore_gold": {
+  "x": 128,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "ore_diamond": {
+  "x": 192,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "emerald_ore": {
+  "x": 256,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "redstone_ore": {
+  "x": 320,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.428571,
+  "emissive": true
+ },
+ "lapis_ore": {
+  "x": 384,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "copper_ore": {
+  "x": 448,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "coal_block": {
+  "x": 512,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "iron_block": {
+  "x": 576,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "gold_block": {
+  "x": 640,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "diamond_block": {
+  "x": 704,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "emerald_block": {
+  "x": 768,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "sandstone": {
+  "x": 832,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "chiseled_sandstone": {
+  "x": 896,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "stone_bricks": {
+  "x": 960,
+  "y": 384,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.428571,
+  "emissive": false
+ },
+ "brick": {
+  "x": 0,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.5,
+  "emissive": false
+ },
+ "netherrack": {
+  "x": 64,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.5,
+  "emissive": false
+ },
+ "soul_sand": {
+  "x": 128,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.5,
+  "emissive": false
+ },
+ "nether_bricks": {
+  "x": 192,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.5,
+  "emissive": false
+ },
+ "glowstone": {
+  "x": 256,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.5,
+  "emissive": true
+ },
+ "end_stone": {
+  "x": 320,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.5,
+  "emissive": false
+ },
+ "purpur_block": {
+  "x": 384,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.5,
+  "emissive": false
+ },
+ "white_concrete": {
+  "x": 448,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.5,
+  "emissive": false
+ },
+ "red_concrete": {
+  "x": 512,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.5,
+  "emissive": false
+ },
+ "green_concrete": {
+  "x": 576,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.5,
+  "emissive": false
+ },
+ "blue_concrete": {
+  "x": 640,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.5,
+  "emissive": false
+ },
+ "crystal": {
+  "x": 704,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.5,
+  "emissive": true
+ },
+ "nether_reactor": {
+  "x": 768,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.5,
+  "emissive": true
+ },
+ "mob_spawner": {
+  "x": 832,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.5,
+  "emissive": true
+ },
+ "end_portal_frame": {
+  "x": 896,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.5,
+  "emissive": true
+ },
+ "end_portal": {
+  "x": 960,
+  "y": 448,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.5,
+  "emissive": false
+ },
+ "grass_top": {
+  "x": 0,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "grass_side": {
+  "x": 64,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "grass_plant": {
+  "x": 128,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "dandelion": {
+  "x": 192,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "poppy": {
+  "x": 256,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "sunflower": {
+  "x": 320,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "lavender": {
+  "x": 384,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "dead_bush": {
+  "x": 448,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "cactus_side": {
+  "x": 512,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "cactus_top": {
+  "x": 576,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "lily_pad": {
+  "x": 640,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "vine": {
+  "x": 704,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "bamboo": {
+  "x": 768,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "coral": {
+  "x": 832,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "seagrass": {
+  "x": 896,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "moss_block": {
+  "x": 960,
+  "y": 512,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.571429,
+  "emissive": false
+ },
+ "dripstone": {
+  "x": 0,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "torch": {
+  "x": 64,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.642857,
+  "emissive": true
+ },
+ "fire": {
+  "x": 128,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.642857,
+  "emissive": true
+ },
+ "rails": {
+  "x": 192,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "wheat_stage0": {
+  "x": 256,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "wheat_stage1": {
+  "x": 320,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "wheat_stage2": {
+  "x": 384,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "wheat_stage3": {
+  "x": 448,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "wheat_stage4": {
+  "x": 512,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "wheat_stage5": {
+  "x": 576,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "wheat_stage6": {
+  "x": 640,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "wheat_stage7": {
+  "x": 704,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "carrot_stage0": {
+  "x": 768,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "carrot_stage1": {
+  "x": 832,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "carrot_stage2": {
+  "x": 896,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "carrot_stage3": {
+  "x": 960,
+  "y": 576,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.642857,
+  "emissive": false
+ },
+ "carrot_stage4": {
+  "x": 0,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "carrot_stage5": {
+  "x": 64,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "carrot_stage6": {
+  "x": 128,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "carrot_stage7": {
+  "x": 192,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "potato_stage0": {
+  "x": 256,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "potato_stage1": {
+  "x": 320,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "potato_stage2": {
+  "x": 384,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "potato_stage3": {
+  "x": 448,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "potato_stage4": {
+  "x": 512,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "potato_stage5": {
+  "x": 576,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "potato_stage6": {
+  "x": 640,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "potato_stage7": {
+  "x": 704,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "oak_leaves": {
+  "x": 576,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "spruce_leaves": {
+  "x": 640,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "jungle_leaves": {
+  "x": 768,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "oak_leaves#1": {
+  "x": 960,
+  "y": 640,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.714286,
+  "emissive": false
+ },
+ "oak_leaves#2": {
+  "x": 0,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "oak_leaves#3": {
+  "x": 64,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "oak_leaves_opaque": {
+  "x": 128,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "oak_leaves_opaque#1": {
+  "x": 192,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "oak_leaves_opaque#2": {
+  "x": 256,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "oak_leaves_opaque#3": {
+  "x": 320,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "spruce_leaves#1": {
+  "x": 384,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "spruce_leaves#2": {
+  "x": 448,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "spruce_leaves#3": {
+  "x": 512,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "spruce_leaves_opaque": {
+  "x": 576,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.5625,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "spruce_leaves_opaque#1": {
+  "x": 640,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.625,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "spruce_leaves_opaque#2": {
+  "x": 704,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "spruce_leaves_opaque#3": {
+  "x": 768,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.75,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "jungle_leaves#1": {
+  "x": 832,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "jungle_leaves#2": {
+  "x": 896,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "jungle_leaves#3": {
+  "x": 960,
+  "y": 704,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.785714,
+  "emissive": false
+ },
+ "jungle_leaves_opaque": {
+  "x": 0,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "jungle_leaves_opaque#1": {
+  "x": 64,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.0625,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "jungle_leaves_opaque#2": {
+  "x": 128,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.125,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "jungle_leaves_opaque#3": {
+  "x": 192,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.1875,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "furnace_side": {
+  "x": 256,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.25,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "furnace_top": {
+  "x": 320,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.3125,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "chest": {
+  "x": 384,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.375,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "chest_top": {
+  "x": 448,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.4375,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "tnt": {
+  "x": 512,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.5,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "birch_leaves": {
+  "x": 704,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.6875,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "autumn_leaves": {
+  "x": 832,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.8125,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "cherry_leaves": {
+  "x": 896,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.875,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "water": {
+  "x": 960,
+  "y": 768,
+  "w": 64,
+  "h": 64,
+  "u": 0.9375,
+  "v": 0.857143,
+  "emissive": false
+ },
+ "lava": {
+  "x": 0,
+  "y": 832,
+  "w": 64,
+  "h": 64,
+  "u": 0.0,
+  "v": 0.928571,
+  "emissive": true
+ }
+}

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>О себе — Иван Петров</title>
+  <meta name="description" content="Биография фронтенд-разработчика: кто я, чем занимаюсь и что мне интересно.">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="О себе — Иван Петров">
+  <meta property="og:description" content="Биография фронтенд-разработчика: кто я, чем занимаюсь и что мне интересно.">
+  <meta property="og:image" content="https://picsum.photos/seed/pf-og-about/1200/630">
+  <!-- Иконка сайта: inline-SVG favicon -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230000ff'/%3E%3Crect x='6' y='6' width='20' height='20' fill='%23000000'/%3E%3Crect x='12' y='12' width='8' height='8' fill='%23ffffff'/%3E%3C/svg%3E">
+  <!-- Шрифты -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;700&family=Russo+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Настройки в <head>: применяются до отрисовки, чтобы не мигала тема -->
+  <script src="js/settings.js"></script>
+</head>
+<body>
+  <!-- Шапка вставляется скриптом main.js -->
+  <div id="site-header"></div>
+
+  <main>
+    <!-- Фото и биография -->
+    <section class="section">
+      <div class="container">
+        <header class="section__head">
+          <h2 class="section__title">Обо мне</h2>
+          <p class="section__sub">Коротко о том, кто я и почему занимаюсь интерфейсами.</p>
+        </header>
+        <div class="about-grid">
+          <figure class="about-photo reveal">
+            <img data-photo src="https://picsum.photos/seed/ivan-portrait/800/1000" alt="Портрет Ивана Петрова" width="800" height="1000">
+          </figure>
+          <div class="about-bio reveal" data-about-bio>
+            <p>Я — фронтенд-разработчик с семилетним опытом. Начинал с простых лендингов, а сегодня проектирую и собираю сложные интерфейсы для продуктов: от интернет-магазинов и галерей до аналитических дашбордов и мобильных приложений.</p>
+            <p>Мне интересен весь путь продукта: от первой зарисовки макета и прототипа до финальной анимации и оптимизации под метрики. Умею находить общий язык и с дизайнерами, и с бэкенд-разработчиками, поэтому люблю работать в командах с плотной коммуникацией.</p>
+            <p>В свободное время экспериментирую с генеративной графикой, веду небольшой блог о типографике в интерфейсах и помогаю начинающим разработчикам с код-ревью.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Профессиональные навыки -->
+    <section class="section">
+      <div class="container">
+        <header class="section__head">
+          <h2 class="section__title">Навыки</h2>
+          <p class="section__sub">Мои основные профессиональные направления.</p>
+        </header>
+        <!-- Список навыков заполняется из данных профиля (БД) -->
+        <div class="skills-list reveal" data-about-skills></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Подвал вставляется скриптом main.js -->
+  <div id="site-footer"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

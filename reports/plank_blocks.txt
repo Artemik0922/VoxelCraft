@@ -1,0 +1,55 @@
+# Улучшенные доски — отчёт
+
+## Статус
+Задача выполнена: сборка зелёная, игра запущена и работает (атлас 250 тайлов,
+61 из PNG, lang ru_ru — 431 строка, game_err.txt пуст).
+
+## Что добавлено
+- **64 блока** (id 191–254, диапазон byte-id заполнен полностью):
+  4 породы (oak, spruce, birch, jungle) x 8 обработок x 2 формы (planks, slab).
+- **32 текстуры**: сгенерированы `tools/PlankTextureGenerator.java` (код
+  пользователя) из базовых PNG; скопированы в `src/main/resources/textures/blocks/`;
+  в игре подхватываются как PNG, процедурный фолбэк в TileGenerator повторяет
+  математику генератора (те же ops и сиды).
+- **8 обработок**: raw, dried, sealed, charred, reinforced, composite, waxed,
+  lacquered. Свойства считаются по формулам:
+  - hardness = species.hardness x treatment.multiplier (oak dried = 2.0; reinforced = 2.8)
+  - resistance = species.resistance x treatment.multiplier
+  - flammability = species.flammability x treatment.multiplier (charred — 0, не горит)
+  - waterResistance = species.base + treatment.bonus (только данные, механики нет)
+- **Свойства блоков**: прочность из данных (Game.getBlockHardness), горючесть
+  (BlockType.FLAMMABLE + flammability), плиты — половина блока по высоте
+  (World.getBlockAabb + GreedyMesher.isSlab расширены data-driven), топливо в печи
+  (300 тиков).
+- **Рецепты**: 1 бревно -> 4 сырых доски; переплавка сырых -> сушёные; сушёные +
+  уголь -> обожжённые; + железный слиток -> армированные; + смола -> герметичные;
+  + воск -> вощёные; сушёные + смола + сушёные -> лакированные (3x3); кольцо
+  сырых + смола в центре -> композитные; 3 сырых доски -> 6 плит. Раскладки
+  попарно различны, коллизий нет.
+- **Substitute-предметы** (своих смолы/воска в игре нет): RESIN (item id 197,
+  2 бревна -> 2 смолы), WAX (198, смола + яйцо, shapeless). Спрайты
+  процедурные (resin/wax в TileGenerator).
+- **Локализация**: 64 ключа block.* + 2 ключа item.* в ru_ru.json и en_us.json.
+- **Креатив-инвентарь**: блоки появляются автоматически (перебор BlockType,
+  список скроллится).
+- **Пакет данных**: `com.voxelgame.world.plank` — WoodSpecies, PlankTreatment,
+  PlankForm, PlankVariant, PlankBlockRegistry, PlankResourceGenerator
+  (datagen: рецепты + lang + отчёт, `java -cp build com.voxelgame.world.plank.PlankResourceGenerator`).
+
+## Пропущено (движок не поддерживает форму)
+stairs, fence, fence_gate, door, trapdoor, button, pressure_plate — в PlankForm
+они описаны (isComplex=true) и включены в отчёт, но в блоки не регистрируются:
+в мешере/коллизиях нет поддержки этих фигур (двери захардкожены только для
+OAK_DOOR). Добавление — отдельная задача.
+
+## Ограничение
+Byte-id блоков 191–254 заняты полностью: новых блоков без смены схемы id
+добавить нельзя. Предметы: свободны id 199+ в ItemRegistry (byte-схема).
+
+## Инструменты (tools/)
+- `tools/PlankTextureGenerator.java` — генератор текстур (код пользователя,
+  добавлен только недостающий хелпер escapeJson).
+- `tools/ExportBasePlanks.java` — экспорт базовых досок (oak из PNG,
+  остальные — процедурно, variant 0).
+- Вывод: `generated/plank_textures/` (288 PNG: 32 набора x 9 файлов + manifest
+  generated_textures.json).

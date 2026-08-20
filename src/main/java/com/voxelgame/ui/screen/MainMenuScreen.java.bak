@@ -1,0 +1,143 @@
+package com.voxelgame.ui.screen;
+
+import com.voxelgame.core.Language;
+import com.voxelgame.ui.FontRenderer;
+import com.voxelgame.ui.GuiAssets;
+import com.voxelgame.ui.UIRenderer;
+import com.voxelgame.ui.widget.Button;
+
+import java.util.Random;
+
+import static com.voxelgame.core.Language.tr;
+
+/**
+ * Title screen: the world panorama, the game logo, a pulsing splash and the
+ * main navigation.
+ */
+public class MainMenuScreen extends Screen {
+
+    public interface Callbacks {
+        void onSingleplayer();
+        void onOptions();
+        void onLanguage();
+        void onQuit();
+        String versionString();
+    }
+
+    private static final String TITLE = "VOXELCRAFT";
+
+    private final Callbacks callbacks;
+    private final String splashKey;
+    private double time = 0;
+
+    public MainMenuScreen(Callbacks callbacks) {
+        this.callbacks = callbacks;
+        // Splash lines live in the language files, so they translate too
+        this.splashKey = "splash." + (1 + new Random().nextInt(6));
+    }
+
+    @Override
+    public boolean rendersWorld() { return true; }
+
+    /** Signals to Game that the orbit camera should drive the view. */
+    public boolean usesPanorama() { return true; }
+
+    @Override
+    public boolean closableWithEscape() { return false; }
+
+    @Override
+    protected void layout() {
+        int bw = 200;
+        int bh = 20;
+        int cx = (width - bw) / 2;
+        int startY = Math.max(height / 2 - 10, 92);
+
+        add(new Button(cx, startY, bw, bh, tr("menu.singleplayer"),
+            b -> callbacks.onSingleplayer()));
+
+        // Multiplayer is deliberately inert; greyed out rather than hidden so
+        // the menu keeps its familiar shape
+        Button multiplayer = add(new Button(cx, startY + 24, bw, bh,
+            tr("menu.multiplayer"), b -> {}));
+        multiplayer.enabled = false;
+
+        add(new Button(cx, startY + 48, bw, bh, tr("menu.options"),
+            b -> callbacks.onOptions()));
+
+        add(new Button(cx, startY + 72, bw, bh, tr("menu.quit"),
+            b -> callbacks.onQuit()));
+
+        // Globe button for language, bottom right of the button column
+        add(new Button(cx + bw + 4, startY + 48, 20, bh, "\u0413",
+            b -> callbacks.onLanguage()));
+    }
+
+    @Override
+    public void update(double deltaTime) {
+        time += deltaTime;
+    }
+
+    @Override
+    protected void renderBackground(UIRenderer ui, FontRenderer font, GuiAssets tex) {
+        // The panorama shows through; darken it enough to keep text readable
+        ui.fillRect(0, 0, width, height, 0x66101018);
+
+        int bandTop = Math.max(height / 2 - 10, 92) - 10;
+        ui.fillRect(0, bandTop, width, 4 * 24 + 12, 0x55000000);
+    }
+
+    @Override
+    protected void renderForeground(UIRenderer ui, FontRenderer font, GuiAssets tex,
+                                    float mx, float my) {
+        drawTitle(ui, font);
+        drawSplash(ui, font);
+
+        font.drawWithShadow(ui, callbacks.versionString(),
+            2, height - FontRenderer.GLYPH_H - 2, 0xFFD0D0D0);
+
+        font.drawRight(ui, "Not affiliated with Mojang",
+            width - 2, height - FontRenderer.GLYPH_H - 2, 0xFFB0B0B0);
+    }
+
+    /** Oversized blocky logo, drawn by scaling the bitmap font. */
+    private void drawTitle(UIRenderer ui, FontRenderer font) {
+        int scale = 3;
+        int w = font.scaledWidth(TITLE, scale);
+        float x = (width - w) / 2.0f;
+        float y = Math.max(20, height / 2.0f - 76);
+
+        font.drawScaledWithShadow(ui, TITLE, x, y, scale, 0xFFFFFFFF);
+    }
+
+    /**
+     * Yellow splash under the logo, pulsing on a sine and tilted by stepping
+     * each glyph up along the baseline.
+     */
+    private void drawSplash(UIRenderer ui, FontRenderer font) {
+        String splash = tr(splashKey);
+
+        float pulse = 1.0f + 0.08f * (float) Math.abs(Math.sin(time * 3.0));
+        int scale = Math.max(1, Math.round(pulse * 1.5f));
+
+        int titleW = font.scaledWidth(TITLE, 3);
+        float baseX = (width + titleW) / 2.0f - 30;
+        float baseY = Math.max(20, height / 2.0f - 76) + 22;
+
+        // -20 degrees: rise as the pen advances
+        final float rise = -0.364f;
+
+        float penX = baseX - font.scaledWidth(splash, scale) * 0.5f;
+        float penY = baseY;
+
+        for (int i = 0; i < splash.length(); i++) {
+            String ch = String.valueOf(splash.charAt(i));
+            float advance = (font.charWidth(splash.charAt(i)) + 1) * scale;
+
+            font.drawScaled(ui, ch, penX + 1, penY + 1, scale, 0xFF3F3F00);
+            font.drawScaled(ui, ch, penX, penY, scale, 0xFFFFFF00);
+
+            penX += advance;
+            penY += advance * rise;
+        }
+    }
+}

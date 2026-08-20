@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Кейс проекта — Иван Петров</title>
+  <meta name="description" content="Разбор проекта: задача, роль, стек, галерея и результат.">
+  <!-- Open Graph -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Кейс проекта — Иван Петров">
+  <meta property="og:description" content="Разбор проекта: задача, роль, стек, галерея и результат.">
+  <meta property="og:image" content="https://picsum.photos/seed/pf-og-case/1200/630">
+  <!-- Иконка сайта: inline-SVG favicon -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230000ff'/%3E%3Crect x='6' y='6' width='20' height='20' fill='%23000000'/%3E%3Crect x='12' y='12' width='8' height='8' fill='%23ffffff'/%3E%3C/svg%3E">
+  <!-- Шрифты -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;700&family=Russo+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Настройки в <head>: применяются до отрисовки, чтобы не мигала тема -->
+  <script src="js/settings.js"></script>
+</head>
+<body>
+  <!-- Шапка вставляется скриптом main.js -->
+  <div id="site-header"></div>
+
+  <main>
+    <div class="container">
+      <!-- Кейс рендерится из данных в main.js по хэшу URL (например, case.html#proj-01) -->
+      <div id="case"></div>
+    </div>
+  </main>
+
+  <!-- Подвал вставляется скриптом main.js -->
+  <div id="site-footer"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

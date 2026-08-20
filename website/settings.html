@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Настройки — Иван Петров</title>
+  <meta name="description" content="Настройки профиля и внешнего вида: тема, акцентный цвет, размер шрифта и обращение.">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Настройки — Иван Петров">
+  <meta property="og:description" content="Настройки профиля и внешнего вида портфолио.">
+  <meta property="og:image" content="https://picsum.photos/seed/pf-og-settings/1200/630">
+  <!-- Иконка сайта: inline-SVG favicon -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230000ff'/%3E%3Crect x='6' y='6' width='20' height='20' fill='%23000000'/%3E%3Crect x='12' y='12' width='8' height='8' fill='%23ffffff'/%3E%3C/svg%3E">
+  <!-- Шрифты -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;700&family=Russo+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Настройки в <head>: применяются до отрисовки, чтобы не мигала тема -->
+  <script src="js/settings.js"></script>
+</head>
+<body>
+  <!-- Шапка вставляется скриптом main.js -->
+  <div id="site-header"></div>
+
+  <main>
+    <section class="section">
+      <div class="container">
+        <header class="section__head">
+          <span class="section__num">01</span>
+          <h2 class="section__title">Настройки</h2>
+          <p class="section__sub">Изменения сохраняются в браузере и мгновенно применяются ко всем страницам сайта.</p>
+        </header>
+
+        <div class="settings-layout">
+          <!-- Форма настроек -->
+          <form class="settings-form" id="settings-form" novalidate>
+            <fieldset class="settings-group">
+              <legend>Профиль / О себе</legend>
+              <div class="profile-fields">
+                <div class="pf-row pf-row--full">
+                  <label>Фотография профиля</label>
+                  <div class="photo-upload">
+                    <img id="photo-preview" alt="Предпросмотр фото профиля" hidden>
+                    <div class="photo-upload__controls">
+                      <input type="file" id="pf-photo" accept="image/*">
+                      <button type="button" class="btn btn--ghost" id="photo-upload-btn">Загрузить фото</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="pf-row">
+                  <label for="pf-name">Имя</label>
+                  <input type="text" id="pf-name" autocomplete="name">
+                </div>
+                <div class="pf-row">
+                  <label for="pf-role">Профессия / роль</label>
+                  <input type="text" id="pf-role">
+                </div>
+                <div class="pf-row pf-row--full">
+                  <label for="pf-bio">Обо мне (каждый абзац — с новой строки, между абзацами — пустая строка)</label>
+                  <textarea id="pf-bio"></textarea>
+                </div>
+                <div class="pf-row pf-row--full">
+                  <label for="pf-hero">Текст-интро на главной</label>
+                  <textarea id="pf-hero"></textarea>
+                </div>
+                <div class="pf-row">
+                  <label for="pf-email">Email</label>
+                  <input type="email" id="pf-email" autocomplete="email">
+                </div>
+                <div class="pf-row">
+                  <label for="pf-location">Город / страна</label>
+                  <input type="text" id="pf-location">
+                </div>
+                <div class="pf-row">
+                  <label for="pf-address">Адрес (офис)</label>
+                  <input type="text" id="pf-address">
+                </div>
+                <div class="pf-row">
+                  <label for="pf-timezone">Часовой пояс</label>
+                  <input type="text" id="pf-timezone">
+                </div>
+                <div class="pf-row">
+                  <label for="pf-telegram">Telegram (ссылка)</label>
+                  <input type="url" id="pf-telegram">
+                </div>
+                <div class="pf-row">
+                  <label for="pf-github">GitHub (ссылка)</label>
+                  <input type="url" id="pf-github">
+                </div>
+                <div class="pf-row">
+                  <label for="pf-behance">Behance (ссылка)</label>
+                  <input type="url" id="pf-behance">
+                </div>
+                <div class="pf-row pf-row--full">
+                  <label>Профессиональные навыки</label>
+                  <div class="skills-editor" id="skills-editor"></div>
+                  <button type="button" class="btn btn--ghost" id="skills-add">Добавить навык</button>
+                </div>
+                <div class="pf-row pf-row--full">
+                  <label>Отзывы клиентов</label>
+                  <div class="testimonials-editor" id="testimonials-editor"></div>
+                  <button type="button" class="btn btn--ghost" id="testimonials-add">Добавить отзыв</button>
+                </div>
+                <div class="pf-row pf-row--full">
+                  <label>Проекты портфолио</label>
+                  <div class="projects-editor" id="projects-editor"></div>
+                  <button type="button" class="btn btn--ghost" id="projects-add">Добавить проект</button>
+                </div>
+              </div>
+              <div class="settings-actions">
+                <button type="button" class="btn btn--solid" id="profile-save">Сохранить профиль</button>
+                <span class="profile-status" id="profile-status" role="status"></span>
+              </div>
+            </fieldset>
+
+            <fieldset class="settings-group">
+              <legend>Тема</legend>
+              <div class="seg" data-group="theme">
+                <button type="button" data-value="light" aria-pressed="false">Светлая</button>
+                <button type="button" data-value="dark" aria-pressed="false">Тёмная</button>
+                <button type="button" data-value="system" aria-pressed="false">Системная</button>
+              </div>
+            </fieldset>
+
+            <fieldset class="settings-group">
+              <legend>Акцентный цвет</legend>
+              <div class="swatches" data-group="accent">
+                <button type="button" class="swatch" data-value="#0000ff" style="--sw: #0000ff" aria-label="Синий (ссылки)"></button>
+                <button type="button" class="swatch" data-value="#000000" style="--sw: #000000" aria-label="Чёрный"></button>
+                <button type="button" class="swatch" data-value="#008000" style="--sw: #008000" aria-label="Зелёный (успех)"></button>
+                <button type="button" class="swatch" data-value="#ffa500" style="--sw: #ffa500" aria-label="Оранжевый (предупреждение)"></button>
+                <button type="button" class="swatch" data-value="#ff0000" style="--sw: #ff0000" aria-label="Красный (ошибка)"></button>
+              </div>
+            </fieldset>
+
+            <fieldset class="settings-group">
+              <legend>Размер шрифта</legend>
+              <div class="seg" data-group="fontSize">
+                <button type="button" data-value="s" aria-pressed="false">S</button>
+                <button type="button" data-value="m" aria-pressed="false">M</button>
+                <button type="button" data-value="l" aria-pressed="false">L</button>
+              </div>
+            </fieldset>
+
+            <fieldset class="settings-group">
+              <legend>Как к вам обращаться</legend>
+              <input type="text" id="address-name" autocomplete="nickname" placeholder="Например, Иван">
+            </fieldset>
+
+            <fieldset class="settings-group">
+              <legend>Доступ к редактированию</legend>
+              <label class="settings-label" for="admin-token">Пароль администратора</label>
+              <input type="password" id="admin-token" autocomplete="current-password" placeholder="Оставьте пустым, если пароль не задан">
+              <p class="settings-hint">Пароль нужен, только если на сервере задан ADMIN_TOKEN. Он хранится только в вашем браузере.</p>
+            </fieldset>
+
+            <div class="settings-actions">
+              <button type="button" class="btn" id="settings-reset">Сбросить по умолчанию</button>
+            </div>
+          </form>
+
+          <!-- Мини-превью изменений -->
+          <aside class="preview" aria-label="Предпросмотр изменений">
+            <p class="preview__title">Превью</p>
+            <div class="preview-card">
+              <span class="preview-card__tag">Пример</span>
+              <p class="preview-card__title">Заголовок</p>
+              <p class="preview-card__text">Так будет выглядеть текст на вашем сайте в выбранной теме и с выбранным размером шрифта.</p>
+              <button type="button" class="preview-card__btn">Кнопка</button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Подвал вставляется скриптом main.js -->
+  <div id="site-footer"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

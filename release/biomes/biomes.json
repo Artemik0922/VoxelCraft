@@ -1,0 +1,337 @@
+{
+  "version": 1,
+  "biomes": [
+    {
+      "id": "plains",
+      "name": "biome.plains",
+      "climate": { "temp_min": 0.4, "temp_max": 0.8, "humid_min": 0.2, "humid_max": 0.5, "cont_min": 0.4, "cont_max": 0.7 },
+      "tints": { "grass": 0x91BD59, "foliage": 0x77AB2F, "water": 0x4FA4F5 },
+      "surface": "grass_block",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "oak", "density": 0.005 },
+        "flowers": { "type": "mixed", "density": 0.02 },
+        "grass": { "type": "tall_grass", "density": 0.08 }
+      },
+      "fog_color": 0xC0D8FF
+    },
+    {
+      "id": "forest",
+      "name": "biome.forest",
+      "climate": { "temp_min": 0.5, "temp_max": 0.7, "humid_min": 0.5, "humid_max": 0.8, "cont_min": 0.4, "cont_max": 0.7 },
+      "tints": { "grass": 0x79C05A, "foliage": 0x59AE30, "water": 0x4FA4F5 },
+      "surface": "grass_block",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "oak", "density": 0.055 },
+        "flowers": { "type": "mixed", "density": 0.01 },
+        "grass": { "type": "tall_grass", "density": 0.05 }
+      },
+      "fog_color": 0xC0D8FF
+    },
+    {
+      "id": "birch",
+      "name": "biome.birch",
+      "climate": { "temp_min": 0.5, "temp_max": 0.7, "humid_min": 0.3, "humid_max": 0.5, "cont_min": 0.4, "cont_max": 0.7 },
+      "tints": { "grass": 0x87C867, "foliage": 0x6BA948, "water": 0x4FA4F5 },
+      "surface": "grass_block",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "birch", "density": 0.045 },
+        "flowers": { "type": "mixed", "density": 0.015 },
+        "grass": { "type": "tall_grass", "density": 0.06 }
+      },
+      "fog_color": 0xC0D8FF
+    },
+    {
+      "id": "taiga",
+      "name": "biome.taiga",
+      "climate": { "temp_min": 0.1, "temp_max": 0.3, "humid_min": 0.5, "humid_max": 0.8, "cont_min": 0.4, "cont_max": 0.7 },
+      "tints": { "grass": 0x86B564, "foliage": 0x6B9D4E, "water": 0x4FA4F5 },
+      "surface": "grass_block",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "spruce", "density": 0.05 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 }
+      },
+      "fog_color": 0xC0D8FF
+    },
+    {
+      "id": "desert",
+      "name": "biome.desert",
+      "climate": { "temp_min": 0.8, "temp_max": 1.0, "humid_min": 0.0, "humid_max": 0.15, "cont_min": 0.4, "cont_max": 0.7 },
+      "tints": { "grass": 0xBFB755, "foliage": 0xA5A14A, "water": 0x3F7AE0 },
+      "surface": "sand",
+      "filler": "sand",
+      "features": {
+        "trees": { "type": "cactus", "density": 0.004 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 }
+      },
+      "fog_color": 0xE8D8A0
+    },
+    {
+      "id": "swamp",
+      "name": "biome.swamp",
+      "climate": { "temp_min": 0.5, "temp_max": 0.7, "humid_min": 0.7, "humid_max": 1.0, "cont_min": 0.3, "cont_max": 0.5 },
+      "tints": { "grass": 0x6A7039, "foliage": 0x6A7039, "water": 0x4C6559 },
+      "surface": "grass_block",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "oak", "density": 0.02 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "tall_grass", "density": 0.12 },
+        "lily_pad": { "density": 0.01 }
+      },
+      "fog_color": 0x6A7039
+    },
+    {
+      "id": "savanna",
+      "name": "biome.savanna",
+      "climate": { "temp_min": 0.7, "temp_max": 1.0, "humid_min": 0.1, "humid_max": 0.3, "cont_min": 0.4, "cont_max": 0.7 },
+      "tints": { "grass": 0xBFB755, "foliage": 0xAEA428, "water": 0x3F7AE0 },
+      "surface": "grass_block",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "acacia", "density": 0.008 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "tall_grass", "density": 0.1 }
+      },
+      "fog_color": 0xE8D8A0
+    },
+    {
+      "id": "ocean",
+      "name": "biome.ocean",
+      "climate": { "temp_min": 0.0, "temp_max": 1.0, "humid_min": 0.0, "humid_max": 1.0, "cont_min": 0.0, "cont_max": 0.3 },
+      "tints": { "grass": 0x8EB971, "foliage": 0x71A74D, "water": 0x3F7AE0 },
+      "surface": "sand",
+      "filler": "gravel",
+      "features": {
+        "trees": { "type": "none", "density": 0 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 }
+      },
+      "fog_color": 0xC0D8FF
+    },
+    {
+      "id": "jungle",
+      "name": "biome.jungle",
+      "climate": { "temp_min": 0.7, "temp_max": 1.0, "humid_min": 0.7, "humid_max": 1.0, "cont_min": 0.4, "cont_max": 0.7 },
+      "tints": { "grass": 0x59C93C, "foliage": 0x30BB0B, "water": 0x3F7AE0 },
+      "surface": "grass_block",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "jungle", "density": 0.06 },
+        "flowers": { "type": "mixed", "density": 0.01 },
+        "grass": { "type": "tall_grass", "density": 0.1 },
+        "vine": { "density": 0.08 }
+      },
+      "fog_color": 0xC0D8FF
+    },
+    {
+      "id": "mountains",
+      "name": "biome.mountains",
+      "climate": { "temp_min": 0.2, "temp_max": 0.5, "humid_min": 0.3, "humid_max": 0.6, "cont_min": 0.7, "cont_max": 1.0 },
+      "tints": { "grass": 0x8AB689, "foliage": 0x6DA36B, "water": 0x4FA4F5 },
+      "surface": "stone",
+      "filler": "stone",
+      "features": {
+        "trees": { "type": "spruce", "density": 0.01 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 }
+      },
+      "fog_color": 0xC0D8FF
+    },
+    {
+      "id": "snowy_plains",
+      "name": "biome.snowy_plains",
+      "climate": { "temp_min": 0.0, "temp_max": 0.1, "humid_min": 0.3, "humid_max": 0.6, "cont_min": 0.4, "cont_max": 0.7 },
+      "tints": { "grass": 0x80B497, "foliage": 0x60917B, "water": 0x3F7AE0 },
+      "surface": "snow",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "none", "density": 0 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 }
+      },
+      "fog_color": 0xE0E8F0
+    },
+    {
+      "id": "mushroom",
+      "name": "biome.mushroom",
+      "climate": { "temp_min": 0.6, "temp_max": 0.8, "humid_min": 0.7, "humid_max": 1.0, "cont_min": 0.4, "cont_max": 0.6 },
+      "tints": { "grass": 0x55C0A0, "foliage": 0x22B14C, "water": 0x4FA4F5 },
+      "surface": "mycelium",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "mushroom", "density": 0.01 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 }
+      },
+      "fog_color": 0xD0E0F0
+    },
+    {
+      "id": "badlands",
+      "name": "biome.badlands",
+      "climate": { "temp_min": 0.8, "temp_max": 1.0, "humid_min": 0.0, "humid_max": 0.2, "cont_min": 0.5, "cont_max": 0.7 },
+      "tints": { "grass": 0x90A44E, "foliage": 0x9E8D4E, "water": 0x3F7AE0 },
+      "surface": "terracotta",
+      "filler": "terracotta",
+      "features": {
+        "trees": { "type": "none", "density": 0 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 }
+      },
+      "fog_color": 0xE8D8A0
+    },
+    {
+      "id": "cherry_grove",
+      "name": "biome.cherry_grove",
+      "climate": { "temp_min": 0.4, "temp_max": 0.6, "humid_min": 0.5, "humid_max": 0.7, "cont_min": 0.5, "cont_max": 0.7 },
+      "tints": { "grass": 0xF2D0DA, "foliage": 0xE8B7C8, "water": 0x4FA4F5 },
+      "surface": "grass_block",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "cherry", "density": 0.04 },
+        "flowers": { "type": "mixed", "density": 0.02 },
+        "grass": { "type": "tall_grass", "density": 0.05 }
+      },
+      "fog_color": 0xF0E0F0
+    },
+    {
+      "id": "autumn_forest",
+      "name": "biome.autumn",
+      "climate": { "temp_min": 0.4, "temp_max": 0.6, "humid_min": 0.5, "humid_max": 0.8, "cont_min": 0.4, "cont_max": 0.7 },
+      "tints": { "grass": 0xC0A040, "foliage": 0xD06020, "water": 0x4FA4F5 },
+      "surface": "grass_block",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "autumn_oak", "density": 0.05 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 },
+        "particles": { "type": "falling_leaves", "density": 0.02 }
+      },
+      "fog_color": 0xE0D0A0
+    },
+    {
+      "id": "lavender_meadow",
+      "name": "biome.lavender",
+      "climate": { "temp_min": 0.5, "temp_max": 0.7, "humid_min": 0.4, "humid_max": 0.6, "cont_min": 0.5, "cont_max": 0.7 },
+      "tints": { "grass": 0xC0A0D0, "foliage": 0xA080C0, "water": 0x4FA4F5 },
+      "surface": "grass_block",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "none", "density": 0 },
+        "flowers": { "type": "lavender", "density": 0.08 },
+        "grass": { "type": "tall_grass", "density": 0.03 },
+        "particles": { "type": "none", "density": 0 }
+      },
+      "fog_color": 0xE0D0F0
+    },
+    {
+      "id": "crystal_peaks",
+      "name": "biome.crystal",
+      "climate": { "temp_min": 0.3, "temp_max": 0.5, "humid_min": 0.4, "humid_max": 0.7, "cont_min": 0.7, "cont_max": 1.0 },
+      "tints": { "grass": 0x8070A0, "foliage": 0x605080, "water": 0x4FA4F5 },
+      "surface": "basalt",
+      "filler": "basalt",
+      "features": {
+        "trees": { "type": "none", "density": 0 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 },
+        "crystal": { "density": 0.02 }
+      },
+      "fog_color": 0xD0C0F0
+    },
+    {
+      "id": "ash_wastes",
+      "name": "biome.ash",
+      "climate": { "temp_min": 0.7, "temp_max": 0.9, "humid_min": 0.0, "humid_max": 0.2, "cont_min": 0.4, "cont_max": 0.6 },
+      "tints": { "grass": 0x808080, "foliage": 0x606060, "water": 0x3F7AE0 },
+      "surface": "ash",
+      "filler": "ash",
+      "features": {
+        "trees": { "type": "charred", "density": 0.005 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 },
+        "particles": { "type": "embers", "density": 0.03 }
+      },
+      "fog_color": 0xA0A0A0
+    },
+    {
+      "id": "misty_moor",
+      "name": "biome.moor",
+      "climate": { "temp_min": 0.4, "temp_max": 0.6, "humid_min": 0.8, "humid_max": 1.0, "cont_min": 0.3, "cont_max": 0.5 },
+      "tints": { "grass": 0x5A6A4A, "foliage": 0x4A5A3A, "water": 0x3A5A6A },
+      "surface": "grass_block",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "none", "density": 0 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "tall_grass", "density": 0.15 },
+        "lily_pad": { "density": 0.02 },
+        "particles": { "type": "will_o_wisp", "density": 0.01 }
+      },
+      "fog_color": 0xC0D0C0
+    },
+    {
+      "id": "salt_flats",
+      "name": "biome.salt",
+      "climate": { "temp_min": 0.6, "temp_max": 0.9, "humid_min": 0.0, "humid_max": 0.1, "cont_min": 0.4, "cont_max": 0.6 },
+      "tints": { "grass": 0xD8D8D0, "foliage": 0xC0C0B8, "water": 0x4FA4F5 },
+      "surface": "salt",
+      "filler": "salt",
+      "features": {
+        "trees": { "type": "none", "density": 0 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 }
+      },
+      "fog_color": 0xE0E0D8
+    },
+    {
+      "id": "volcanic_highlands",
+      "name": "biome.volcano",
+      "climate": { "temp_min": 0.9, "temp_max": 1.0, "humid_min": 0.0, "humid_max": 0.2, "cont_min": 0.5, "cont_max": 0.8 },
+      "tints": { "grass": 0x4A4A4A, "foliage": 0x3A3A3A, "water": 0x3F7AE0 },
+      "surface": "basalt",
+      "filler": "basalt",
+      "features": {
+        "trees": { "type": "none", "density": 0 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 },
+        "lava_lake": { "density": 0.01 },
+        "particles": { "type": "smoke", "density": 0.02 }
+      },
+      "fog_color": 0xD0A080
+    },
+    {
+      "id": "petrified_forest",
+      "name": "biome.petrified",
+      "climate": { "temp_min": 0.5, "temp_max": 0.7, "humid_min": 0.2, "humid_max": 0.4, "cont_min": 0.5, "cont_max": 0.7 },
+      "tints": { "grass": 0x90A090, "foliage": 0x708070, "water": 0x4FA4F5 },
+      "surface": "dirt",
+      "filler": "dirt",
+      "features": {
+        "trees": { "type": "petrified", "density": 0.03 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 }
+      },
+      "fog_color": 0xC0D0C0
+    },
+    {
+      "id": "glacier",
+      "name": "biome.glacier",
+      "climate": { "temp_min": 0.0, "temp_max": 0.1, "humid_min": 0.5, "humid_max": 0.8, "cont_min": 0.5, "cont_max": 0.7 },
+      "tints": { "grass": 0xA0C8E0, "foliage": 0x80A8C0, "water": 0x3F7AE0 },
+      "surface": "blue_ice",
+      "filler": "blue_ice",
+      "features": {
+        "trees": { "type": "none", "density": 0 },
+        "flowers": { "type": "none", "density": 0 },
+        "grass": { "type": "none", "density": 0 }
+      },
+      "fog_color": 0xC0E0F0
+    }
+  ]
+}

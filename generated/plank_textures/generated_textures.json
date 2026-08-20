@@ -1,0 +1,482 @@
+[
+  {
+    "wood": "birch",
+    "treatment": "raw",
+    "files": {
+      "planks": "birch_raw_planks.png",
+      "button": "birch_raw_button.png",
+      "door_top": "birch_raw_door_top.png",
+      "door_bottom": "birch_raw_door_bottom.png",
+      "door_combined": "birch_raw_door.png",
+      "trapdoor": "birch_raw_trapdoor.png",
+      "fence": "birch_raw_fence.png",
+      "fence_gate": "birch_raw_fence_gate.png",
+      "sign": "birch_raw_sign.png"
+    }
+  },
+  {
+    "wood": "birch",
+    "treatment": "dried",
+    "files": {
+      "planks": "birch_dried_planks.png",
+      "button": "birch_dried_button.png",
+      "door_top": "birch_dried_door_top.png",
+      "door_bottom": "birch_dried_door_bottom.png",
+      "door_combined": "birch_dried_door.png",
+      "trapdoor": "birch_dried_trapdoor.png",
+      "fence": "birch_dried_fence.png",
+      "fence_gate": "birch_dried_fence_gate.png",
+      "sign": "birch_dried_sign.png"
+    }
+  },
+  {
+    "wood": "birch",
+    "treatment": "sealed",
+    "files": {
+      "planks": "birch_sealed_planks.png",
+      "button": "birch_sealed_button.png",
+      "door_top": "birch_sealed_door_top.png",
+      "door_bottom": "birch_sealed_door_bottom.png",
+      "door_combined": "birch_sealed_door.png",
+      "trapdoor": "birch_sealed_trapdoor.png",
+      "fence": "birch_sealed_fence.png",
+      "fence_gate": "birch_sealed_fence_gate.png",
+      "sign": "birch_sealed_sign.png"
+    }
+  },
+  {
+    "wood": "birch",
+    "treatment": "charred",
+    "files": {
+      "planks": "birch_charred_planks.png",
+      "button": "birch_charred_button.png",
+      "door_top": "birch_charred_door_top.png",
+      "door_bottom": "birch_charred_door_bottom.png",
+      "door_combined": "birch_charred_door.png",
+      "trapdoor": "birch_charred_trapdoor.png",
+      "fence": "birch_charred_fence.png",
+      "fence_gate": "birch_charred_fence_gate.png",
+      "sign": "birch_charred_sign.png"
+    }
+  },
+  {
+    "wood": "birch",
+    "treatment": "reinforced",
+    "files": {
+      "planks": "birch_reinforced_planks.png",
+      "button": "birch_reinforced_button.png",
+      "door_top": "birch_reinforced_door_top.png",
+      "door_bottom": "birch_reinforced_door_bottom.png",
+      "door_combined": "birch_reinforced_door.png",
+      "trapdoor": "birch_reinforced_trapdoor.png",
+      "fence": "birch_reinforced_fence.png",
+      "fence_gate": "birch_reinforced_fence_gate.png",
+      "sign": "birch_reinforced_sign.png"
+    }
+  },
+  {
+    "wood": "birch",
+    "treatment": "composite",
+    "files": {
+      "planks": "birch_composite_planks.png",
+      "button": "birch_composite_button.png",
+      "door_top": "birch_composite_door_top.png",
+      "door_bottom": "birch_composite_door_bottom.png",
+      "door_combined": "birch_composite_door.png",
+      "trapdoor": "birch_composite_trapdoor.png",
+      "fence": "birch_composite_fence.png",
+      "fence_gate": "birch_composite_fence_gate.png",
+      "sign": "birch_composite_sign.png"
+    }
+  },
+  {
+    "wood": "birch",
+    "treatment": "waxed",
+    "files": {
+      "planks": "birch_waxed_planks.png",
+      "button": "birch_waxed_button.png",
+      "door_top": "birch_waxed_door_top.png",
+      "door_bottom": "birch_waxed_door_bottom.png",
+      "door_combined": "birch_waxed_door.png",
+      "trapdoor": "birch_waxed_trapdoor.png",
+      "fence": "birch_waxed_fence.png",
+      "fence_gate": "birch_waxed_fence_gate.png",
+      "sign": "birch_waxed_sign.png"
+    }
+  },
+  {
+    "wood": "birch",
+    "treatment": "lacquered",
+    "files": {
+      "planks": "birch_lacquered_planks.png",
+      "button": "birch_lacquered_button.png",
+      "door_top": "birch_lacquered_door_top.png",
+      "door_bottom": "birch_lacquered_door_bottom.png",
+      "door_combined": "birch_lacquered_door.png",
+      "trapdoor": "birch_lacquered_trapdoor.png",
+      "fence": "birch_lacquered_fence.png",
+      "fence_gate": "birch_lacquered_fence_gate.png",
+      "sign": "birch_lacquered_sign.png"
+    }
+  },
+  {
+    "wood": "jungle",
+    "treatment": "raw",
+    "files": {
+      "planks": "jungle_raw_planks.png",
+      "button": "jungle_raw_button.png",
+      "door_top": "jungle_raw_door_top.png",
+      "door_bottom": "jungle_raw_door_bottom.png",
+      "door_combined": "jungle_raw_door.png",
+      "trapdoor": "jungle_raw_trapdoor.png",
+      "fence": "jungle_raw_fence.png",
+      "fence_gate": "jungle_raw_fence_gate.png",
+      "sign": "jungle_raw_sign.png"
+    }
+  },
+  {
+    "wood": "jungle",
+    "treatment": "dried",
+    "files": {
+      "planks": "jungle_dried_planks.png",
+      "button": "jungle_dried_button.png",
+      "door_top": "jungle_dried_door_top.png",
+      "door_bottom": "jungle_dried_door_bottom.png",
+      "door_combined": "jungle_dried_door.png",
+      "trapdoor": "jungle_dried_trapdoor.png",
+      "fence": "jungle_dried_fence.png",
+      "fence_gate": "jungle_dried_fence_gate.png",
+      "sign": "jungle_dried_sign.png"
+    }
+  },
+  {
+    "wood": "jungle",
+    "treatment": "sealed",
+    "files": {
+      "planks": "jungle_sealed_planks.png",
+      "button": "jungle_sealed_button.png",
+      "door_top": "jungle_sealed_door_top.png",
+      "door_bottom": "jungle_sealed_door_bottom.png",
+      "door_combined": "jungle_sealed_door.png",
+      "trapdoor": "jungle_sealed_trapdoor.png",
+      "fence": "jungle_sealed_fence.png",
+      "fence_gate": "jungle_sealed_fence_gate.png",
+      "sign": "jungle_sealed_sign.png"
+    }
+  },
+  {
+    "wood": "jungle",
+    "treatment": "charred",
+    "files": {
+      "planks": "jungle_charred_planks.png",
+      "button": "jungle_charred_button.png",
+      "door_top": "jungle_charred_door_top.png",
+      "door_bottom": "jungle_charred_door_bottom.png",
+      "door_combined": "jungle_charred_door.png",
+      "trapdoor": "jungle_charred_trapdoor.png",
+      "fence": "jungle_charred_fence.png",
+      "fence_gate": "jungle_charred_fence_gate.png",
+      "sign": "jungle_charred_sign.png"
+    }
+  },
+  {
+    "wood": "jungle",
+    "treatment": "reinforced",
+    "files": {
+      "planks": "jungle_reinforced_planks.png",
+      "button": "jungle_reinforced_button.png",
+      "door_top": "jungle_reinforced_door_top.png",
+      "door_bottom": "jungle_reinforced_door_bottom.png",
+      "door_combined": "jungle_reinforced_door.png",
+      "trapdoor": "jungle_reinforced_trapdoor.png",
+      "fence": "jungle_reinforced_fence.png",
+      "fence_gate": "jungle_reinforced_fence_gate.png",
+      "sign": "jungle_reinforced_sign.png"
+    }
+  },
+  {
+    "wood": "jungle",
+    "treatment": "composite",
+    "files": {
+      "planks": "jungle_composite_planks.png",
+      "button": "jungle_composite_button.png",
+      "door_top": "jungle_composite_door_top.png",
+      "door_bottom": "jungle_composite_door_bottom.png",
+      "door_combined": "jungle_composite_door.png",
+      "trapdoor": "jungle_composite_trapdoor.png",
+      "fence": "jungle_composite_fence.png",
+      "fence_gate": "jungle_composite_fence_gate.png",
+      "sign": "jungle_composite_sign.png"
+    }
+  },
+  {
+    "wood": "jungle",
+    "treatment": "waxed",
+    "files": {
+      "planks": "jungle_waxed_planks.png",
+      "button": "jungle_waxed_button.png",
+      "door_top": "jungle_waxed_door_top.png",
+      "door_bottom": "jungle_waxed_door_bottom.png",
+      "door_combined": "jungle_waxed_door.png",
+      "trapdoor": "jungle_waxed_trapdoor.png",
+      "fence": "jungle_waxed_fence.png",
+      "fence_gate": "jungle_waxed_fence_gate.png",
+      "sign": "jungle_waxed_sign.png"
+    }
+  },
+  {
+    "wood": "jungle",
+    "treatment": "lacquered",
+    "files": {
+      "planks": "jungle_lacquered_planks.png",
+      "button": "jungle_lacquered_button.png",
+      "door_top": "jungle_lacquered_door_top.png",
+      "door_bottom": "jungle_lacquered_door_bottom.png",
+      "door_combined": "jungle_lacquered_door.png",
+      "trapdoor": "jungle_lacquered_trapdoor.png",
+      "fence": "jungle_lacquered_fence.png",
+      "fence_gate": "jungle_lacquered_fence_gate.png",
+      "sign": "jungle_lacquered_sign.png"
+    }
+  },
+  {
+    "wood": "oak",
+    "treatment": "raw",
+    "files": {
+      "planks": "oak_raw_planks.png",
+      "button": "oak_raw_button.png",
+      "door_top": "oak_raw_door_top.png",
+      "door_bottom": "oak_raw_door_bottom.png",
+      "door_combined": "oak_raw_door.png",
+      "trapdoor": "oak_raw_trapdoor.png",
+      "fence": "oak_raw_fence.png",
+      "fence_gate": "oak_raw_fence_gate.png",
+      "sign": "oak_raw_sign.png"
+    }
+  },
+  {
+    "wood": "oak",
+    "treatment": "dried",
+    "files": {
+      "planks": "oak_dried_planks.png",
+      "button": "oak_dried_button.png",
+      "door_top": "oak_dried_door_top.png",
+      "door_bottom": "oak_dried_door_bottom.png",
+      "door_combined": "oak_dried_door.png",
+      "trapdoor": "oak_dried_trapdoor.png",
+      "fence": "oak_dried_fence.png",
+      "fence_gate": "oak_dried_fence_gate.png",
+      "sign": "oak_dried_sign.png"
+    }
+  },
+  {
+    "wood": "oak",
+    "treatment": "sealed",
+    "files": {
+      "planks": "oak_sealed_planks.png",
+      "button": "oak_sealed_button.png",
+      "door_top": "oak_sealed_door_top.png",
+      "door_bottom": "oak_sealed_door_bottom.png",
+      "door_combined": "oak_sealed_door.png",
+      "trapdoor": "oak_sealed_trapdoor.png",
+      "fence": "oak_sealed_fence.png",
+      "fence_gate": "oak_sealed_fence_gate.png",
+      "sign": "oak_sealed_sign.png"
+    }
+  },
+  {
+    "wood": "oak",
+    "treatment": "charred",
+    "files": {
+      "planks": "oak_charred_planks.png",
+      "button": "oak_charred_button.png",
+      "door_top": "oak_charred_door_top.png",
+      "door_bottom": "oak_charred_door_bottom.png",
+      "door_combined": "oak_charred_door.png",
+      "trapdoor": "oak_charred_trapdoor.png",
+      "fence": "oak_charred_fence.png",
+      "fence_gate": "oak_charred_fence_gate.png",
+      "sign": "oak_charred_sign.png"
+    }
+  },
+  {
+    "wood": "oak",
+    "treatment": "reinforced",
+    "files": {
+      "planks": "oak_reinforced_planks.png",
+      "button": "oak_reinforced_button.png",
+      "door_top": "oak_reinforced_door_top.png",
+      "door_bottom": "oak_reinforced_door_bottom.png",
+      "door_combined": "oak_reinforced_door.png",
+      "trapdoor": "oak_reinforced_trapdoor.png",
+      "fence": "oak_reinforced_fence.png",
+      "fence_gate": "oak_reinforced_fence_gate.png",
+      "sign": "oak_reinforced_sign.png"
+    }
+  },
+  {
+    "wood": "oak",
+    "treatment": "composite",
+    "files": {
+      "planks": "oak_composite_planks.png",
+      "button": "oak_composite_button.png",
+      "door_top": "oak_composite_door_top.png",
+      "door_bottom": "oak_composite_door_bottom.png",
+      "door_combined": "oak_composite_door.png",
+      "trapdoor": "oak_composite_trapdoor.png",
+      "fence": "oak_composite_fence.png",
+      "fence_gate": "oak_composite_fence_gate.png",
+      "sign": "oak_composite_sign.png"
+    }
+  },
+  {
+    "wood": "oak",
+    "treatment": "waxed",
+    "files": {
+      "planks": "oak_waxed_planks.png",
+      "button": "oak_waxed_button.png",
+      "door_top": "oak_waxed_door_top.png",
+      "door_bottom": "oak_waxed_door_bottom.png",
+      "door_combined": "oak_waxed_door.png",
+      "trapdoor": "oak_waxed_trapdoor.png",
+      "fence": "oak_waxed_fence.png",
+      "fence_gate": "oak_waxed_fence_gate.png",
+      "sign": "oak_waxed_sign.png"
+    }
+  },
+  {
+    "wood": "oak",
+    "treatment": "lacquered",
+    "files": {
+      "planks": "oak_lacquered_planks.png",
+      "button": "oak_lacquered_button.png",
+      "door_top": "oak_lacquered_door_top.png",
+      "door_bottom": "oak_lacquered_door_bottom.png",
+      "door_combined": "oak_lacquered_door.png",
+      "trapdoor": "oak_lacquered_trapdoor.png",
+      "fence": "oak_lacquered_fence.png",
+      "fence_gate": "oak_lacquered_fence_gate.png",
+      "sign": "oak_lacquered_sign.png"
+    }
+  },
+  {
+    "wood": "spruce",
+    "treatment": "raw",
+    "files": {
+      "planks": "spruce_raw_planks.png",
+      "button": "spruce_raw_button.png",
+      "door_top": "spruce_raw_door_top.png",
+      "door_bottom": "spruce_raw_door_bottom.png",
+      "door_combined": "spruce_raw_door.png",
+      "trapdoor": "spruce_raw_trapdoor.png",
+      "fence": "spruce_raw_fence.png",
+      "fence_gate": "spruce_raw_fence_gate.png",
+      "sign": "spruce_raw_sign.png"
+    }
+  },
+  {
+    "wood": "spruce",
+    "treatment": "dried",
+    "files": {
+      "planks": "spruce_dried_planks.png",
+      "button": "spruce_dried_button.png",
+      "door_top": "spruce_dried_door_top.png",
+      "door_bottom": "spruce_dried_door_bottom.png",
+      "door_combined": "spruce_dried_door.png",
+      "trapdoor": "spruce_dried_trapdoor.png",
+      "fence": "spruce_dried_fence.png",
+      "fence_gate": "spruce_dried_fence_gate.png",
+      "sign": "spruce_dried_sign.png"
+    }
+  },
+  {
+    "wood": "spruce",
+    "treatment": "sealed",
+    "files": {
+      "planks": "spruce_sealed_planks.png",
+      "button": "spruce_sealed_button.png",
+      "door_top": "spruce_sealed_door_top.png",
+      "door_bottom": "spruce_sealed_door_bottom.png",
+      "door_combined": "spruce_sealed_door.png",
+      "trapdoor": "spruce_sealed_trapdoor.png",
+      "fence": "spruce_sealed_fence.png",
+      "fence_gate": "spruce_sealed_fence_gate.png",
+      "sign": "spruce_sealed_sign.png"
+    }
+  },
+  {
+    "wood": "spruce",
+    "treatment": "charred",
+    "files": {
+      "planks": "spruce_charred_planks.png",
+      "button": "spruce_charred_button.png",
+      "door_top": "spruce_charred_door_top.png",
+      "door_bottom": "spruce_charred_door_bottom.png",
+      "door_combined": "spruce_charred_door.png",
+      "trapdoor": "spruce_charred_trapdoor.png",
+      "fence": "spruce_charred_fence.png",
+      "fence_gate": "spruce_charred_fence_gate.png",
+      "sign": "spruce_charred_sign.png"
+    }
+  },
+  {
+    "wood": "spruce",
+    "treatment": "reinforced",
+    "files": {
+      "planks": "spruce_reinforced_planks.png",
+      "button": "spruce_reinforced_button.png",
+      "door_top": "spruce_reinforced_door_top.png",
+      "door_bottom": "spruce_reinforced_door_bottom.png",
+      "door_combined": "spruce_reinforced_door.png",
+      "trapdoor": "spruce_reinforced_trapdoor.png",
+      "fence": "spruce_reinforced_fence.png",
+      "fence_gate": "spruce_reinforced_fence_gate.png",
+      "sign": "spruce_reinforced_sign.png"
+    }
+  },
+  {
+    "wood": "spruce",
+    "treatment": "composite",
+    "files": {
+      "planks": "spruce_composite_planks.png",
+      "button": "spruce_composite_button.png",
+      "door_top": "spruce_composite_door_top.png",
+      "door_bottom": "spruce_composite_door_bottom.png",
+      "door_combined": "spruce_composite_door.png",
+      "trapdoor": "spruce_composite_trapdoor.png",
+      "fence": "spruce_composite_fence.png",
+      "fence_gate": "spruce_composite_fence_gate.png",
+      "sign": "spruce_composite_sign.png"
+    }
+  },
+  {
+    "wood": "spruce",
+    "treatment": "waxed",
+    "files": {
+      "planks": "spruce_waxed_planks.png",
+      "button": "spruce_waxed_button.png",
+      "door_top": "spruce_waxed_door_top.png",
+      "door_bottom": "spruce_waxed_door_bottom.png",
+      "door_combined": "spruce_waxed_door.png",
+      "trapdoor": "spruce_waxed_trapdoor.png",
+      "fence": "spruce_waxed_fence.png",
+      "fence_gate": "spruce_waxed_fence_gate.png",
+      "sign": "spruce_waxed_sign.png"
+    }
+  },
+  {
+    "wood": "spruce",
+    "treatment": "lacquered",
+    "files": {
+      "planks": "spruce_lacquered_planks.png",
+      "button": "spruce_lacquered_button.png",
+      "door_top": "spruce_lacquered_door_top.png",
+      "door_bottom": "spruce_lacquered_door_bottom.png",
+      "door_combined": "spruce_lacquered_door.png",
+      "trapdoor": "spruce_lacquered_trapdoor.png",
+      "fence": "spruce_lacquered_fence.png",
+      "fence_gate": "spruce_lacquered_fence_gate.png",
+      "sign": "spruce_lacquered_sign.png"
+    }
+  }
+]

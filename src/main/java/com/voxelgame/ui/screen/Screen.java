@@ -1,0 +1,111 @@
+package com.voxelgame.ui.screen;
+
+import com.voxelgame.ui.FontRenderer;
+import com.voxelgame.ui.UIRenderer;
+import com.voxelgame.ui.GuiAssets;
+import com.voxelgame.ui.widget.Widget;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Base class for full-screen interfaces.
+ *
+ * A screen owns a flat list of widgets and is rebuilt via {@link #layout}
+ * whenever the virtual canvas size changes, so everything stays centred
+ * across resizes and GUI scale changes.
+ */
+public abstract class Screen {
+
+    protected final List<Widget> widgets = new ArrayList<>();
+    protected int width;
+    protected int height;
+
+    /** Whether the world keeps ticking while this screen is open. */
+    public boolean pausesGame() { return true; }
+
+    /** Whether the mouse cursor should be visible. */
+    public boolean showsCursor() { return true; }
+
+    /** Whether the world is still drawn behind this screen. */
+    public boolean rendersWorld() { return true; }
+
+    /** Whether Escape closes this screen. */
+    public boolean closableWithEscape() { return true; }
+
+    public void init(int width, int height) {
+        this.width = width;
+        this.height = height;
+        widgets.clear();
+        layout();
+    }
+
+    public void resize(int width, int height) {
+        init(width, height);
+    }
+
+    /** Create and position widgets. Called on init and on every resize. */
+    protected abstract void layout();
+
+    protected <T extends Widget> T add(T widget) {
+        widgets.add(widget);
+        return widget;
+    }
+
+    public void update(double deltaTime) {}
+
+    public void render(UIRenderer ui, FontRenderer font, GuiAssets tex, float mx, float my) {
+        renderBackground(ui, font, tex);
+
+        for (Widget w : widgets) {
+            w.updateHover(mx, my);
+            w.render(ui, font, tex, mx, my);
+        }
+
+        renderForeground(ui, font, tex, mx, my);
+    }
+
+    protected void renderBackground(UIRenderer ui, FontRenderer font, GuiAssets tex) {}
+
+    protected void renderForeground(UIRenderer ui, FontRenderer font, GuiAssets tex,
+                                    float mx, float my) {}
+
+    // ------------------------------------------------------------------
+    // Input
+    // ------------------------------------------------------------------
+
+    public boolean mouseClicked(float mx, float my, int button) {
+        // Iterate backwards so widgets drawn on top get the click first
+        for (int i = widgets.size() - 1; i >= 0; i--) {
+            if (widgets.get(i).mouseClicked(mx, my, button)) return true;
+        }
+        return false;
+    }
+
+    public void mouseReleased(float mx, float my, int button) {
+        for (Widget w : widgets) w.mouseReleased(mx, my, button);
+    }
+
+    public boolean mouseDragged(float mx, float my, int button) {
+        for (Widget w : widgets) {
+            if (w.mouseDragged(mx, my, button)) return true;
+        }
+        return false;
+    }
+
+    public boolean mouseScrolled(float mx, float my, double delta) {
+        for (int i = widgets.size() - 1; i >= 0; i--) {
+            if (widgets.get(i).mouseScrolled(mx, my, delta)) return true;
+        }
+        return false;
+    }
+
+    public boolean keyPressed(int key, int mods) {
+        for (Widget w : widgets) {
+            if (w.keyPressed(key, mods)) return true;
+        }
+        return false;
+    }
+
+    public void onClosed() {}
+}
