@@ -480,7 +480,10 @@ public class Renderer {
             }
 
             if (rc.transparent != null) {
-                Chunk chunk = world.getChunks().get(rc.modelMatrix.m30() / Chunk.SIZE); // approximate key lookup
+                // Use the packed chunk key so the map lookup actually finds the chunk
+                int cx = (int) (rc.modelMatrix.m30() / Chunk.SIZE);
+                int cz = (int) (rc.modelMatrix.m32() / Chunk.SIZE);
+                Chunk chunk = world.getChunks().get(Chunk.key(cx, cz));
                 float dx = chunk != null ? chunk.getWorldX() + 8 - camX : 0;
                 float dz = chunk != null ? chunk.getWorldZ() + 8 - camZ : 0;
                 rc.sortKey = dx * dx + dz * dz;

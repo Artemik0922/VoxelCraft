@@ -148,12 +148,23 @@ public class Game {
     private float eyeHeight = 1.6f;
     private float fov = settings.fov;
     
-    // Timing
+// Timing
     private double deltaTime;
     private double lastFrame;
     private int frameCount = 0;
     private float fps = 60;
     private float fpsTimer = 0;
+    /** Fixed timestep: one world tick = 1/60 s */
+    private static final double TICK_RATE = 1.0 / 60.0;
+    /** Accumulates wall-clock seconds for fixed-timestep world updates */
+    private double tickAccumulator = 0;
+    /** Background thread for non-blocking autosave */
+    private static final java.util.concurrent.ExecutorService saveExecutor =
+        java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "world-save");
+            t.setDaemon(true);
+            return t;
+        });
     
     // Input state
     private boolean mouseCaptured = false;
@@ -655,8 +666,8 @@ public class Game {
     private void openDeathScreen(Player.DeathCause cause, boolean hardcore) {
         screens.open(new DeathScreen(cause, hardcore, new DeathScreen.Callbacks() {
             @Override public void onRespawn() { respawnPlayer(); }
-            @Override public void onTitleScreen() {
-                saveWorld();
+@Override public void onTitleScreen() {
+                saveWorldSync();
                 openMainMenu();
             }
         }));
@@ -1048,7 +1059,7 @@ if (fresh) {
         }
     }
     
-    /**
+/**
      * Persist the world and the player's position + inventory.
      */
     private void saveWorld() {
@@ -1069,13 +1080,45 @@ if (fresh) {
         meta.dayTime = dayNight.getTime();
         meta.inventoryData = serializeInventory(player.getInventory());
 
+        // Meta and discovery are small; keep synchronous on the game thread
+        currentSave.saveMeta();
+        if (biomeDiscovery != null) biomeDiscovery.save();
+
+        // Snapshot all dirty chunk data on the main thread (fast memcpy), then
+        // write to disk on a daemon background thread so autosave never stalls
+        // the render loop. On exit (cleanup), we use the synchronous path.
+        java.util.List<com.voxelgame.world.save.WorldSave.ChunkSnapshot> snaps =
+            world.snapshotDirtyChunks();
+        final WorldSave saveRef = currentSave;
+        final String displayName = meta.displayName;
+        saveExecutor.submit(() -> {
+            int chunks = saveRef.writeSnapshots(snaps);
+            saveRef.createBackup();
+            System.out.println("Saved '" + displayName + "' (" + chunks + " chunks)");
+        });
+    }
+
+    /** Synchronous save used on exit — waits for the background queue to drain. */
+    private void saveWorldSync() {
+        if (currentSave == null || world == null) return;
+        // Stop accepting new tasks and wait for pending autosave to finish
+        saveExecutor.shutdown();
+        try { saveExecutor.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS); }
+        catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+
+        WorldMeta meta = currentSave.getMeta();
+        Vector3f p = player.getPosition();
+        meta.playerX = p.x; meta.playerY = p.y; meta.playerZ = p.z;
+        meta.playerYaw = camera.getYaw(); meta.playerPitch = camera.getPitch();
+        meta.playerHealth = player.getHealth(); meta.playerHunger = player.getHunger();
+        meta.selectedSlot = player.getInventory().getSelectedSlot();
+        meta.gameMode = player.getGameMode(); meta.difficulty = settings.difficulty;
+        meta.dayTime = dayNight.getTime();
+        meta.inventoryData = serializeInventory(player.getInventory());
         currentSave.saveMeta();
         if (biomeDiscovery != null) biomeDiscovery.save();
         int chunks = world.flushToDisk();
-
-        // [GP-082] Rolling snapshot of the chunk files, at most once per 5 min
         currentSave.createBackup();
-
         System.out.println("Saved '" + meta.displayName + "' (" + chunks + " chunks)");
     }
 
@@ -1515,12 +1558,22 @@ if (fresh) {
                 saveWorld();
             }
             
-            if (!paused) {
+if (!paused) {
                 processInput();
-                updateWorld();
+                // Clamp to prevent physics explosions after a lag spike
+                deltaTime = java.lang.Math.min(deltaTime, 0.1);
+                tickAccumulator += deltaTime;
+                // Run world logic at a fixed 60 Hz regardless of actual framerate
+                while (tickAccumulator >= TICK_RATE) {
+                    tickAccumulator -= TICK_RATE;
+                    double realDelta = deltaTime;
+                    deltaTime = TICK_RATE;
+                    updateWorld();
+                    deltaTime = realDelta;
+                }
             } else {
-                // Stop the player dead so they don't coast while paused
                 player.setHorizontalVelocity(0, 0);
+                tickAccumulator = 0;
             }
             
             // The sky keeps moving while paused so the world stays alive,
@@ -2872,7 +2925,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
 
         // [GP-013] Cracks grow on the block while it is being mined
         if (breakingBlock != null && blockBreakProgress > 0 && blockBreakProgress < 1) {
-            int stage = java.lang.Math.min(9, (int) (blockBreakProgress * 10));
+            int stage = java.lang.Math.min(4, (int) (blockBreakProgress * 10));
             crackOverlay.render(breakingBlock.x, breakingBlock.y, breakingBlock.z,
                 stage, camera, renderer.getTextureAtlas());
         }
@@ -3909,7 +3962,7 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                 out.accept("loaded world '" + meta.displayName + "'");
             }
 
-            case "save" -> { requireWorld(out); saveWorld(); out.accept("world saved"); }
+            case "save" -> { requireWorld(out); saveWorldSync(); out.accept("world saved"); }
 
             case "weather" -> {
                 currentWeather = arg(t, 1).toLowerCase(java.util.Locale.ROOT);
@@ -3971,9 +4024,9 @@ netClient.sendBlockChange(world.getLastPlacedX(),
         throw new IllegalArgumentException("unknown block: " + s);
     }
 
-    private void cleanup() {
-        // Persist before tearing anything down
-        saveWorld();
+private void cleanup() {
+        // Persist before tearing anything down (synchronous so we don't exit mid-write)
+        saveWorldSync();
         world.cleanup();
         shader.cleanup();
         renderer.cleanup();

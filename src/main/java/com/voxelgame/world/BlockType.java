@@ -169,11 +169,11 @@ public enum BlockType {
     ITEM_STONE_SWORD(123, "stone_sword", false, 0xFF7A7A7A),
     ITEM_STONE_HOE(124, "stone_hoe", false, 0xFF7A7A7A),
 
-    // Iron tools (IDs continue past 127 — atlas uses HashMap)
-    ITEM_IRON_PICKAXE(130, "iron_pickaxe", false, 0xFFA0A0B0),
-    ITEM_IRON_AXE(131, "iron_axe", false, 0xFFA0A0B0),
-    ITEM_IRON_SHOVEL(132, "iron_shovel", false, 0xFFA0A0B0),
-    ITEM_IRON_SWORD(133, "iron_sword_item", false, 0xFFA0A0B0),
+    // Iron tools — moved to 262-265 to avoid ID collisions with GLASS_PANE/SHEARS/BUCKET/MILK
+    ITEM_IRON_PICKAXE(262, "iron_pickaxe", false, 0xFFA0A0B0),
+    ITEM_IRON_AXE(263, "iron_axe", false, 0xFFA0A0B0),
+    ITEM_IRON_SHOVEL(264, "iron_shovel", false, 0xFFA0A0B0),
+    ITEM_IRON_SWORD(265, "iron_sword_item", false, 0xFFA0A0B0),
     ITEM_IRON_HOE(134, "iron_hoe", false, 0xFFA0A0B0),
 
     // Diamond tools

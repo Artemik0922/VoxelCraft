@@ -311,7 +311,7 @@ public class World {
      */
     public int flushToDisk() {
         if (save == null) return 0;
-        
+
         int written = 0;
         for (Chunk chunk : chunks.values()) {
             if (chunk.isModified()) {
@@ -324,6 +324,48 @@ public class World {
             }
         }
         return written;
+    }
+
+    /**
+     * Snapshot all modified chunks for background saving.
+     * This copies the block arrays and metadata on the main thread so the
+     * background thread only does I/O — avoiding data races with chunk edits.
+     *
+     * @return immutable list of chunk snapshots, empty if no save is set
+     */
+    public java.util.List<com.voxelgame.world.save.WorldSave.ChunkSnapshot> snapshotDirtyChunks() {
+        java.util.List<com.voxelgame.world.save.WorldSave.ChunkSnapshot> out =
+            new java.util.ArrayList<>();
+        if (save == null) return out;
+        for (Chunk chunk : chunks.values()) {
+            if (!chunk.isModified()) continue;
+            java.util.List<int[]> doorList = chunk.doorMetaEntries();
+            java.util.List<int[]> cropList = chunk.cropMetaEntries();
+            java.util.List<int[]> waterList = chunk.waterMetaEntries();
+            java.util.List<Object[]> rawContainers = containerManager.getContainersInChunk(
+                chunk.getChunkX(), chunk.getChunkZ());
+            Object[][] containers = new Object[rawContainers.size()][];
+            for (int i = 0; i < rawContainers.size(); i++) {
+                Object[] c = rawContainers.get(i);
+                com.voxelgame.world.container.ContainerData cd =
+                    (com.voxelgame.world.container.ContainerData) c[3];
+                containers[i] = new Object[] {
+                    c[0], c[1], c[2],
+                    cd.type.ordinal(),
+                    cd.serialize()
+                };
+            }
+            out.add(new com.voxelgame.world.save.WorldSave.ChunkSnapshot(
+                chunk.getChunkX(), chunk.getChunkZ(),
+                chunk.getBlocks().clone(),  // shallow copy of the array (short elements are immutable)
+                doorList.toArray(new int[0][]),
+                cropList.toArray(new int[0][]),
+                waterList.toArray(new int[0][]),
+                containers
+            ));
+            chunk.clearModified();
+        }
+        return out;
     }
     
     /** Reused request scratch so streaming allocates nothing per frame. */
@@ -1787,7 +1829,11 @@ public class World {
 
     /** Tick every primed TNT; remove any that have detonated. */
     public void updateTnt(float dt) {
-        for (TntEntity tnt : tntEntities) tnt.update(dt);
+        // Snapshot iteration prevents ConcurrentModificationException when
+        // explode() removes other TNT from the list during the loop.
+        for (TntEntity tnt : new java.util.ArrayList<>(tntEntities)) {
+            if (!tnt.isDead()) tnt.update(dt);
+        }
         tntEntities.removeIf(TntEntity::isDead);
     }
 

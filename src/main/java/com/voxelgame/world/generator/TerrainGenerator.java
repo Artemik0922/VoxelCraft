@@ -102,8 +102,8 @@ public class TerrainGenerator {
     public boolean isStructuresEnabled() { return structuresEnabled; }
     public void setStructuresEnabled(boolean enabled) { this.structuresEnabled = enabled; }
 
-    /** Height cache for external systems (player, mobs, etc). */
-    private final java.util.Map<Long, Integer> heightCache = new java.util.HashMap<>();
+    /** Height cache for external systems (player, mobs, etc). Thread-safe. */
+    private final java.util.Map<Long, Integer> heightCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     private int computeHeight(int x, int z, BiomeSelector.MCBiome biome) {
         double c = biomeNoise.C(x, z);

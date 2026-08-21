@@ -25,6 +25,22 @@ import java.util.zip.GZIPOutputStream;
  */
 public class WorldSave {
 
+    /** Immutable snapshot of a modified chunk for background saving. */
+    public static final class ChunkSnapshot {
+        public final int cx, cz;
+        public final short[] blocks;
+        public final int[][] doors, crops, water;
+        // Each container: {lx, ly, lz, typeOrdinal, serializedData}
+        public final Object[][] containers;
+
+        public ChunkSnapshot(int cx, int cz, short[] blocks,
+                int[][] doors, int[][] crops, int[][] water, Object[][] containers) {
+            this.cx = cx; this.cz = cz; this.blocks = blocks;
+            this.doors = doors; this.crops = crops; this.water = water;
+            this.containers = containers;
+        }
+    }
+
     private static final Path ROOT = Paths.get("saves");
     private static final int FORMAT_VERSION = 6;
 
@@ -222,9 +238,10 @@ public class WorldSave {
         try {
             Files.createDirectories(p.getParent());
 
+            Path tmp = p.resolveSibling(p.getFileName() + ".tmp");
             try (DataOutputStream out = new DataOutputStream(
                     new BufferedOutputStream(
-                        new GZIPOutputStream(Files.newOutputStream(p))))) {
+                        new GZIPOutputStream(Files.newOutputStream(tmp))))) {
 
                 out.writeInt(FORMAT_VERSION);
                 out.writeInt(chunk.getChunkX());
@@ -281,6 +298,8 @@ public class WorldSave {
                     }
                 }
             }
+            // Atomic replace: prevents corruption if the process crashes mid-write
+            Files.move(tmp, p, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             System.err.println("Could not save chunk " + chunk.getChunkX()
                 + "," + chunk.getChunkZ() + ": " + e.getMessage());
@@ -315,6 +334,12 @@ public class WorldSave {
             }
 
             int length = in.readInt();
+            if (length != Chunk.SIZE * Chunk.HEIGHT * Chunk.SIZE) {
+                System.err.println("Corrupt chunk data at " + cx + "," + cz
+                    + ": expected " + (Chunk.SIZE * Chunk.HEIGHT * Chunk.SIZE)
+                    + " blocks, got " + length);
+                return null;
+            }
             Chunk chunk = new Chunk(cx, cz);
             if (version >= 6) {
                 // [BASE] Format 6: 16-bit block ids (extended base blocks)
@@ -395,5 +420,50 @@ public class WorldSave {
         } catch (IOException e) {
             return 0;
         }
+    }
+
+    /**
+     * Write a list of chunk snapshots to disk atomically.
+     * Called from the background save thread.
+     *
+     * @return number of chunks written
+     */
+    public int writeSnapshots(java.util.List<ChunkSnapshot> snapshots) {
+        int written = 0;
+        for (ChunkSnapshot snap : snapshots) {
+            Path p = chunkPath(snap.cx, snap.cz);
+            try {
+                Files.createDirectories(p.getParent());
+                Path tmp = p.resolveSibling(p.getFileName() + ".tmp");
+                try (DataOutputStream out = new DataOutputStream(
+                        new BufferedOutputStream(
+                            new GZIPOutputStream(Files.newOutputStream(tmp))))) {
+                    out.writeInt(FORMAT_VERSION);
+                    out.writeInt(snap.cx);
+                    out.writeInt(snap.cz);
+                    out.writeInt(snap.blocks.length);
+                    for (short b : snap.blocks) out.writeShort(b);
+                    out.writeInt(snap.doors.length);
+                    for (int[] d : snap.doors) { out.writeByte(d[0]); out.writeByte(d[1]); out.writeByte(d[2]); out.writeByte(d[3]); }
+                    out.writeInt(snap.crops.length);
+                    for (int[] c2 : snap.crops) { out.writeByte(c2[0]); out.writeByte(c2[1]); out.writeByte(c2[2]); out.writeByte(c2[3]); }
+                    out.writeInt(snap.water.length);
+                    for (int[] w : snap.water) { out.writeByte(w[0]); out.writeByte(w[1]); out.writeByte(w[2]); out.writeByte(w[3]); }
+                    out.writeInt(snap.containers.length);
+                    for (Object[] c2 : snap.containers) {
+                        out.writeByte(((Integer) c2[0]) & 15);
+                        out.writeByte((Integer) c2[1]);
+                        out.writeByte(((Integer) c2[2]) & 15);
+                        out.writeByte((Integer) c2[3]); // typeOrdinal
+                        out.writeUTF((String) c2[4]);    // serialized
+                    }
+                }
+                Files.move(tmp, p, StandardCopyOption.REPLACE_EXISTING);
+                written++;
+            } catch (IOException e) {
+                System.err.println("Could not write snapshot " + snap.cx + "," + snap.cz + ": " + e.getMessage());
+            }
+        }
+        return written;
     }
 }
