@@ -329,6 +329,8 @@ public class Game {
                 m.charTyped((char) codepoint);
             } else if (top instanceof com.voxelgame.ui.screen.CreativeInventoryScreen ci) {
                 ci.charTyped((char) codepoint);
+            } else if (top instanceof com.voxelgame.ui.screen.CraftingScreen cs) {
+                cs.charTyped((char) codepoint);
             }
             if (chat.isOpen()) {
                 chat.charTyped((char) codepoint);

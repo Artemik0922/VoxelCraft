@@ -279,6 +279,7 @@
   "container.crafting": "Создание",
   "recipeBook.toggle": "Рецепты",
   "recipeBook.title": "Книга рецептов",
+  "recipeBook.search": "Поиск рецепта...",
   "menu.saveAndQuit": "Сохранить и выйти в меню",
   "menu.quitQuestion": "Выйти в главное меню?",
   "menu.quitWarning": "Прогресс будет сохранен.",

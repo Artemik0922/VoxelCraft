@@ -8,7 +8,10 @@ import com.voxelgame.ui.GuiAssets;
 import com.voxelgame.ui.MenuTheme;
 import com.voxelgame.ui.StackIcons;
 import com.voxelgame.ui.UIRenderer;
+import com.voxelgame.ui.widget.TextField;
 import com.voxelgame.world.BlockType;
+
+import java.util.Locale;
 
 import static com.voxelgame.core.Language.tr;
 
@@ -44,6 +47,7 @@ public class CraftingScreen extends Screen {
     private static final int BOOK_ENTRY_H = 34;
     private static final int BOOK_VISIBLE = 9;
     private static final int BOOK_W = 200;
+    private static final int BOOK_SEARCH_H = 14;
 
     private static final int PANEL_PAD = 7;
     private static final int TITLE_H = 12;
@@ -66,6 +70,10 @@ public class CraftingScreen extends Screen {
     private int bookX, bookY, bookW, bookH;
 
     private float lastMx, lastMy;
+
+    /** [UI-042] Recipe book search: filters the visible recipe list. */
+    private final TextField searchField = new TextField(0, 0, 10, BOOK_SEARCH_H, 24);
+    private Recipe[] visibleList = RecipeRegistry.RECIPES;
 
     public CraftingScreen(Callbacks callbacks, TextureAtlas atlas) {
         this.callbacks = callbacks;
@@ -110,9 +118,18 @@ public class CraftingScreen extends Screen {
         bookButtonY = panelY + 6;
 
         bookW = BOOK_W;
-        bookH = 4 + BOOK_VISIBLE * BOOK_ENTRY_H;
+        bookH = 4 + 20 + BOOK_SEARCH_H + 4 + BOOK_VISIBLE * BOOK_ENTRY_H;
         bookX = panelX + panelW + 12;
         bookY = panelY;
+
+        // Search row sits between the title and the first recipe entry
+        searchField.x = bookX + 8;
+        searchField.y = bookY + 22;
+        searchField.width = bookW - 16;
+        searchField.height = BOOK_SEARCH_H;
+        searchField.setPlaceholder(tr("recipeBook.search"));
+
+        rebuildRecipes();
     }
 
     @Override
@@ -217,7 +234,10 @@ public class CraftingScreen extends Screen {
         ui.fillRect(bookX + 8, bookY + 1, bookW - 16, 1, 0x60FFFFFF);
         font.draw(ui, tr("recipeBook.title"), bookX + 8, bookY + 6, 0xFFE8EEFF);
 
-        Recipe[] recipes = RecipeRegistry.RECIPES;
+        // Search bar filters the list below it
+        searchField.render(ui, font, gui, mx, my);
+
+        Recipe[] recipes = visibleList;
         int maxScroll = Math.max(0, recipes.length - BOOK_VISIBLE);
         if (bookScroll > maxScroll) bookScroll = maxScroll;
 
@@ -226,7 +246,7 @@ public class CraftingScreen extends Screen {
             if (idx >= recipes.length) break;
 
             Recipe r = recipes[idx];
-            int ey = bookY + 20 + i * BOOK_ENTRY_H;
+            int ey = bookY + 22 + BOOK_SEARCH_H + 4 + i * BOOK_ENTRY_H;
 
             // Mini 3x3 pattern: 7px cells with 1px gaps
             int px = bookX + 8;
@@ -271,6 +291,30 @@ public class CraftingScreen extends Screen {
 
     private String recipeName(Recipe r) {
         return StackIcons.displayName(r.getResult());
+    }
+
+    /** [UI-042] Recompute the recipe list from the search query. */
+    private void rebuildRecipes() {
+        String q = searchField.getText().trim().toLowerCase(Locale.ROOT);
+        if (q.isEmpty()) {
+            visibleList = RecipeRegistry.RECIPES;
+            return;
+        }
+        java.util.ArrayList<Recipe> out = new java.util.ArrayList<>();
+        for (Recipe r : RecipeRegistry.RECIPES) {
+            if (StackIcons.displayName(r.getResult()).toLowerCase(Locale.ROOT).contains(q)) {
+                out.add(r);
+                continue;
+            }
+            for (ItemStack ing : r.getInputs()) {
+                if (ing != null && !ing.isEmpty()
+                        && StackIcons.displayName(ing).toLowerCase(Locale.ROOT).contains(q)) {
+                    out.add(r);
+                    break;
+                }
+            }
+        }
+        visibleList = out.toArray(new Recipe[0]);
     }
 
     private void drawIngredientIcon(UIRenderer ui, ItemStack stack, int x, int y, int size) {
@@ -359,15 +403,16 @@ public class CraftingScreen extends Screen {
         }
 
         // Clicking a recipe fills the grid from the inventory (or shift:
-        // crafts straight into the inventory)
+        // crafts straight into the inventory), clicking the search field focuses it
         if (bookOpen) {
+            if (searchField.mouseClicked(mx, my, button)) return true;
             for (int i = 0; i < BOOK_VISIBLE; i++) {
                 int idx = bookScroll + i;
-                if (idx >= RecipeRegistry.RECIPES.length) break;
-                int ey = bookY + 20 + i * BOOK_ENTRY_H;
+                if (idx >= visibleList.length) break;
+                int ey = bookY + 22 + BOOK_SEARCH_H + 4 + i * BOOK_ENTRY_H;
                 if (mx >= bookX + 4 && mx < bookX + bookW - 4
                     && my >= ey && my < ey + BOOK_ENTRY_H) {
-                    useRecipe(RecipeRegistry.RECIPES[idx], shift);
+                    useRecipe(visibleList[idx], shift);
                     return true;
                 }
             }
@@ -631,7 +676,7 @@ public class CraftingScreen extends Screen {
     public boolean mouseScrolled(float mx, float my, double delta) {
         if (!bookOpen) return false;
         bookScroll -= (int) delta;
-        int max = Math.max(0, RecipeRegistry.RECIPES.length - BOOK_VISIBLE);
+        int max = Math.max(0, visibleList.length - BOOK_VISIBLE);
         bookScroll = Math.max(0, Math.min(bookScroll, max));
         return true;
     }
@@ -642,6 +687,17 @@ public class CraftingScreen extends Screen {
 
     @Override
     public boolean keyPressed(int key, int mods) {
+        // While the search field is focused, all keys feed the field
+        // (backspace, arrows) instead of acting on slots. TextField returns
+        // false for plain letters — handled via charTyped instead.
+        if (bookOpen && searchField.isFocused()) {
+            if (searchField.keyPressed(key, mods)) {
+                rebuildRecipes();
+                bookScroll = 0;
+            }
+            return true;
+        }
+
         if (key >= org.lwjgl.glfw.GLFW.GLFW_KEY_1 && key <= org.lwjgl.glfw.GLFW.GLFW_KEY_9) {
             int index = key - org.lwjgl.glfw.GLFW.GLFW_KEY_1;
             SlotEngine.Slot hovered = hoveredSlot();
@@ -662,6 +718,21 @@ public class CraftingScreen extends Screen {
             }
         }
         return false;
+    }
+
+    /** Keyboard: recipe-book search text entry. */
+    public boolean charTyped(char c) {
+        if (!bookOpen || !searchField.isFocused()) return false;
+        if (!searchField.charTyped(c)) return false;
+        rebuildRecipes();
+        bookScroll = 0;
+        return true;
+    }
+
+    @Override
+    public void update(double deltaTime) {
+        super.update(deltaTime);
+        searchField.update(deltaTime);
     }
 
     private SlotEngine.Slot hoveredSlot() {
