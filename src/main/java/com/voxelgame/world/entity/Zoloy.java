@@ -2,6 +2,7 @@ package com.voxelgame.world.entity;
 
 import com.voxelgame.audio.AudioManager;
 import com.voxelgame.player.Player;
+import com.voxelgame.world.BlockType;
 import com.voxelgame.world.World;
 import org.joml.Vector3f;
 
@@ -376,6 +377,13 @@ public class Zoloy {
     private boolean isWalkable(int x, int z) {
         int groundY = world.getGroundHeight(x, z);
         if (groundY <= 0) return false;
+
+        // [GP-043] Lava surfaces are deadly even though not solid: refuse to
+        // path across them so the mob walks around lava lakes.
+        if (world.getBlock(x, groundY, z) == BlockType.LAVA.id
+                || world.getBlock(x, groundY + 1, z) == BlockType.LAVA.id) {
+            return false;
+        }
 
         int standY = Math.max(groundY, (int) Math.floor(position.y) - 1);
 

@@ -3704,7 +3704,8 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         dmg *= player.getStrengthMultiplier();
 
         if (hitVillager != null) {
-            hitVillager.takeDamage(dmg);
+            Vector3f from = new Vector3f(hitVillager.getPosition()).sub(player.getPosition());
+            hitVillager.takeDamage(dmg, from);
             if (hitVillager.isDead()) {
                 AchievementRegistry.trigger("kill_mob");
                 // [ENCH] Experience for the kill

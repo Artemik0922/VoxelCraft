@@ -440,6 +440,11 @@ public class Animal {
             stop();
             return;
         }
+        // [GP-043] Do not step into lava
+        if (lavaAhead(dx, dz)) {
+            stop();
+            return;
+        }
         yaw = (float) Math.atan2(-tx, -tz);
         velocity.x = dx * speed;
         velocity.z = dz * speed;
@@ -456,6 +461,15 @@ public class Animal {
             if (world.isSolid(fx0, by - dy, fz0)) return true;
         }
         return false;
+    }
+
+    /** [GP-043] Is the block the animal is about to step into lava? */
+    private boolean lavaAhead(float dx, float dz) {
+        float fx = position.x + dx * 1.2f;
+        float fz = position.z + dz * 1.2f;
+        int by = (int) Math.floor(position.y);
+        return world.getBlock((int) Math.floor(fx), by, (int) Math.floor(fz)) == BlockType.LAVA.id
+            || world.getBlock((int) Math.floor(fx), by - 1, (int) Math.floor(fz)) == BlockType.LAVA.id;
     }
 
     private float distTo(Player player) {

@@ -1053,6 +1053,8 @@ public class Villager {
             int g = world.getGroundHeight((int) Math.floor(tx), (int) Math.floor(tz));
             if (g < 1) continue;                         // РІРѕРґР°/РїСѓСЃС‚РѕС‚Р°
             if (Math.abs(g - position.y) > 2.5f) continue; // СЃР»РёС€РєРѕРј РєСЂСѓС‚Рѕ
+            // [GP-043] Never wander onto a lava surface
+            if (world.getBlock((int) Math.floor(tx), g, (int) Math.floor(tz)) == BlockType.LAVA.id) continue;
             moveTarget.set(tx, position.y, tz);
             hasTarget = true;
             return;
@@ -1103,6 +1105,10 @@ public class Villager {
         float px = position.x + (vx / len) * 1.5f;
         float pz = position.z + (vz / len) * 1.5f;
         int g = world.getGroundHeight((int) Math.floor(px), (int) Math.floor(pz));
+        // [GP-043] Lava counts as danger: never step into a lava surface
+        if (world.getBlock((int) Math.floor(px), g, (int) Math.floor(pz)) == BlockType.LAVA.id) {
+            return true;
+        }
         return position.y - g > 2.0f;
     }
 
@@ -1460,9 +1466,24 @@ public class Villager {
     }
 
     public void takeDamage(float dmg) {
+        takeDamage(dmg, null);
+    }
+
+    /** [GP-025] Damage with knockback and the hit-away fleeing behaviour. */
+    public void takeDamage(float dmg, Vector3f fromDir) {
         hp -= dmg;
         // [0.7] Getting hit sends the villager running
         if (!dead) {
+            // [GP-025] Knockback pushes the villager away from the attacker
+            if (fromDir != null) {
+                float len = (float) Math.sqrt(fromDir.x * fromDir.x + fromDir.z * fromDir.z);
+                if (len > 0.001f) {
+                    float strength = 5.0f;
+                    velocity.x += (fromDir.x / len) * strength;
+                    velocity.z += (fromDir.z / len) * strength;
+                    velocity.y = 5.0f;
+                }
+            }
             state = State.FLEE;
             fleeTimer = 3.0f;
             fleeToHome = false;
