@@ -147,44 +147,83 @@ public class Inventory {
     public ItemStack[] getArmorSlots() { return armor; }
 
     // --- Add items ---
+    /** Add a count of a block, splitting across slots when it exceeds the
+     *  stack limit. Returns true when all of it found a home. */
     public boolean addItem(BlockType type, int count) {
-        for (int i = 0; i < HOTBAR_SIZE; i++) {
-            if (hotbar[i].isBlock() && hotbar[i].getBlockType() == type && hotbar[i].canAdd(count)) {
-                hotbar[i].add(count); return true;
+        int remaining = count;
+        for (int i = 0; i < HOTBAR_SIZE && remaining > 0; i++) {
+            if (hotbar[i].isBlock() && hotbar[i].getBlockType() == type) {
+                remaining = hotbar[i].add(remaining);
             }
         }
-        for (int i = 0; i < MAIN_INVENTORY_SIZE; i++) {
-            if (mainInventory[i].isBlock() && mainInventory[i].getBlockType() == type && mainInventory[i].canAdd(count)) {
-                mainInventory[i].add(count); return true;
+        for (int i = 0; i < MAIN_INVENTORY_SIZE && remaining > 0; i++) {
+            if (mainInventory[i].isBlock() && mainInventory[i].getBlockType() == type) {
+                remaining = mainInventory[i].add(remaining);
             }
         }
-        for (int i = 0; i < HOTBAR_SIZE; i++) {
-            if (hotbar[i].isEmpty()) { hotbar[i] = new ItemStack(type, count); return true; }
+        // Fill empty slots with as many full stacks as fit
+        while (remaining > 0) {
+            boolean placed = false;
+            for (int i = 0; i < HOTBAR_SIZE && remaining > 0 && !placed; i++) {
+                if (hotbar[i].isEmpty()) {
+                    int put = Math.min(remaining, 64);
+                    hotbar[i] = new ItemStack(type, put);
+                    remaining -= put;
+                    placed = true;
+                }
+            }
+            if (remaining > 0 && !placed) {
+                for (int i = 0; i < MAIN_INVENTORY_SIZE && remaining > 0; i++) {
+                    if (mainInventory[i].isEmpty()) {
+                        int put = Math.min(remaining, 64);
+                        mainInventory[i] = new ItemStack(type, put);
+                        remaining -= put;
+                        placed = true;
+                        break;
+                    }
+                }
+            }
+            if (remaining > 0 && !placed) break; // nowhere left
         }
-        for (int i = 0; i < MAIN_INVENTORY_SIZE; i++) {
-            if (mainInventory[i].isEmpty()) { mainInventory[i] = new ItemStack(type, count); return true; }
-        }
-        return false;
+        return remaining <= 0;
     }
 
     public boolean addItem(Item item, int count) {
-        for (int i = 0; i < HOTBAR_SIZE; i++) {
-            if (hotbar[i].isItem() && hotbar[i].getItem() == item && hotbar[i].canAdd(count)) {
-                hotbar[i].add(count); return true;
+        int remaining = count;
+        for (int i = 0; i < HOTBAR_SIZE && remaining > 0; i++) {
+            if (hotbar[i].isItem() && hotbar[i].getItem() == item) {
+                remaining = hotbar[i].add(remaining);
             }
         }
-        for (int i = 0; i < MAIN_INVENTORY_SIZE; i++) {
-            if (mainInventory[i].isItem() && mainInventory[i].getItem() == item && mainInventory[i].canAdd(count)) {
-                mainInventory[i].add(count); return true;
+        for (int i = 0; i < MAIN_INVENTORY_SIZE && remaining > 0; i++) {
+            if (mainInventory[i].isItem() && mainInventory[i].getItem() == item) {
+                remaining = mainInventory[i].add(remaining);
             }
         }
-        for (int i = 0; i < HOTBAR_SIZE; i++) {
-            if (hotbar[i].isEmpty()) { hotbar[i] = new ItemStack(item, count); return true; }
+        while (remaining > 0) {
+            boolean placed = false;
+            for (int i = 0; i < HOTBAR_SIZE && remaining > 0 && !placed; i++) {
+                if (hotbar[i].isEmpty()) {
+                    int put = Math.min(remaining, item.maxStackSize);
+                    hotbar[i] = new ItemStack(item, put);
+                    remaining -= put;
+                    placed = true;
+                }
+            }
+            if (remaining > 0 && !placed) {
+                for (int i = 0; i < MAIN_INVENTORY_SIZE && remaining > 0; i++) {
+                    if (mainInventory[i].isEmpty()) {
+                        int put = Math.min(remaining, item.maxStackSize);
+                        mainInventory[i] = new ItemStack(item, put);
+                        remaining -= put;
+                        placed = true;
+                        break;
+                    }
+                }
+            }
+            if (remaining > 0 && !placed) break;
         }
-        for (int i = 0; i < MAIN_INVENTORY_SIZE; i++) {
-            if (mainInventory[i].isEmpty()) { mainInventory[i] = new ItemStack(item, count); return true; }
-        }
-        return false;
+        return remaining <= 0;
     }
 
     /**

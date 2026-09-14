@@ -20,14 +20,14 @@ public class ItemStack {
     public ItemStack(BlockType blockType, int count) {
         this.blockType = blockType;
         this.item = null;
-        this.count = count;
+        this.count = blockType != null ? Math.min(count, 64) : 0;
         this.durability = 0;
     }
 
     public ItemStack(Item item, int count) {
         this.blockType = null;
         this.item = item;
-        this.count = count;
+        this.count = item != null ? Math.min(count, item.maxStackSize) : 0;
         this.durability = item != null ? item.getMaxDurability() : 0;
     }
 
