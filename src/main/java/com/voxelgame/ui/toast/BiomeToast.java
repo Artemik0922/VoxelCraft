@@ -63,19 +63,18 @@ public final class BiomeToast implements Toast {
         int x = screenW - WIDTH - 6 + xOffset;
         int y = 6;
 
-        // Background with bevel
-        ui.drawNineSlice(gui.panel, x, y, WIDTH, HEIGHT,
-            GuiAssets.BORDER, GuiAssets.WIDGET, 0xEE202028);
-        ui.useSolidColor();
-        ui.drawRectOutline(x, y, WIDTH, HEIGHT, 0xFF444444);
-        ui.drawRectOutline(x + 1, y + 1, WIDTH - 2, HEIGHT - 2, 0xFF555555);
+        // Background with frosted glass
+        ui.drawNineSlice(gui.glassPanel, x, y, WIDTH, HEIGHT,
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF202838);
+        ui.fillRect(x + 6, y + 1, WIDTH - 12, 1, 0x60FFFFFF);
 
         // Icon block (tinted square)
         int iconSize = 20;
         int iconX = x + 6;
         int iconY = y + (HEIGHT - iconSize) / 2;
+        ui.useSolidColor();
         ui.fillRect(iconX, iconY, iconSize, iconSize, tint);
-        ui.drawRectOutline(iconX, iconY, iconSize, iconSize, 0xFF000000);
+        ui.fillRect(iconX + 1, iconY + 1, iconSize - 2, 1, 0x60FFFFFF);
 
         // Text lines
         int textX = iconX + iconSize + 6;

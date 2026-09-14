@@ -66,56 +66,40 @@ public class ChunkMeshBuilder {
         {0, 1}  // -Z
     };
 
-    public static class MeshData {
-        public final Mesh opaque;
-        public final Mesh transparent;
+    public static class ChunkGeom {
+        public final MeshGeom opaque;
+        public final MeshGeom transparent;
         /** Alpha-tested geometry drawn with culling disabled. */
-        public final Mesh leaves;
+        public final MeshGeom leaves;
 
-        MeshData(Mesh opaque, Mesh transparent, Mesh leaves) {
+        ChunkGeom(MeshGeom opaque, MeshGeom transparent, MeshGeom leaves) {
             this.opaque = opaque;
             this.transparent = transparent;
             this.leaves = leaves;
         }
     }
 
-    private static class Buffers {
-        final List<Float> positions = new ArrayList<>();
-        final List<Float> texCoords = new ArrayList<>();
-        final List<Float> normals = new ArrayList<>();
-        final List<Float> colors = new ArrayList<>();
-        final List<Integer> indices = new ArrayList<>();
-
-        boolean isEmpty() { return positions.isEmpty(); }
-
-        Mesh toMesh() {
-            if (isEmpty()) return null;
-            return new Mesh(positions, texCoords, normals, colors, indices);
-        }
-    }
-
     /**
-     * Build opaque + transparent meshes for a chunk.
+     * Build opaque + transparent geometry for a chunk.
      */
-    public static MeshData build(Chunk chunk, World world, TextureAtlas atlas) {
-        GreedyMesher.Buffers opaque = new GreedyMesher.Buffers();
-        GreedyMesher.Buffers transparent = new GreedyMesher.Buffers();
-        GreedyMesher.Buffers leaves = new GreedyMesher.Buffers();
+    public static ChunkGeom build(Chunk chunk, World world, TextureAtlas atlas) {
+        MeshGeom opaque = new MeshGeom();
+        MeshGeom transparent = new MeshGeom();
+        MeshGeom leaves = new MeshGeom();
 
         GreedyMesher.build(chunk, world, atlas, opaque, transparent, leaves);
 
-        return new MeshData(toMesh(opaque), toMesh(transparent), toMesh(leaves));
+        return new ChunkGeom(opaque, transparent, leaves);
     }
 
-    private static Mesh toMesh(GreedyMesher.Buffers b) {
+    private static Mesh toMesh(MeshGeom b) {
         if (b.isEmpty()) return null;
-        return new Mesh(b.positions, b.texCoords, b.normals, b.colors,
-            b.layers, b.ao, b.wave, b.emissive, b.blockLight, b.indices);
+        return new Mesh(b);
     }
 
     /** Legacy entry point - opaque geometry only. */
     public static Mesh buildMesh(Chunk chunk, World world, TextureAtlas atlas) {
-        return build(chunk, world, atlas).opaque;
+        return toMesh(build(chunk, world, atlas).opaque);
     }
 
     /**
@@ -236,6 +220,8 @@ public class ChunkMeshBuilder {
             || t == BlockType.SEAGRASS
             || t == BlockType.RAILS
             || t == BlockType.END_PORTAL
+            // [BIOME] Crystal peaks shards grow as crossed gems, not cubes
+            || t == BlockType.CRYSTAL
             // [BASE] Campfire renders as crossed flame-ish quads (non-solid)
             || t == BlockType.CAMPFIRE;
     }
@@ -320,7 +306,7 @@ public class ChunkMeshBuilder {
         return neighborTransparent;
     }
 
-    private static void addFace(Buffers buf, World world, int originX, int originZ,
+    private static void addFace(MeshGeom buf, World world, int originX, int originZ,
                                 int x, int y, int z, int face, int blockId,
                                 TextureAtlas atlas) {
         int vertexIndex = buf.positions.size() / 3;

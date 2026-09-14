@@ -151,6 +151,7 @@ public class CreateWorldScreen extends Screen {
 
     @Override
     public void update(double deltaTime) {
+        super.update(deltaTime);
         if (nameField != null) nameField.update(deltaTime);
         if (seedField != null) seedField.update(deltaTime);
     }
@@ -217,8 +218,7 @@ public class CreateWorldScreen extends Screen {
             default -> color = MenuTheme.ACCENT;
         }
         ui.fillRect(x - 14, y + 4, 10, 10, 0xFF000000 | color);
-        ui.drawRectOutline(x - 14, y + 4, 10, 10,
-            0xFF000000 | MenuTheme.PANEL_BORDER);
+        ui.drawRectOutline(x - 14, y + 4, 10, 10, 0xFF3A4258);
     }
 
     /** Typed characters are routed here by Game. */

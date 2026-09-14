@@ -29,6 +29,8 @@ public class VideoSettingsScreen extends Screen {
         void onVsyncChanged(boolean on);
         void onFullscreenChanged(boolean on);
         void onShadowsChanged(boolean on);
+        void onBloomChanged(boolean on);
+        void onFxaaChanged(boolean on);
         void onMenuThemeChanged(int theme);
         void onClosed();
     }
@@ -144,9 +146,19 @@ public class VideoSettingsScreen extends Screen {
             }));
 
         row++;
+        add(new Toggle(leftX, top + row * (rowH + gap), colW, rowH,
+            tr("options.bloom"), settings.bloomEnabled,
+            (t, v) -> listener.onBloomChanged(v)));
+
+        add(new Toggle(rightX, top + row * (rowH + gap), colW, rowH,
+            tr("options.fxaa"), settings.fxaaEnabled,
+            (t, v) -> listener.onFxaaChanged(v)));
+
+        row++;
         themeButton = add(new Button(leftX, top + row * (rowH + gap), colW, rowH,
             themeLabel(), b -> {
                 settings.menuTheme = (settings.menuTheme + 1) % Settings.MENU_THEME_COUNT;
+                MenuTheme.setThemeIndex(settings.menuTheme);
                 themeButton.setLabel(themeLabel());
                 listener.onMenuThemeChanged(settings.menuTheme);
             }));
@@ -217,6 +229,8 @@ public class VideoSettingsScreen extends Screen {
                 settings.ambientOcclusion = false;
                 settings.clouds = false;
                 settings.particleLevel = 2;
+                settings.bloomEnabled = false;
+                settings.fxaaEnabled = false;
                 break;
             case 1: // Medium
                 settings.renderDistance = 4;
@@ -225,6 +239,8 @@ public class VideoSettingsScreen extends Screen {
                 settings.ambientOcclusion = true;
                 settings.clouds = true;
                 settings.particleLevel = 1;
+                settings.bloomEnabled = false;
+                settings.fxaaEnabled = false;
                 break;
             case 2: // Fancy
                 settings.renderDistance = 6;
@@ -233,6 +249,8 @@ public class VideoSettingsScreen extends Screen {
                 settings.ambientOcclusion = true;
                 settings.clouds = true;
                 settings.particleLevel = 0;
+                settings.bloomEnabled = true;
+                settings.fxaaEnabled = false;
                 break;
             default: // Ultra
                 settings.renderDistance = 10;
@@ -241,6 +259,8 @@ public class VideoSettingsScreen extends Screen {
                 settings.ambientOcclusion = true;
                 settings.clouds = true;
                 settings.particleLevel = 0;
+                settings.bloomEnabled = true;
+                settings.fxaaEnabled = true;
                 break;
         }
 

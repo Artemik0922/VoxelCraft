@@ -190,6 +190,21 @@ public class ContainerData {
     public int getSmeltTime() { return smeltTime; }
     public static int getSmeltDuration() { return SMELT_TIME; }
 
+    /** Whether the given stack can burn (used to filter the fuel slot). */
+    public static boolean isFuel(ItemStack stack) {
+        return getFuelTime(stack) > 0;
+    }
+
+    /** The smelting output for a stack, or null when it cannot be smelted. */
+    public static ItemStack smeltResultFor(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return null;
+        int id;
+        if (stack.isBlock()) id = stack.getBlockType().id;
+        else if (stack.getItem() != null) id = stack.getItem().id;
+        else return null;
+        return com.voxelgame.item.RecipeRegistry.getSmeltingResult(id);
+    }
+
     /**
      * Serialize to string for saving.
      * Slot format: "index:b:blockId:count" for blocks, "index:i:itemId:count"

@@ -70,6 +70,9 @@ public class WorldSave {
                 WorldMeta m = WorldMeta.read(p.resolve("meta.json"));
                 if (m != null) {
                     m.folderName = p.getFileName().toString();
+                    // [SPACE] Space planets are linked to their overworld and
+                    // are reached by rocket, so they stay out of the world list.
+                    if ("space".equals(m.dimension)) continue;
                     out.add(m);
                 }
             }
@@ -83,6 +86,15 @@ public class WorldSave {
 
     public static boolean exists(String folderName) {
         return Files.isDirectory(ROOT.resolve(sanitise(folderName)));
+    }
+
+    /** Load a meta by folder name (bypasses the overworld-only list filter). */
+    public static WorldMeta readWorld(String folderName) {
+        Path p = ROOT.resolve(sanitise(folderName)).resolve("meta.json");
+        if (!Files.isRegularFile(p)) return null;
+        WorldMeta m = WorldMeta.read(p);
+        if (m != null) m.folderName = sanitise(folderName);
+        return m;
     }
 
     /** Turn a display name into a folder name that is safe on any platform. */

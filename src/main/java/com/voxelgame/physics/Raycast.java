@@ -1,5 +1,6 @@
 package com.voxelgame.physics;
 
+import com.voxelgame.world.BlockType;
 import com.voxelgame.world.World;
 import org.joml.*;
 
@@ -79,7 +80,10 @@ public class Raycast {
         while (distance < maxDistance) {
             // Check if current block is solid
             if (stopAtNonSolid) {
-                if (world.getBlock(x, y, z) != 0) {
+                // Fluids are never targetable: water and lava cannot be
+                // mined or clicked, the ray passes through to what is
+                // behind them (vanilla rule)
+                if (world.getBlock(x, y, z) != 0 && !isFluid(world, x, y, z)) {
                     return new Hit(x, y, z, lastFace);
                 }
             } else if (world.isSolid(x, y, z)) {
@@ -115,5 +119,10 @@ public class Raycast {
         }
         
         return null;
+    }
+
+    private static boolean isFluid(World world, int x, int y, int z) {
+        BlockType type = BlockType.fromId(world.getBlock(x, y, z));
+        return type == BlockType.WATER || type == BlockType.LAVA;
     }
 }

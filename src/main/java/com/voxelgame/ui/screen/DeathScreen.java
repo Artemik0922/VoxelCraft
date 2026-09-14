@@ -63,13 +63,16 @@ public class DeathScreen extends Screen {
         int scale = 2;
         int tw = font.scaledWidth(title, scale);
 
-        // Red glow behind title
+        // Soft red halo behind the title
         float pulse = 0.5f + 0.5f * (float) Math.sin(System.currentTimeMillis() * 0.002);
-        int glowAlpha = (int) (40 + 20 * pulse) << 24;
         float tx = (width - tw) / 2f;
         float ty = height / 2.0f - 50;
-        ui.fillRect(tx - 20, ty - 6, tw + 40, scale * FontRenderer.GLYPH_H + 12,
-            glowAlpha | 0x880000);
+        for (int i = 3; i > 0; i--) {
+            int a = (int) ((16 + 8 * pulse) / i) << 24;
+            ui.fillRoundedRect(tx - 24 - i * 3, ty - 8 - i * 3,
+                tw + 48 + i * 6, scale * FontRenderer.GLYPH_H + 16 + i * 6, 10,
+                a | 0x880000);
+        }
 
         font.drawScaledWithShadow(ui, title, tx, ty, scale, 0xFFFFFFFF);
 

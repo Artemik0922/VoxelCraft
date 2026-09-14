@@ -15,11 +15,11 @@ import org.joml.Vector3f;
 public class PanoramaCamera {
 
     /** Full revolution time, in seconds. */
-    private static final double ORBIT_PERIOD = 90.0;
+    private static final double ORBIT_PERIOD = 130.0;
     /** How far the eye sits from the anchor. */
-    private static final float RADIUS = 14.0f;
+    private static final float RADIUS = 16.0f;
     /** Height above the anchor. */
-    private static final float EYE_HEIGHT = 6.0f;
+    private static final float EYE_HEIGHT = 7.0f;
 
     private final Vector3f anchor = new Vector3f();
     private final Vector3f eye = new Vector3f();
@@ -59,7 +59,7 @@ public class PanoramaCamera {
         float dz = anchor.z - eye.z;
 
         float yaw = (float) Math.toDegrees(Math.atan2(dz, dx));
-        camera.setOrientation(yaw, -12.0f);
+        camera.setOrientation(yaw, -9.0f);
     }
 
     public Vector3f getEye() { return eye; }

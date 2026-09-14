@@ -62,26 +62,8 @@ public class GreedyMesher {
         }
     }
 
-    public static class Buffers {
-        public final List<Float> positions = new ArrayList<>();
-        public final List<Float> texCoords = new ArrayList<>();
-        public final List<Float> normals = new ArrayList<>();
-        public final List<Float> colors = new ArrayList<>();
-        public final List<Float> ao = new ArrayList<>();
-        /** Sway weight per vertex; 0 keeps the vertex pinned. */
-        public final List<Float> wave = new ArrayList<>();
-        public final List<Float> layers = new ArrayList<>();
-        /** Emissive per vertex; 0 = normal, 1 = glowing. */
-        public final List<Float> emissive = new ArrayList<>();
-        /** Block light per vertex (torch contribution), 0..1. */
-        public final List<Float> blockLight = new ArrayList<>();
-        public final List<Integer> indices = new ArrayList<>();
-
-        public boolean isEmpty() { return positions.isEmpty(); }
-    }
-
     public static void build(Chunk chunk, World world, TextureAtlas atlas,
-                             Buffers opaque, Buffers transparent, Buffers leaves) {
+                             MeshGeom opaque, MeshGeom transparent, MeshGeom leaves) {
         for (int face = 0; face < 6; face++) {
             sweepFace(chunk, world, atlas, face, opaque, transparent, leaves);
         }
@@ -110,7 +92,7 @@ public class GreedyMesher {
      * angle without disabling face culling for the whole pass.
      */
     private static void emitCrossPlants(Chunk chunk, World world, TextureAtlas atlas,
-                                        Buffers buf) {
+                                        MeshGeom buf) {
         int originX = chunk.getWorldX();
         int originZ = chunk.getWorldZ();
 
@@ -139,9 +121,11 @@ public class GreedyMesher {
                     }
 
                     if (door) {
-                        // Р вЂќР Р†Р ВµРЎР‚РЎРЉ РІР‚вЂќ Р С—Р В»Р С•РЎРѓР С”Р В°РЎРЏ Р С—Р В°Р Р…Р ВµР В»РЎРЉ Р Р† Р С—Р В»Р С•РЎРѓР С”Р С•РЎРѓРЎвЂљР С‘ РЎРѓРЎвЂљР ВµР Р…РЎвЂ№ (Р С”Р В°Р С” Р Р† MC),
-                        // Р Р†Р ВµРЎР‚РЎвЂ¦Р Р…РЎРЏРЎРЏ/Р Р…Р С‘Р В¶Р Р…РЎРЏРЎРЏ Р С—Р С•Р В»Р С•Р Р†Р С‘Р Р…Р В° РЎРѓ РЎР‚Р В°Р В·Р Р…Р С•Р в„– РЎвЂљР ВµР С”РЎРѓРЎвЂљРЎС“РЎР‚Р С•Р в„–
-                        addDoorQuad(buf, x, y, z, world, wx, wz, atlas);
+                        // Vanilla door: a 3/16-thick panel. Closed it stands
+                        // in the wall plane; open it has swung 90 degrees
+                        // and hugs a jamb of the doorway.
+                        addDoorBox(buf, x, y, z, world, wx, wz, atlas,
+                            id == BlockType.OAK_DOOR_OPEN.id);
                         continue;
                     }
 
@@ -178,12 +162,12 @@ public class GreedyMesher {
      *
      * @param height plant height in blocks, measured up from the floor
      */
-    private static void addCrossQuad(Buffers buf, float x, float y, float z,
+    private static void addCrossQuad(MeshGeom buf, float x, float y, float z,
                                      int layer, float shade, float blockLight, float[] tint,
                                      boolean secondDiagonal, float height,
                                      boolean sway) {
-        final float LO = 0.15f;
-        final float HI = 0.85f;
+        final float LO = 0.08f;
+        final float HI = 0.92f;
 
         float x0, z0, x1, z1;
         if (!secondDiagonal) {
@@ -252,39 +236,39 @@ public class GreedyMesher {
     }
 
     /**
-     * [GP-020] Door panel: a flat double-sided quad of full block height,
-     * standing in the wall plane like a real Minecraft door.
+     * [MC] Door panel: a thin (3/16) box of full block height, exactly like
+     * a vanilla door.
      *
      * The wall is found by scanning the four horizontal neighbours of the
      * door cell at the door's own height: cells left/right of the door mean
-     * the wall runs along X (panel normal along Z), cells front/back mean
-     * the wall runs along Z (panel normal along X). The panel is flushed
-     * with the wall's face (plane = 0); free-standing doors get the cell
-     * centre.
+     * the wall runs along X (closed panel normal along Z), cells front/back
+     * mean the wall runs along Z (normal along X). Free-standing doors are
+     * centred in their cell.
+     *
+     * An OPEN door has swung 90 degrees: its panel now spans the doorway
+     * depth and hugs one jamb, the side where the wall continues - vanilla
+     * reads the hinge from placement data the chunk does not store, so the
+     * solid side wins and defaults to the near edge.
      *
      * The upper half (the block below is also a door) uses the window tile,
      * the lower half the handle tile.
      */
-    private static void addDoorQuad(Buffers buf, int x, int y, int z,
-                                    World world, int wx, int wz,
-                                    TextureAtlas atlas) {
+    private static final float DOOR_T = 0.1875f; // vanilla 3/16
+
+    private static void addDoorBox(MeshGeom buf, int x, int y, int z,
+                                   World world, int wx, int wz,
+                                   TextureAtlas atlas, boolean open) {
         boolean sideXMinus = world.isSolid(wx - 1, y, wz);
         boolean sideXPlus  = world.isSolid(wx + 1, y, wz);
         boolean sideZMinus = world.isSolid(wx, y, wz - 1);
         boolean sideZPlus  = world.isSolid(wx, y, wz + 1);
 
-        boolean facingZ;   // true: panel lies in the X-Y plane (normal along Z)
-        float plane;       // panel position inside the cell (0..1)
-        if (sideXMinus || sideXPlus) {
-            facingZ = true;
-            plane = 0.0f;
-        } else if (sideZMinus || sideZPlus) {
-            facingZ = false;
-            plane = 0.0f;
-        } else {
-            facingZ = true;
-            plane = 0.5f;
-        }
+        // true: the wall runs along X, the closed panel lies in the X-Y
+        // plane (normal along Z)
+        boolean facingZ;
+        if (sideXMinus || sideXPlus) facingZ = true;
+        else if (sideZMinus || sideZPlus) facingZ = false;
+        else facingZ = true; // free-standing
 
         boolean top = world.getBlock(wx, y - 1, wz) == BlockType.OAK_DOOR_OPEN.id
                    || world.getBlock(wx, y - 1, wz) == BlockType.OAK_DOOR.id;
@@ -296,50 +280,125 @@ public class GreedyMesher {
         float[] tint = BiomeColors.tintFor(world, BlockType.OAK_DOOR_OPEN.id, 2, wx, y, wz);
 
         float x0, x1, z0, z1;
-        if (facingZ) {
-            x0 = x;         x1 = x + 1; z0 = z + plane; z1 = z + plane;
-        } else {
-            x0 = x + plane; x1 = x + plane; z0 = z;     z1 = z + 1;
-        }
-
-        for (int side = 0; side < 2; side++) {
-            int base = buf.positions.size() / 3;
-            float sign = (side == 0) ? 1 : -1;
-            float nx = facingZ ? 0.0f : sign;
-            float nz = facingZ ? sign : 0.0f;
-
-            // bottom-left, bottom-right, top-right, top-left
-            float[][] corners = {
-                {x0, y,     z0},
-                {x1, y,     z1},
-                {x1, y + 1, z1},
-                {x0, y + 1, z0}
-            };
-            float[][] uvs = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
-            int[] order = (side == 0) ? new int[]{0, 1, 2, 3} : new int[]{1, 0, 3, 2};
-
-            for (int i = 0; i < 4; i++) {
-                int c = order[i];
-                buf.positions.add(corners[c][0]);
-                buf.positions.add(corners[c][1]);
-                buf.positions.add(corners[c][2]);
-                buf.texCoords.add(uvs[c][0]);
-                buf.texCoords.add(uvs[c][1]);
-                buf.normals.add(nx);
-                buf.normals.add(0.0f);
-                buf.normals.add(nz);
-                buf.colors.add(tint[0] * shade);
-                buf.colors.add(tint[1] * shade);
-                buf.colors.add(tint[2] * shade);
-                buf.ao.add(1.0f);
-                buf.layers.add((float) layer);
-                buf.wave.add(0.0f);
-                buf.blockLight.add(blockLight);
+        if (!open) {
+            if (facingZ) {
+                x0 = x; x1 = x + 1;
+                z0 = z; z1 = z + DOOR_T;
+            } else {
+                x0 = x; x1 = x + DOOR_T;
+                z0 = z; z1 = z + 1;
             }
-
-            buf.indices.add(base);     buf.indices.add(base + 1); buf.indices.add(base + 2);
-            buf.indices.add(base);     buf.indices.add(base + 2); buf.indices.add(base + 3);
+        } else {
+            // Swung open: perpendicular to the wall, hugging a jamb
+            if (facingZ) {
+                if (sideXMinus)      { x0 = x; x1 = x + DOOR_T; }
+                else if (sideXPlus)  { x0 = x + 1 - DOOR_T; x1 = x + 1; }
+                else                 { x0 = x; x1 = x + DOOR_T; }
+                z0 = z; z1 = z + 1;
+            } else {
+                x0 = x; x1 = x + 1;
+                if (sideZMinus)      { z0 = z; z1 = z + DOOR_T; }
+                else if (sideZPlus)  { z0 = z + 1 - DOOR_T; z1 = z + 1; }
+                else                 { z0 = z; z1 = z + DOOR_T; }
+            }
         }
+
+        emitDoorBox(buf, x0, y, z0, x1, y + 1, z1,
+            layer, shade, blockLight, tint);
+    }
+
+    /** Six faces of the door panel; the two broad faces carry the full
+     *  door texture, the four rim faces thin slices of it. */
+    private static void emitDoorBox(MeshGeom buf, float x0, float y0, float z0,
+                                    float x1, float y1, float z1,
+                                    int layer, float shade, float blockLight,
+                                    float[] tint) {
+        // +Z / -Z broad faces (drawn only when they are the wide ones)
+        if (x1 - x0 > z1 - z0) {
+            addDoorQuad(buf, layer, shade, blockLight, tint,
+                new float[][]{{x0, y0, z1}, {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}},
+                new float[][]{{0, 0}, {1, 0}, {1, 1}, {0, 1}},
+                0f, 0f, 1f, false);
+            addDoorQuad(buf, layer, shade, blockLight, tint,
+                new float[][]{{x1, y0, z0}, {x0, y0, z0}, {x0, y1, z0}, {x1, y1, z0}},
+                new float[][]{{0, 0}, {1, 0}, {1, 1}, {0, 1}},
+                0f, 0f, -1f, false);
+        } else {
+            addDoorQuad(buf, layer, shade, blockLight, tint,
+                new float[][]{{x1, y0, z1}, {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}},
+                new float[][]{{0, 0}, {1, 0}, {1, 1}, {0, 1}},
+                1f, 0f, 0f, false);
+            addDoorQuad(buf, layer, shade, blockLight, tint,
+                new float[][]{{x0, y0, z0}, {x0, y0, z1}, {x0, y1, z1}, {x0, y1, z0}},
+                new float[][]{{0, 0}, {1, 0}, {1, 1}, {0, 1}},
+                -1f, 0f, 0f, false);
+        }
+
+        // Rim faces: thin strips sampling the tile edge
+        float e = 0.03f;
+        addDoorQuad(buf, layer, shade, blockLight, tint,
+            new float[][]{{x0, y1, z0}, {x1, y1, z0}, {x1, y1, z1}, {x0, y1, z1}},
+            new float[][]{{0, 0}, {e, 0}, {e, e}, {0, e}},
+            0f, 1f, 0f, false);
+        addDoorQuad(buf, layer, shade, blockLight, tint,
+            new float[][]{{x0, y0, z1}, {x1, y0, z1}, {x1, y0, z0}, {x0, y0, z0}},
+            new float[][]{{0, 1 - e}, {e, 1 - e}, {e, 1}, {0, 1}},
+            0f, -1f, 0f, false);
+        if (x1 - x0 > z1 - z0) {
+            addDoorQuad(buf, layer, shade, blockLight, tint,
+                new float[][]{{x0, y0, z0}, {x0, y0, z1}, {x0, y1, z1}, {x0, y1, z0}},
+                new float[][]{{0, 0}, {0, 1}, {e, 1}, {e, 0}},
+                -1f, 0f, 0f, false);
+            addDoorQuad(buf, layer, shade, blockLight, tint,
+                new float[][]{{x1, y0, z1}, {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}},
+                new float[][]{{1 - e, 0}, {1, 0}, {1, 1}, {1 - e, 1}},
+                1f, 0f, 0f, false);
+        } else {
+            addDoorQuad(buf, layer, shade, blockLight, tint,
+                new float[][]{{x0, y0, z0}, {x1, y0, z0}, {x1, y1, z0}, {x0, y1, z0}},
+                new float[][]{{0, 0}, {e, 0}, {e, 1}, {0, 1}},
+                0f, 0f, -1f, false);
+            addDoorQuad(buf, layer, shade, blockLight, tint,
+                new float[][]{{x1, y0, z1}, {x0, y0, z1}, {x0, y1, z1}, {x1, y1, z1}},
+                new float[][]{{0, 0}, {e, 0}, {e, 1}, {0, 1}},
+                0f, 0f, 1f, false);
+        }
+    }
+
+    /** One textured quad with an explicit normal and UV corners. */
+    private static void addDoorQuad(MeshGeom buf, int layer, float shade,
+                                    float blockLight, float[] tint,
+                                    float[][] corners, float[][] uvs,
+                                    float nx, float ny, float nz,
+                                    boolean flip) {
+        int base = buf.positions.size() / 3;
+        int[] order = flip ? new int[]{1, 0, 3, 2} : new int[]{0, 1, 2, 3};
+
+        for (int i = 0; i < 4; i++) {
+            int c = order[i];
+            buf.positions.add(corners[c][0]);
+            buf.positions.add(corners[c][1]);
+            buf.positions.add(corners[c][2]);
+
+            buf.texCoords.add(uvs[c][0]);
+            buf.texCoords.add(uvs[c][1]);
+
+            buf.normals.add(nx);
+            buf.normals.add(ny);
+            buf.normals.add(nz);
+
+            buf.colors.add(tint[0] * shade);
+            buf.colors.add(tint[1] * shade);
+            buf.colors.add(tint[2] * shade);
+
+            buf.ao.add(1.0f);
+            buf.layers.add((float) layer);
+            buf.wave.add(0.0f);
+            buf.blockLight.add(blockLight);
+        }
+
+        buf.indices.add(base);     buf.indices.add(base + 1); buf.indices.add(base + 2);
+        buf.indices.add(base);     buf.indices.add(base + 2); buf.indices.add(base + 3);
     }
 
     /**
@@ -350,7 +409,7 @@ public class GreedyMesher {
      * cross; a free-standing pane is a short stub along X.
      */
     private static void emitGlassPanes(Chunk chunk, World world, TextureAtlas atlas,
-                                       Buffers buf) {
+                                       MeshGeom buf) {
         int originX = chunk.getWorldX();
         int originZ = chunk.getWorldZ();
 
@@ -371,7 +430,7 @@ public class GreedyMesher {
      * when free. Both faces are emitted (blend pass runs with culling off,
      * but this keeps the panel readable without relying on that).
      */
-    private static void addGlassPane(Buffers buf, int x, int y, int z,
+    private static void addGlassPane(MeshGeom buf, int x, int y, int z,
                                      World world, int wx, int wz,
                                      TextureAtlas atlas) {
         boolean connectXMinus = paneConnects(world, wx - 1, y, wz);
@@ -467,7 +526,7 @@ public class GreedyMesher {
      * source block. Only the topmost water cell of a column gets a panel.
      */
     private static void emitWaterSurfaces(Chunk chunk, World world, TextureAtlas atlas,
-                                          Buffers buf) {
+                                          MeshGeom buf) {
         int ox = chunk.getWorldX();
         int oz = chunk.getWorldZ();
 
@@ -493,7 +552,7 @@ public class GreedyMesher {
      * from the other half's position - the chunk storage keeps no metadata
      * - so a bed always shows the pillow at the head end.
      */
-    private static void addBedFurniture(Buffers buf, int x, int y, int z,
+    private static void addBedFurniture(MeshGeom buf, int x, int y, int z,
                                         World world, int wx, int wz,
                                         TextureAtlas atlas, int id) {
         boolean head = id == BlockType.BED_HEAD.id;
@@ -589,7 +648,7 @@ public class GreedyMesher {
      * correctly from inside its own cell. UVs span the whole tile, v=0 at
      * the bottom of the sprite.
      */
-    private static void addBedQuad(Buffers buf, float[][] corners, int layer,
+    private static void addBedQuad(MeshGeom buf, float[][] corners, int layer,
                                    float shade, float blockLight) {
         for (int side = 0; side < 2; side++) {
             int base = buf.positions.size() / 3;
@@ -640,8 +699,9 @@ public class GreedyMesher {
         return switch (type) {
             case DANDELION, POPPY -> 0.40f;
             case DEAD_BUSH -> 0.55f;
-            // 0.50 .. 0.60, so a patch is not perfectly level
-            case GRASS_PLANT -> 0.50f + jitter * 0.10f;
+            // Vanilla tufts reach most of the block and vary in height, so
+            // a meadow reads as uneven grass, not a crew-cut hedge
+            case GRASS_PLANT -> 0.70f + jitter * 0.30f;
             // [GP-020] Full-height panel
             case OAK_DOOR_OPEN -> 1.0f;
             // Crops grow with their stage: 0.25 (sprouts) to 1.0 (mature).
@@ -658,6 +718,8 @@ public class GreedyMesher {
             case SEAGRASS -> 0.55f + jitter * 0.10f;
             case CORAL -> 0.45f + jitter * 0.10f;
             case RAILS -> 0.12f;
+            // [BIOME] Crystal shards stand tall, heights vary per cluster
+            case CRYSTAL -> 0.75f + jitter * 0.25f;
             default -> 0.90f;
         };
     }
@@ -673,7 +735,7 @@ public class GreedyMesher {
      * Sweep every slice perpendicular to one face direction.
      */
     private static void sweepFace(Chunk chunk, World world, TextureAtlas atlas, int face,
-                                  Buffers opaque, Buffers transparent, Buffers leaves) {
+                                  MeshGeom opaque, MeshGeom transparent, MeshGeom leaves) {
         // Slice axis is the face's dominant axis; u/v are the two others.
         final int axis = (face <= 1) ? 0 : (face <= 3) ? 1 : 2;
         final int uAxis = (axis == 0) ? 2 : 0;
@@ -841,7 +903,7 @@ public class GreedyMesher {
      * of full blocks hides every face it should.
      */
     private static void emitSlabs(Chunk chunk, World world, TextureAtlas atlas,
-                                  Buffers opaque) {
+                                  MeshGeom opaque) {
         float[] nbb = new float[6];
 
         for (int x = 0; x < Chunk.SIZE; x++) {
@@ -923,7 +985,7 @@ public class GreedyMesher {
     /**
      * Emit one merged rectangle as two triangles.
      */
-    private static void emitQuad(Buffers buf, int face, int axis, int uAxis, int vAxis,
+    private static void emitQuad(MeshGeom buf, int face, int axis, int uAxis, int vAxis,
                                  float axisPos, int u, int v, int width, float height,
                                  Quad q, float uvVScale) {
         int base = buf.positions.size() / 3;

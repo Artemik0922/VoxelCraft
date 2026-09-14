@@ -187,7 +187,7 @@ public class TextureAtlas {
         tile("autumn_leaves", "autumn_leaves.png", BlockType.AUTUMN_LEAVES);
         tile("cherry_leaves", "cherry_leaves.png", BlockType.CHERRY_LEAVES);
         tile("lavender", "lavender.png", BlockType.LAVENDER);
-        tile("crystal", "crystal.png", BlockType.CRYSTAL);
+        tileGenerated("crystal", BlockType.CRYSTAL);
         tile("basalt", "basalt.png", BlockType.BASALT);
         tile("salt", "salt.png", BlockType.SALT);
         tile("ash", "ash.png", BlockType.ASH);
@@ -315,6 +315,20 @@ tile("spruce_planks", "spruce_planks.png", BlockType.SPRUCE_PLANKS);
         tileGenerated("shears", BlockType.ITEM_SHEARS);
         tileGenerated("bucket", BlockType.ITEM_BUCKET);
         tileGenerated("milk", BlockType.ITEM_MILK);
+        // [GP-009] Slime ball item
+        tileGenerated("slime_ball", BlockType.SLIME_BLOCK);
+        // [POT] Potion bottles and HUD status-effect icons
+        tileGenerated("water_bottle", BlockType.SLIME_BLOCK);
+        tileGenerated("potion_healing", BlockType.SLIME_BLOCK);
+        tileGenerated("potion_speed", BlockType.SLIME_BLOCK);
+        tileGenerated("potion_strength", BlockType.SLIME_BLOCK);
+        tileGenerated("potion_fire_resistance", BlockType.SLIME_BLOCK);
+        tileGenerated("effect_regeneration", BlockType.SLIME_BLOCK);
+        tileGenerated("effect_speed", BlockType.SLIME_BLOCK);
+        tileGenerated("effect_strength", BlockType.SLIME_BLOCK);
+        tileGenerated("effect_fire_resistance", BlockType.SLIME_BLOCK);
+        // [POT] Sugar for brewing the Speed potion
+        tileGenerated("sugar", BlockType.SLIME_BLOCK);
 
         // Tools
         tileGenerated("wooden_pickaxe", BlockType.ITEM_WOODEN_PICKAXE);
@@ -420,6 +434,16 @@ tile("spruce_planks", "spruce_planks.png", BlockType.SPRUCE_PLANKS);
         tile("campfire", "campfire.png", BlockType.CAMPFIRE);
         tile("snow_bricks", "snow_bricks.png", BlockType.SNOW_BRICKS);
         tile("sandstone_bricks", "sandstone_bricks.png", BlockType.SANDSTONE_BRICKS);
+        // [GP-009] Slime block: procedural bouncy green gel tile
+        tileGenerated("slime_block", BlockType.SLIME_BLOCK);
+
+        // [SPACE] Rocket tower parts: procedural metal, hull and window tiles
+        tileGenerated("rocket_launch_pad", BlockType.ROCKET_LAUNCH_PAD);
+        tileGenerated("rocket_engine", BlockType.ROCKET_ENGINE);
+        tileGenerated("rocket_fuel", BlockType.ROCKET_FUEL);
+        tileGenerated("rocket_body", BlockType.ROCKET_BODY);
+        tileGenerated("rocket_window", BlockType.ROCKET_WINDOW);
+        tileGenerated("rocket_cone", BlockType.ROCKET_CONE);
     }
 
     /**
@@ -962,6 +986,15 @@ tile("spruce_planks", "spruce_planks.png", BlockType.SPRUCE_PLANKS);
         faces(BlockType.CAMPFIRE, "campfire");
         faces(BlockType.SNOW_BRICKS, "snow_bricks");
         faces(BlockType.SANDSTONE_BRICKS, "sandstone_bricks");
+        // [GP-009] Slime block: same gel tile on every face
+        faces(BlockType.SLIME_BLOCK, "slime_block");
+        // [SPACE] Rocket parts: one tile per block
+        faces(BlockType.ROCKET_LAUNCH_PAD, "rocket_launch_pad");
+        faces(BlockType.ROCKET_ENGINE, "rocket_engine");
+        faces(BlockType.ROCKET_FUEL, "rocket_fuel");
+        faces(BlockType.ROCKET_BODY, "rocket_body");
+        faces(BlockType.ROCKET_WINDOW, "rocket_window");
+        faces(BlockType.ROCKET_CONE, "rocket_cone");
     }
 
     private void faces(BlockType block, String all) {
@@ -1311,6 +1344,14 @@ tile("spruce_planks", "spruce_planks.png", BlockType.SPRUCE_PLANKS);
     /** [GR-015] Array layer of the lava tile, for shader-side animation. */
     public int getLavaLayer() {
         return slotByName.getOrDefault("lava", -1);
+    }
+
+    public int getGlassLayer() {
+        return slotByName.getOrDefault("glass", -1);
+    }
+
+    public int getIceLayer() {
+        return slotByName.getOrDefault("ice", -1);
     }
 
     public void bind() {

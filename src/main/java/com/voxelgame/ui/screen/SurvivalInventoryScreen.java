@@ -1,5 +1,6 @@
 package com.voxelgame.ui.screen;
 
+import com.voxelgame.core.Game;
 import com.voxelgame.item.Inventory;
 import com.voxelgame.item.ItemStack;
 import com.voxelgame.item.Recipe;
@@ -7,7 +8,8 @@ import com.voxelgame.item.RecipeRegistry;
 import com.voxelgame.rendering.TextureAtlas;
 import com.voxelgame.ui.FontRenderer;
 import com.voxelgame.ui.GuiAssets;
-import com.voxelgame.ui.InventoryItemRenderer;
+import com.voxelgame.ui.MenuTheme;
+import com.voxelgame.ui.StackIcons;
 import com.voxelgame.ui.UIRenderer;
 import com.voxelgame.ui.widget.Button;
 import com.voxelgame.world.BlockType;
@@ -15,9 +17,13 @@ import com.voxelgame.world.BlockType;
 import static com.voxelgame.core.Language.tr;
 
 /**
- * Survival inventory: 27 storage slots above a hotbar strip, with the held
- * mouse item following the cursor. Left click moves a whole stack; right
- * click moves one item.
+ * Survival inventory, Minecraft-style: armor column, 27 storage slots, hotbar
+ * strip and the persistent 2x2 crafting grid with a live result slot.
+ *
+ * Every click goes through {@link SlotEngine}: left click takes/places/merges
+ * whole stacks, right click splits and places single items, shift-click quick
+ * moves between regions, 1-9 swaps the hovered slot with the hotbar, Q drops
+ * and clicking outside the panel drops the cursor stack into the world.
  */
 public class SurvivalInventoryScreen extends Screen {
 
@@ -26,31 +32,37 @@ public class SurvivalInventoryScreen extends Screen {
         ItemStack mouseItem();
         void onMouseItemChanged(ItemStack stack);
         void onSelectHotbarSlot(int index);
-        /** [UI-016] The persistent 2x2 crafting grid (row-major, 4 cells). */
+        /** The persistent 2x2 crafting grid (row-major, 4 cells). */
         ItemStack[] craftingGrid();
         /** Fired when the player takes a crafted result out of the grid. */
         void onCraft(ItemStack result);
+        /** Drop a stack into the world at the player's feet. */
+        void dropStack(ItemStack stack);
     }
 
     private static final int SLOT = GuiAssets.SLOT_SIZE;
-    private static final int ICON = GuiAssets.ICON_SIZE;
     private static final int COLS = 9;
 
     private static final int PANEL_PAD = 7;
     private static final int TITLE_H = 12;
     private static final int SECTION_GAP = 4;
     private static final int CRAFT_GAP = 16;
+    private static final int ARMOR_GAP = 10;
 
     private final Callbacks callbacks;
     private final TextureAtlas atlas;
 
     private int panelX, panelY, panelW, panelH;
+    private int armorX, armorY;
     private int storageX, storageY;
     private int hotbarX, hotbarY;
     private int craftX, craftY, resultX, resultY;
 
-    /** [UI-016] Result of the 2x2 grid, recomputed after every grid change. */
+    /** Result of the 2x2 grid, recomputed after every grid change. */
     private ItemStack resultSlot = new ItemStack(BlockType.AIR, 0);
+
+    // Hover tracking for keyboard interactions (Q, 1-9)
+    private float lastMx, lastMy;
 
     public SurvivalInventoryScreen(Callbacks callbacks, TextureAtlas atlas) {
         this.callbacks = callbacks;
@@ -61,25 +73,27 @@ public class SurvivalInventoryScreen extends Screen {
     public boolean rendersWorld() { return false; }
 
     @Override
+    public boolean usesBlurredBackdrop() { return true; }
+
+    @Override
     protected void layout() {
         int contentW = COLS * SLOT;
         int storageRows = Inventory.MAIN_INVENTORY_SIZE / COLS;
         int storageH = storageRows * SLOT;
-        int hotbarH = SLOT;
-
-        // [UI-016] Crafting area sits to the right of the storage grid:
-        // 2x2 grid + arrow + result slot.
         int craftW = 2 * SLOT + CRAFT_GAP + SLOT + CRAFT_GAP + SLOT;
+        int armorW = SLOT;
 
-        int fixedH = PANEL_PAD * 2 + TITLE_H + SECTION_GAP * 2 + storageH + hotbarH;
-        panelW = PANEL_PAD * 2 + contentW + CRAFT_GAP + craftW;
-        panelH = fixedH;
+        panelW = PANEL_PAD * 2 + armorW + ARMOR_GAP + contentW + CRAFT_GAP + craftW;
+        panelH = PANEL_PAD * 2 + TITLE_H + SECTION_GAP * 2 + storageH + SLOT;
 
         panelX = (width - panelW) / 2;
         panelY = (height - panelH) / 2;
 
-        storageX = panelX + PANEL_PAD;
-        storageY = panelY + PANEL_PAD + TITLE_H;
+        armorX = panelX + PANEL_PAD;
+        armorY = panelY + PANEL_PAD + TITLE_H;
+
+        storageX = armorX + armorW + ARMOR_GAP;
+        storageY = armorY;
 
         hotbarX = storageX;
         hotbarY = storageY + storageH + SECTION_GAP;
@@ -94,28 +108,114 @@ public class SurvivalInventoryScreen extends Screen {
     }
 
     private void fireClosed() {
-        if (onClosedCallback != null) onClosedCallback.run();
+        if (onClosedCallback != null) {
+            Runnable cb = onClosedCallback;
+            onClosedCallback = null;
+            cb.run();
+        }
     }
 
     private Runnable onClosedCallback;
     public void onClose(Runnable cb) { this.onClosedCallback = cb; }
 
+    /** Also fires when the screen is popped with Escape. */
+    @Override
+    public void onClosed() { fireClosed(); }
+
+    // ------------------------------------------------------------------
+    // Slot views over the player's storage
+    // ------------------------------------------------------------------
+
+    private SlotEngine.Slot storageSlot(int i) {
+        Inventory inv = callbacks.inventory();
+        return new SlotEngine.Slot() {
+            @Override public ItemStack get() { return inv.getInventoryItem(i); }
+            @Override public void set(ItemStack s) { inv.setInventoryItem(i, s); }
+        };
+    }
+
+    private SlotEngine.Slot hotbarSlot(int i) {
+        Inventory inv = callbacks.inventory();
+        return new SlotEngine.Slot() {
+            @Override public ItemStack get() { return inv.getHotbarItem(i); }
+            @Override public void set(ItemStack s) { inv.setHotbarItem(i, s); }
+        };
+    }
+
+    private SlotEngine.Slot armorSlot(int i) {
+        Inventory inv = callbacks.inventory();
+        return new SlotEngine.Slot() {
+            @Override public ItemStack get() { return inv.getArmor(i); }
+            @Override public void set(ItemStack s) { inv.setArmor(i, s); }
+
+            @Override public boolean mayPlace(ItemStack stack) {
+                return stack.isItem() && stack.getItem() != null
+                    && stack.getItem().isArmor()
+                    && stack.getItem().armorSlot.index == i;
+            }
+        };
+    }
+
+    private SlotEngine.Slot gridSlot(int i) {
+        return new SlotEngine.Slot() {
+            @Override public ItemStack get() { return callbacks.craftingGrid()[i]; }
+            @Override public void set(ItemStack s) {
+                callbacks.craftingGrid()[i] = s == null || s.isEmpty()
+                    ? new ItemStack(BlockType.AIR, 0) : s;
+                updateResult();
+            }
+        };
+    }
+
+    /** Main inventory then hotbar - the vanilla chest-to-player order. */
+    private SlotEngine.Slot[] playerSlots() {
+        SlotEngine.Slot[] slots = new SlotEngine.Slot[
+            Inventory.MAIN_INVENTORY_SIZE + Inventory.HOTBAR_SIZE];
+        for (int i = 0; i < Inventory.MAIN_INVENTORY_SIZE; i++) slots[i] = storageSlot(i);
+        for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
+            slots[Inventory.MAIN_INVENTORY_SIZE + i] = hotbarSlot(i);
+        }
+        return slots;
+    }
+
+    // ------------------------------------------------------------------
+    // Rendering
+    // ------------------------------------------------------------------
+
     @Override
     protected void renderBackground(UIRenderer ui, FontRenderer font, GuiAssets gui) {
-        ui.fillRect(0, 0, width, height, 0xB0101010);
-        ui.drawNineSlice(gui.panel, panelX, panelY, panelW, panelH,
-            GuiAssets.BORDER, GuiAssets.WIDGET, 0xFFFFFFFF);
+        MenuTheme.drawWorldOverlay(ui, width, height);
+        ui.drawNineSlice(gui.glassPanel, panelX, panelY, panelW, panelH,
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
     }
 
     @Override
     protected void renderForeground(UIRenderer ui, FontRenderer font, GuiAssets gui,
                                     float mx, float my) {
-        font.draw(ui, tr("container.survival"), storageX, panelY + PANEL_PAD,
-            GuiAssets.TEXT_TITLE);
+        lastMx = mx;
+        lastMy = my;
+
+        font.draw(ui, tr("container.survival"), storageX, panelY + PANEL_PAD, 0xFFE8EEFF);
+        font.draw(ui, tr("container.armor"), armorX, panelY + PANEL_PAD, 0xFFE8EEFF);
 
         Inventory inv = callbacks.inventory();
         ItemStack mouse = callbacks.mouseItem();
         ItemStack hoveredStack = null;
+        String hoveredArmorHint = null;
+
+        // Armor column
+        for (int i = 0; i < Inventory.ARMOR_SIZE; i++) {
+            int sx = armorX;
+            int sy = armorY + i * SLOT;
+            drawGlassSlot(ui, gui, sx, sy, mx, my);
+            ItemStack stack = inv.getArmor(i);
+            if (!stack.isEmpty()) {
+                StackIcons.drawStack(ui, font, atlas, stack, sx + 1, sy + 1);
+                if (inside(mx, my, sx, sy)) hoveredStack = stack;
+            } else if (inside(mx, my, sx, sy)) {
+                hoveredArmorHint = tr("ui.armor.slot." + i);
+            }
+        }
 
         // 27 storage slots
         for (int i = 0; i < Inventory.MAIN_INVENTORY_SIZE; i++) {
@@ -124,300 +224,134 @@ public class SurvivalInventoryScreen extends Screen {
             int sx = storageX + col * SLOT;
             int sy = storageY + row * SLOT;
 
-            ui.drawSprite(gui.slot, sx, sy, SLOT, SLOT);
+            drawGlassSlot(ui, gui, sx, sy, mx, my);
             ItemStack stack = inv.getInventoryItem(i);
             if (!stack.isEmpty()) {
-                drawIcon(ui, stack.getBlockType(), sx + 1, sy + 1);
-                drawCount(ui, font, stack.getCount(), sx, sy);
-                // [UI-021] Durability bar for tools
-                drawDurabilityBar(ui, stack, sx, sy);
-                // Track hovered item for tooltip
-                if (inside(mx, my, sx, sy, SLOT, SLOT)) {
-                    hoveredStack = stack;
-                }
+                StackIcons.drawStack(ui, font, atlas, stack, sx + 1, sy + 1);
+                if (inside(mx, my, sx, sy)) hoveredStack = stack;
             }
         }
 
         // Hotbar strip
         for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
             int sx = hotbarX + i * SLOT;
-            ui.drawSprite(gui.slot, sx, hotbarY, SLOT, SLOT);
+            drawGlassSlot(ui, gui, sx, hotbarY, mx, my);
             ItemStack stack = inv.getHotbarItem(i);
             if (!stack.isEmpty()) {
-                drawIcon(ui, stack.getBlockType(), sx + 1, hotbarY + 1);
-                drawCount(ui, font, stack.getCount(), sx, hotbarY);
-                // [UI-021] Durability bar for tools
-                drawDurabilityBar(ui, stack, sx, hotbarY);
-                // Track hovered item for tooltip
-                if (inside(mx, my, sx, hotbarY, SLOT, SLOT)) {
-                    hoveredStack = stack;
-                }
+                StackIcons.drawStack(ui, font, atlas, stack, sx + 1, hotbarY + 1);
+                if (inside(mx, my, sx, hotbarY)) hoveredStack = stack;
             }
             if (i == inv.getSelectedSlot()) {
                 ui.useSolidColor();
-                for (int k = 0; k < 2; k++) {
-                    ui.drawRectOutline(sx - 1 - k, hotbarY - 1 - k,
-                        SLOT + 2 + k * 2, SLOT + 2 + k * 2, 0xFFFFFFFF);
-                }
+                ui.fillRect(sx - 1, hotbarY - 1, SLOT + 2, 1, MenuTheme.ACCENT);
+                ui.fillRect(sx - 1, hotbarY + SLOT, SLOT + 2, 1, MenuTheme.ACCENT);
+                ui.fillRect(sx - 1, hotbarY, 1, SLOT, MenuTheme.ACCENT);
+                ui.fillRect(sx + SLOT, hotbarY, 1, SLOT, MenuTheme.ACCENT);
             }
         }
 
-        // [UI-016] Crafting area: 2x2 grid + arrow + result preview
+        // Crafting area: 2x2 grid + arrow + result preview
         ItemStack[] grid = callbacks.craftingGrid();
         for (int i = 0; i < 4; i++) {
             int sx = craftX + (i % 2) * SLOT;
             int sy = craftY + (i / 2) * SLOT;
-            ui.drawSprite(gui.slot, sx, sy, SLOT, SLOT);
+            drawGlassSlot(ui, gui, sx, sy, mx, my);
             ItemStack stack = grid[i];
             if (stack != null && !stack.isEmpty()) {
-                BlockType icon = iconBlock(stack);
-                if (icon != null) drawIcon(ui, icon, sx + 1, sy + 1);
-                if (inside(mx, my, sx, sy, SLOT, SLOT)) {
-                    hoveredStack = stack;
-                }
+                StackIcons.drawStack(ui, font, atlas, stack, sx + 1, sy + 1);
+                if (inside(mx, my, sx, sy)) hoveredStack = stack;
             }
         }
 
-        // Arrow
         font.draw(ui, "→", craftX + 2 * SLOT + CRAFT_GAP / 2 - 3, resultY + 6,
             GuiAssets.TEXT_HINT);
 
-        // Result slot: preview only, crafted on click
-        ui.drawSprite(gui.slot, resultX, resultY, SLOT, SLOT);
+        drawGlassSlot(ui, gui, resultX, resultY, mx, my);
         if (!resultSlot.isEmpty()) {
-            BlockType icon = iconBlock(resultSlot);
-            if (icon != null) drawIcon(ui, icon, resultX + 1, resultY + 1);
-            drawCount(ui, font, resultSlot.getCount(), resultX, resultY);
-            if (inside(mx, my, resultX, resultY, SLOT, SLOT)) {
-                hoveredStack = resultSlot;
-            }
+            StackIcons.drawStack(ui, font, atlas, resultSlot, resultX + 1, resultY + 1);
+            if (inside(mx, my, resultX, resultY)) hoveredStack = resultSlot;
         }
 
-        // Mouse item follows cursor
+        // Cursor stack follows the mouse
         if (!mouse.isEmpty()) {
-            drawIcon(ui, mouse.getBlockType(), (int) mx - ICON / 2, (int) my - ICON / 2);
-            if (mouse.getCount() > 1) {
-                drawCount(ui, font, mouse.getCount(), (int) mx - ICON / 2, (int) my - ICON / 2);
-            }
+            StackIcons.drawStack(ui, font, atlas, mouse,
+                (int) mx - GuiAssets.ICON_SIZE / 2, (int) my - GuiAssets.ICON_SIZE / 2);
         }
-        
-        // [UI-015] Draw tooltip for hovered item
+
+        // Tooltip: the hovered stack, or the piece an empty armor slot wants
         if (hoveredStack != null && mouse.isEmpty()) {
-            drawTooltip(ui, font, hoveredStack, (int) mx, (int) my);
+            StackIcons.drawTooltip(ui, font, atlas, hoveredStack, mx, my, width, height);
+        } else if (hoveredArmorHint != null && mouse.isEmpty()) {
+            java.util.List<String> lines = new java.util.ArrayList<>();
+            lines.add(hoveredArmorHint);
+            com.voxelgame.ui.GlassTooltip.draw(ui, font, lines, (int) mx, (int) my,
+                width, height);
         }
-    }
-    
-    /**
-     * [UI-021] Draw a durability bar under tool items. Green when high, yellow medium,
-     * red when low. Bar is 14px wide, 2px tall, positioned at the bottom of the slot.
-     */
-    private void drawDurabilityBar(UIRenderer ui, ItemStack stack, int sx, int sy) {
-        int maxDur = stack.getMaxDurability();
-        if (maxDur <= 0) return;
-        
-        int dur = stack.getDurability();
-        float fraction = 1.0f - (float) dur / maxDur;
-        if (fraction >= 1.0f) return; // Full durability, no bar needed
-        
-        int barW = 14;
-        int filled = (int) (barW * fraction);
-        int barX = sx + 2;
-        int barY = sy + SLOT - 3;
-        
-        // Background
-        ui.useSolidColor();
-        ui.drawRectOutline(barX, barY, barW, 2, 0xFF000000);
-        // Fill color based on remaining durability
-        int color = fraction > 0.6f ? 0xFF55FF55 : (fraction > 0.3f ? 0xFFFFFF55 : 0xFFFF5555);
-        if (filled > 0) {
-            ui.drawRectOutline(barX, barY, filled, 2, color);
-        }
-    }
-    
-    /**
-     * [UI-015] Draw a tooltip with item name, durability info, and description.
-     * Positioned near the cursor, clamped to screen bounds.
-     */
-    private void drawTooltip(UIRenderer ui, FontRenderer font, ItemStack stack, int mx, int my) {
-        if (stack.isEmpty()) return;
-        
-        // Build tooltip lines
-        java.util.List<String> lines = new java.util.ArrayList<>();
-        
-        // Item name (localized or formatted)
-        String name = getLocalizedName(stack);
-        lines.add(name);
-        
-        // Durability info for tools
-        int maxDur = stack.getMaxDurability();
-        if (maxDur > 0) {
-            int dur = stack.getDurability(); // dur = remaining durability
-            int damageTaken = maxDur - dur;
-            if (damageTaken > 0) {
-                lines.add("Durability: " + dur + "/" + maxDur);
-            }
-        }
-        
-        // Count for stackable items
-        if (stack.getCount() > 1) {
-            // Already shown on the icon, skip
-        }
-        
-        if (lines.isEmpty()) return;
-        
-        // Calculate tooltip dimensions
-        int maxWidth = 0;
-        for (String line : lines) {
-            maxWidth = Math.max(maxWidth, font.width(line));
-        }
-        int lineHeight = FontRenderer.LINE_HEIGHT;
-        int tooltipW = maxWidth + 8;
-        int tooltipH = lines.size() * lineHeight + 6;
-        
-        // Position tooltip near cursor, clamped to screen
-        int tx = mx + 12;
-        int ty = my - tooltipH - 4;
-        if (tx + tooltipW > ui.getWidth()) tx = mx - tooltipW - 4;
-        if (ty < 0) ty = my + 16;
-        if (tx < 0) tx = 4;
-        
-        // Draw background
-        ui.useSolidColor();
-        ui.fillRect(tx, ty, tooltipW, tooltipH, 0xE0100010); // Dark background
-        ui.drawRectOutline(tx, ty, tooltipW, tooltipH, 0xFF500070); // Purple border
-        
-        // Draw text lines
-        int textY = ty + 3;
-        for (int i = 0; i < lines.size(); i++) {
-            int color = i == 0 ? 0xFFFFFF : 0xAAAAAA; // First line white, rest grey
-            if (i == 0) color = 0xFFFFFFFF;
-            else if (lines.get(i).startsWith("Durability")) {
-                // Color durability based on remaining
-                int maxDur2 = stack.getMaxDurability();
-                if (maxDur2 > 0) {
-                    float fraction = 1.0f - (float) stack.getDurability() / maxDur2;
-                    color = fraction > 0.6f ? 0xFF55FF55 : (fraction > 0.3f ? 0xFFFFFF55 : 0xFFFF5555);
-                }
-            } else {
-                color = 0xFFAAAAAA;
-            }
-            font.drawWithShadow(ui, lines.get(i), tx + 4, textY, color);
-            textY += lineHeight;
-        }
-    }
-    
-    /** Get localized or formatted name for an item stack. */
-    private String getLocalizedName(ItemStack stack) {
-        if (stack.isBlock()) {
-            String key = "block." + stack.getBlockType().name;
-            String localized = com.voxelgame.core.Language.tr(key);
-            if (localized != null && !localized.equals(key)) return localized;
-            // Format block name
-            String[] parts = stack.getBlockType().name.split("_");
-            StringBuilder sb = new StringBuilder();
-            for (String p : parts) {
-                if (p.isEmpty()) continue;
-                if (sb.length() > 0) sb.append(' ');
-                sb.append(Character.toUpperCase(p.charAt(0))).append(p.substring(1));
-            }
-            return sb.toString();
-        }
-        if (stack.isItem() && stack.getItem() != null) {
-            String key = "item." + stack.getItem().name;
-            String localized = com.voxelgame.core.Language.tr(key);
-            if (localized != null && !localized.equals(key)) return localized;
-            return stack.getItem().name;
-        }
-        return "Unknown";
     }
 
-    private void drawIcon(UIRenderer ui, BlockType block, int x, int y) {
-        TextureAtlas.TextureCoords uv = atlas.getCoords(block.id, 2);
-        ui.drawTexture(atlas.getTexture().getId(), x, y, ICON, ICON,
-            uv.u1, uv.v2, uv.u2, uv.v1, 0xFFFFFFFF);
+    private void drawGlassSlot(UIRenderer ui, GuiAssets gui, int sx, int sy, float mx, float my) {
+        boolean hover = inside(mx, my, sx, sy);
+        ui.drawNineSlice(hover ? gui.glassSlotHover : gui.glassSlot,
+            sx, sy, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
     }
 
-    /** Block used to draw a stack's icon, or null when it maps to none. */
-    private BlockType iconBlock(ItemStack stack) {
-        if (stack == null) return null;
-        if (stack.isBlock()) return stack.getBlockType();
-        if (stack.isItem() && stack.getItem().blockType != null) {
-            return stack.getItem().blockType;
-        }
-        return null;
-    }
-
-    private void drawCount(UIRenderer ui, FontRenderer font, int count, int sx, int sy) {
-        if (count < 2) return;
-        String text = String.valueOf(count);
-        int tw = font.width(text);
-        font.drawWithShadow(ui, text,
-            sx + SLOT - tw - 1,
-            sy + SLOT - FontRenderer.GLYPH_H - 1,
-            0xFFFFFFFF);
-    }
+    // ------------------------------------------------------------------
+    // Mouse
+    // ------------------------------------------------------------------
 
     @Override
     public boolean mouseClicked(float mx, float my, int button) {
         Inventory inv = callbacks.inventory();
         ItemStack mouse = callbacks.mouseItem();
+        boolean shift = Game.isShiftDown();
 
-        // [UI-016] Crafting result: take the preview, consume the grid
-        if (inside(mx, my, resultX, resultY, SLOT, SLOT)) {
-            if (button == 0 && !resultSlot.isEmpty() && mouse.isEmpty()) {
-                ItemStack crafted = resultSlot.copy();
-                callbacks.onMouseItemChanged(crafted);
-                ItemStack[] grid = callbacks.craftingGrid();
-                for (ItemStack g : grid) g.remove(1);
-                updateResult();
-                callbacks.onCraft(crafted);
-            }
+        // Crafting result: take onto the cursor, or craft everything with shift
+        if (inside(mx, my, resultX, resultY)) {
+            takeResult(shift);
             return true;
         }
 
-        // [UI-016] Crafting grid: place one from the cursor, or pick up
+        // Crafting grid
         for (int i = 0; i < 4; i++) {
             int sx = craftX + (i % 2) * SLOT;
             int sy = craftY + (i / 2) * SLOT;
-            if (inside(mx, my, sx, sy, SLOT, SLOT)) {
-                handleGridClick(i, button);
+            if (inside(mx, my, sx, sy)) {
+                if (shift) {
+                    SlotEngine.quickMove(gridSlot(i), playerSlots());
+                } else {
+                    callbacks.onMouseItemChanged(
+                        SlotEngine.click(gridSlot(i), mouse, button == 0));
+                }
                 return true;
             }
         }
 
-        ItemStack result;
+        // Armor slots
+        for (int i = 0; i < Inventory.ARMOR_SIZE; i++) {
+            int sx = armorX;
+            int sy = armorY + i * SLOT;
+            if (inside(mx, my, sx, sy)) {
+                SlotEngine.Slot slot = armorSlot(i);
+                if (shift) {
+                    SlotEngine.quickMove(slot, playerSlots());
+                } else {
+                    callbacks.onMouseItemChanged(SlotEngine.click(slot, mouse, button == 0));
+                }
+                return true;
+            }
+        }
 
         // Hotbar strip
         if (inside(mx, my, hotbarX, hotbarY, Inventory.HOTBAR_SIZE * SLOT, SLOT)) {
             int slot = (int) ((mx - hotbarX) / SLOT);
             if (slot >= 0 && slot < Inventory.HOTBAR_SIZE) {
-                if (button == 0) {
-                    // Left click: swap mouse with slot
-                    result = inv.getHotbarItem(slot);
-                    inv.setHotbarItem(slot, mouse.getBlockType(), mouse.getCount());
-                    callbacks.onMouseItemChanged(result);
+                SlotEngine.Slot s = hotbarSlot(slot);
+                if (shift) {
+                    SlotEngine.Slot[] storage = new SlotEngine.Slot[Inventory.MAIN_INVENTORY_SIZE];
+                    for (int i = 0; i < storage.length; i++) storage[i] = storageSlot(i);
+                    SlotEngine.quickMove(s, storage);
                 } else {
-                    // Right click: place one, or pick up half
-                    if (mouse.isEmpty()) {
-                        ItemStack slotStack = inv.getHotbarItem(slot);
-                        if (!slotStack.isEmpty()) {
-                            int half = (slotStack.getCount() + 1) / 2;
-                            int remain = slotStack.getCount() - half;
-                            inv.setHotbarItem(slot, slotStack.getBlockType(), remain);
-                            callbacks.onMouseItemChanged(new ItemStack(slotStack.getBlockType(), half));
-                        }
-                    } else {
-                        // Try to add one to slot
-                        ItemStack slotStack = inv.getHotbarItem(slot);
-                        if (slotStack.isEmpty()) {
-                            inv.setHotbarItem(slot, mouse.getBlockType(), 1);
-                            callbacks.onMouseItemChanged(decrement(mouse));
-                        } else if (slotStack.getBlockType() == mouse.getBlockType()
-                                && slotStack.getCount() < 64) {
-                            inv.setHotbarItem(slot, mouse.getBlockType(), slotStack.getCount() + 1);
-                            callbacks.onMouseItemChanged(decrement(mouse));
-                        }
-                    }
+                    callbacks.onMouseItemChanged(SlotEngine.click(s, mouse, button == 0));
                 }
             }
             return true;
@@ -430,56 +364,84 @@ public class SurvivalInventoryScreen extends Screen {
             int row = (int) ((my - storageY) / SLOT);
             int slot = row * COLS + col;
             if (slot >= 0 && slot < Inventory.MAIN_INVENTORY_SIZE) {
-                if (button == 0) {
-                    result = inv.getInventoryItem(slot);
-                    inv.setInventoryItem(slot, mouse.getBlockType(), mouse.getCount());
-                    callbacks.onMouseItemChanged(result);
+                SlotEngine.Slot s = storageSlot(slot);
+                if (shift) {
+                    SlotEngine.Slot[] hotbar = new SlotEngine.Slot[Inventory.HOTBAR_SIZE];
+                    for (int i = 0; i < hotbar.length; i++) hotbar[i] = hotbarSlot(i);
+                    SlotEngine.quickMove(s, hotbar);
                 } else {
-                    if (mouse.isEmpty()) {
-                        ItemStack slotStack = inv.getInventoryItem(slot);
-                        if (!slotStack.isEmpty()) {
-                            int half = (slotStack.getCount() + 1) / 2;
-                            int remain = slotStack.getCount() - half;
-                            inv.setInventoryItem(slot, slotStack.getBlockType(), remain);
-                            callbacks.onMouseItemChanged(new ItemStack(slotStack.getBlockType(), half));
-                        }
-                    } else {
-                        ItemStack slotStack = inv.getInventoryItem(slot);
-                        if (slotStack.isEmpty()) {
-                            inv.setInventoryItem(slot, mouse.getBlockType(), 1);
-                            callbacks.onMouseItemChanged(decrement(mouse));
-                        } else if (slotStack.getBlockType() == mouse.getBlockType()
-                                && slotStack.getCount() < 64) {
-                            inv.setInventoryItem(slot, mouse.getBlockType(), slotStack.getCount() + 1);
-                            callbacks.onMouseItemChanged(decrement(mouse));
-                        }
-                    }
+                    callbacks.onMouseItemChanged(SlotEngine.click(s, mouse, button == 0));
                 }
             }
+            return true;
+        }
+
+        // Click outside the panel drops the cursor stack into the world,
+        // matching vanilla. The Done button keeps its normal behaviour.
+        if (!mouse.isEmpty() && !insidePanel(mx, my) && !overDoneButton(mx, my)) {
+            callbacks.dropStack(mouse.copy());
+            callbacks.onMouseItemChanged(SlotEngine.empty());
             return true;
         }
 
         return super.mouseClicked(mx, my, button);
     }
 
-    /** [UI-016] Place one item from the cursor into a grid cell, or take it back. */
-    private void handleGridClick(int index, int button) {
-        ItemStack[] grid = callbacks.craftingGrid();
-        ItemStack mouse = callbacks.mouseItem();
-        if (button != 0) return;
+    private boolean overDoneButton(float mx, float my) {
+        return my >= height - 32 && my < height - 8
+            && mx >= (width - 200) / 2 && mx < (width - 200) / 2 + 200;
+    }
 
-        if (grid[index].isEmpty() && !mouse.isEmpty()) {
-            grid[index] = mouse.copy();
-            grid[index].setCount(1);
-            callbacks.onMouseItemChanged(decrement(mouse));
-        } else if (!grid[index].isEmpty() && mouse.isEmpty()) {
-            callbacks.onMouseItemChanged(grid[index].copy());
-            grid[index] = new ItemStack(BlockType.AIR, 0);
+    private boolean insidePanel(float mx, float my) {
+        return mx >= panelX && mx < panelX + panelW && my >= panelY && my < panelY + panelH;
+    }
+
+    // ------------------------------------------------------------------
+    // Crafting
+    // ------------------------------------------------------------------
+
+    private void takeResult(boolean shift) {
+        if (resultSlot.isEmpty()) return;
+        ItemStack[] grid = callbacks.craftingGrid();
+
+        if (shift) {
+            // Craft as many as the grid ingredients and inventory space allow
+            int guard = 0;
+            while (!resultSlot.isEmpty() && guard++ < 64) {
+                ItemStack leftover = callbacks.inventory().addStack(resultSlot.copy());
+                if (!leftover.isEmpty()) break;
+                consumeGrid(grid);
+                callbacks.onCraft(resultSlot);
+                updateResult();
+            }
+            return;
+        }
+
+        ItemStack mouse = callbacks.mouseItem();
+        if (mouse.isEmpty()) {
+            callbacks.onMouseItemChanged(resultSlot.copy());
+            consumeGrid(grid);
+            callbacks.onCraft(resultSlot);
+        } else if (mouse.canMerge(resultSlot)
+                && mouse.getCount() + resultSlot.getCount() <= mouse.getMaxStackSize()) {
+            callbacks.onMouseItemChanged(
+                mouse.copyWithCount(mouse.getCount() + resultSlot.getCount()));
+            consumeGrid(grid);
+            callbacks.onCraft(resultSlot);
         }
         updateResult();
     }
 
-    /** [UI-016] Recompute the result preview from the 2x2 grid. */
+    private void consumeGrid(ItemStack[] grid) {
+        for (int i = 0; i < grid.length; i++) {
+            ItemStack g = grid[i];
+            if (g == null || g.isEmpty()) continue;
+            grid[i] = g.getCount() <= 1
+                ? new ItemStack(BlockType.AIR, 0) : g.copyWithCount(g.getCount() - 1);
+        }
+    }
+
+    /** Recompute the result preview from the 2x2 grid. */
     private void updateResult() {
         resultSlot = new ItemStack(BlockType.AIR, 0);
         ItemStack[] grid = callbacks.craftingGrid();
@@ -491,18 +453,63 @@ public class SurvivalInventoryScreen extends Screen {
         }
     }
 
-    private ItemStack decrement(ItemStack stack) {
-        if (stack.getCount() <= 1) return new ItemStack(BlockType.AIR, 0);
-        return new ItemStack(stack.getBlockType(), stack.getCount() - 1);
-    }
+    // ------------------------------------------------------------------
+    // Keyboard: Q drop, 1-9 hotbar swap
+    // ------------------------------------------------------------------
 
     @Override
     public boolean keyPressed(int key, int mods) {
         if (key >= org.lwjgl.glfw.GLFW.GLFW_KEY_1 && key <= org.lwjgl.glfw.GLFW.GLFW_KEY_9) {
-            callbacks.onSelectHotbarSlot(key - org.lwjgl.glfw.GLFW.GLFW_KEY_1);
+            int index = key - org.lwjgl.glfw.GLFW.GLFW_KEY_1;
+            SlotEngine.Slot hovered = hoveredSlot();
+            if (hovered != null) {
+                SlotEngine.hotbarSwap(hovered, hotbarSlot(index));
+            } else {
+                callbacks.onSelectHotbarSlot(index);
+            }
             return true;
         }
+
+        if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_Q) {
+            SlotEngine.Slot hovered = hoveredSlot();
+            if (hovered != null) {
+                boolean entire = (mods & org.lwjgl.glfw.GLFW.GLFW_MOD_CONTROL) != 0;
+                ItemStack dropped = SlotEngine.pullForDrop(hovered, entire);
+                if (!dropped.isEmpty()) callbacks.dropStack(dropped);
+                return true;
+            }
+        }
         return false;
+    }
+
+    /** The slot under the last mouse position, or null. */
+    private SlotEngine.Slot hoveredSlot() {
+        float mx = lastMx, my = lastMy;
+
+        for (int i = 0; i < 4; i++) {
+            int sx = craftX + (i % 2) * SLOT;
+            int sy = craftY + (i / 2) * SLOT;
+            if (inside(mx, my, sx, sy)) return gridSlot(i);
+        }
+        for (int i = 0; i < Inventory.ARMOR_SIZE; i++) {
+            if (inside(mx, my, armorX, armorY + i * SLOT)) return armorSlot(i);
+        }
+        if (inside(mx, my, hotbarX, hotbarY, Inventory.HOTBAR_SIZE * SLOT, SLOT)) {
+            int slot = (int) ((mx - hotbarX) / SLOT);
+            if (slot >= 0 && slot < Inventory.HOTBAR_SIZE) return hotbarSlot(slot);
+        }
+        if (inside(mx, my, storageX, storageY,
+                COLS * SLOT, Inventory.MAIN_INVENTORY_SIZE / COLS * SLOT)) {
+            int col = (int) ((mx - storageX) / SLOT);
+            int row = (int) ((my - storageY) / SLOT);
+            int slot = row * COLS + col;
+            if (slot >= 0 && slot < Inventory.MAIN_INVENTORY_SIZE) return storageSlot(slot);
+        }
+        return null;
+    }
+
+    private boolean inside(float mx, float my, int x, int y) {
+        return mx >= x && mx < x + SLOT && my >= y && my < y + SLOT;
     }
 
     private boolean inside(float mx, float my, int x, int y, int w, int h) {

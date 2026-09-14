@@ -1,10 +1,13 @@
 package com.voxelgame.ui.screen;
 
+import com.voxelgame.core.Game;
 import com.voxelgame.item.Inventory;
 import com.voxelgame.item.ItemStack;
 import com.voxelgame.rendering.TextureAtlas;
 import com.voxelgame.ui.FontRenderer;
 import com.voxelgame.ui.GuiAssets;
+import com.voxelgame.ui.MenuTheme;
+import com.voxelgame.ui.StackIcons;
 import com.voxelgame.ui.UIRenderer;
 import com.voxelgame.ui.widget.Button;
 import com.voxelgame.world.BlockType;
@@ -13,8 +16,12 @@ import com.voxelgame.world.container.ContainerData;
 import static com.voxelgame.core.Language.tr;
 
 /**
- * Chest container UI: 27 chest slots + player inventory.
- * Left click swaps, right click splits/places one item.
+ * Chest container UI: chest slots on top, player inventory below.
+ *
+ * Clicks run through {@link SlotEngine}: whole-stack take/place/merge/swap on
+ * left click, half/one on right click, shift-click quick-moves between the
+ * chest and the inventory, 1-9 swaps with the hotbar, Q drops, and clicking
+ * outside the panel drops the cursor stack into the world.
  */
 public class ChestScreen extends Screen {
 
@@ -23,10 +30,11 @@ public class ChestScreen extends Screen {
         ItemStack mouseItem();
         void onMouseItemChanged(ItemStack stack);
         ContainerData container();
+        /** Drop a stack into the world at the player's feet. */
+        void dropStack(ItemStack stack);
     }
 
     private static final int SLOT = GuiAssets.SLOT_SIZE;
-    private static final int ICON = GuiAssets.ICON_SIZE;
     private static final int COLS = 9;
     private static final int CHEST_ROWS_SINGLE = 3;
     private static final int CHEST_ROWS_DOUBLE = 6;
@@ -43,6 +51,8 @@ public class ChestScreen extends Screen {
     private int storageX, storageY;
     private int hotbarX, hotbarY;
 
+    private float lastMx, lastMy;
+
     public ChestScreen(Callbacks callbacks, TextureAtlas atlas) {
         this.callbacks = callbacks;
         this.atlas = atlas;
@@ -52,18 +62,19 @@ public class ChestScreen extends Screen {
     public boolean rendersWorld() { return false; }
 
     @Override
+    public boolean usesBlurredBackdrop() { return true; }
+
+    @Override
     protected void layout() {
         int contentW = COLS * SLOT;
-        // Determine if double chest
-        int chestRows = (callbacks.container().size() > 27) ? CHEST_ROWS_DOUBLE : CHEST_ROWS_SINGLE;
+        int chestRows = chestRows();
         int chestH = chestRows * SLOT;
         int storageRows = Inventory.MAIN_INVENTORY_SIZE / COLS;
         int storageH = storageRows * SLOT;
-        int hotbarH = SLOT;
 
         panelW = PANEL_PAD * 2 + contentW;
         panelH = PANEL_PAD * 2 + TITLE_H + SECTION_GAP + chestH
-                + SECTION_GAP + storageH + hotbarH;
+                + SECTION_GAP + storageH + SLOT;
 
         panelX = (width - panelW) / 2;
         panelY = (height - panelH) / 2;
@@ -81,122 +92,168 @@ public class ChestScreen extends Screen {
             tr("gui.done"), b -> fireClosed()));
     }
 
+    private int chestRows() {
+        return callbacks.container().size() > 27 ? CHEST_ROWS_DOUBLE : CHEST_ROWS_SINGLE;
+    }
+
     private void fireClosed() {
-        if (onClosedCallback != null) onClosedCallback.run();
+        if (onClosedCallback != null) {
+            Runnable cb = onClosedCallback;
+            onClosedCallback = null;
+            cb.run();
+        }
     }
 
     private Runnable onClosedCallback;
     public void onClose(Runnable cb) { this.onClosedCallback = cb; }
 
+    /** Also fires when the screen is popped with Escape. */
+    @Override
+    public void onClosed() { fireClosed(); }
+
+    // ------------------------------------------------------------------
+    // Slot views
+    // ------------------------------------------------------------------
+
+    private SlotEngine.Slot chestSlot(int i) {
+        ContainerData container = callbacks.container();
+        return new SlotEngine.Slot() {
+            @Override public ItemStack get() { return container.getSlot(i); }
+            @Override public void set(ItemStack s) { container.setSlot(i, s); }
+        };
+    }
+
+    private SlotEngine.Slot storageSlot(int i) {
+        Inventory inv = callbacks.inventory();
+        return new SlotEngine.Slot() {
+            @Override public ItemStack get() { return inv.getInventoryItem(i); }
+            @Override public void set(ItemStack s) { inv.setInventoryItem(i, s); }
+        };
+    }
+
+    private SlotEngine.Slot hotbarSlot(int i) {
+        Inventory inv = callbacks.inventory();
+        return new SlotEngine.Slot() {
+            @Override public ItemStack get() { return inv.getHotbarItem(i); }
+            @Override public void set(ItemStack s) { inv.setHotbarItem(i, s); }
+        };
+    }
+
+    /** Main inventory then hotbar, the vanilla chest-to-player order. */
+    private SlotEngine.Slot[] playerSlots() {
+        SlotEngine.Slot[] slots = new SlotEngine.Slot[
+            Inventory.MAIN_INVENTORY_SIZE + Inventory.HOTBAR_SIZE];
+        for (int i = 0; i < Inventory.MAIN_INVENTORY_SIZE; i++) slots[i] = storageSlot(i);
+        for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
+            slots[Inventory.MAIN_INVENTORY_SIZE + i] = hotbarSlot(i);
+        }
+        return slots;
+    }
+
+    private SlotEngine.Slot[] chestSlots() {
+        SlotEngine.Slot[] slots = new SlotEngine.Slot[callbacks.container().size()];
+        for (int i = 0; i < slots.length; i++) slots[i] = chestSlot(i);
+        return slots;
+    }
+
+    // ------------------------------------------------------------------
+    // Rendering
+    // ------------------------------------------------------------------
+
     @Override
     protected void renderBackground(UIRenderer ui, FontRenderer font, GuiAssets gui) {
-        ui.fillRect(0, 0, width, height, 0xB0101010);
-        ui.drawNineSlice(gui.panel, panelX, panelY, panelW, panelH,
-            GuiAssets.BORDER, GuiAssets.WIDGET, 0xFFFFFFFF);
+        MenuTheme.drawWorldOverlay(ui, width, height);
+        ui.drawNineSlice(gui.glassPanel, panelX, panelY, panelW, panelH,
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
     }
 
     @Override
     protected void renderForeground(UIRenderer ui, FontRenderer font, GuiAssets gui,
                                     float mx, float my) {
-        font.draw(ui, tr("container.chest"), chestX, panelY + PANEL_PAD,
-            GuiAssets.TEXT_TITLE);
+        lastMx = mx;
+        lastMy = my;
+
+        font.draw(ui, tr("container.chest"), chestX, panelY + PANEL_PAD, 0xFFE8EEFF);
 
         ContainerData container = callbacks.container();
         Inventory inv = callbacks.inventory();
         ItemStack mouse = callbacks.mouseItem();
+        ItemStack hovered = null;
 
-        // Chest slots (27 or 54 for double chest)
-        int chestRows = (container.size() > 27) ? CHEST_ROWS_DOUBLE : CHEST_ROWS_SINGLE;
+        // Chest slots
+        int chestRows = chestRows();
         for (int i = 0; i < container.size(); i++) {
-            int row = i / COLS;
-            int col = i % COLS;
-            int sx = chestX + col * SLOT;
-            int sy = chestY + row * SLOT;
+            int sx = chestX + (i % COLS) * SLOT;
+            int sy = chestY + (i / COLS) * SLOT;
 
-            ui.drawSprite(gui.slot, sx, sy, SLOT, SLOT);
+            drawGlassSlot(ui, gui, sx, sy, mx, my);
             ItemStack stack = container.getSlot(i);
             if (!stack.isEmpty()) {
-                drawItem(ui, stack, sx + 1, sy + 1);
-                drawCount(ui, font, stack.getCount(), sx, sy);
+                StackIcons.drawStack(ui, font, atlas, stack, sx + 1, sy + 1);
+                if (inside(mx, my, sx, sy)) hovered = stack;
             }
         }
 
         // Player inventory
         for (int i = 0; i < Inventory.MAIN_INVENTORY_SIZE; i++) {
-            int row = i / COLS;
-            int col = i % COLS;
-            int sx = storageX + col * SLOT;
-            int sy = storageY + row * SLOT;
+            int sx = storageX + (i % COLS) * SLOT;
+            int sy = storageY + (i / COLS) * SLOT;
 
-            ui.drawSprite(gui.slot, sx, sy, SLOT, SLOT);
+            drawGlassSlot(ui, gui, sx, sy, mx, my);
             ItemStack stack = inv.getInventoryItem(i);
             if (!stack.isEmpty()) {
-                drawItem(ui, stack, sx + 1, sy + 1);
-                drawCount(ui, font, stack.getCount(), sx, sy);
+                StackIcons.drawStack(ui, font, atlas, stack, sx + 1, sy + 1);
+                if (inside(mx, my, sx, sy)) hovered = stack;
             }
         }
 
         // Hotbar strip
         for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
             int sx = hotbarX + i * SLOT;
-            ui.drawSprite(gui.slot, sx, hotbarY, SLOT, SLOT);
+            drawGlassSlot(ui, gui, sx, hotbarY, mx, my);
             ItemStack stack = inv.getHotbarItem(i);
             if (!stack.isEmpty()) {
-                drawItem(ui, stack, sx + 1, hotbarY + 1);
-                drawCount(ui, font, stack.getCount(), sx, hotbarY);
+                StackIcons.drawStack(ui, font, atlas, stack, sx + 1, hotbarY + 1);
+                if (inside(mx, my, sx, hotbarY)) hovered = stack;
             }
         }
 
-        // Mouse item follows cursor
+        // Cursor stack follows the mouse
         if (!mouse.isEmpty()) {
-            drawItem(ui, mouse, (int) mx - ICON / 2, (int) my - ICON / 2);
-            if (mouse.getCount() > 1) {
-                drawCount(ui, font, mouse.getCount(),
-                    (int) mx - ICON / 2, (int) my - ICON / 2);
-            }
+            StackIcons.drawStack(ui, font, atlas, mouse,
+                (int) mx - GuiAssets.ICON_SIZE / 2, (int) my - GuiAssets.ICON_SIZE / 2);
+        }
+
+        if (hovered != null && mouse.isEmpty()) {
+            StackIcons.drawTooltip(ui, font, atlas, hovered, mx, my, width, height);
         }
     }
 
-    private void drawItem(UIRenderer ui, ItemStack stack, int x, int y) {
-        if (stack.isBlock()) {
-            drawIcon(ui, stack.getBlockType(), x, y);
-        } else {
-            // Draw item sprite
-            drawIcon(ui, BlockType.STONE, x, y); // Fallback for items
-        }
+    private void drawGlassSlot(UIRenderer ui, GuiAssets gui, int sx, int sy, float mx, float my) {
+        boolean hover = inside(mx, my, sx, sy);
+        ui.drawNineSlice(hover ? gui.glassSlotHover : gui.glassSlot,
+            sx, sy, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
     }
 
-    private void drawIcon(UIRenderer ui, BlockType block, int x, int y) {
-        TextureAtlas.TextureCoords uv = atlas.getCoords(block.id, 2);
-        ui.drawTexture(atlas.getTexture().getId(), x, y, ICON, ICON,
-            uv.u1, uv.v2, uv.u2, uv.v1, 0xFFFFFFFF);
-    }
-
-    private void drawCount(UIRenderer ui, FontRenderer font, int count, int sx, int sy) {
-        if (count < 2) return;
-        String text = String.valueOf(count);
-        int tw = font.width(text);
-        font.drawWithShadow(ui, text,
-            sx + SLOT - tw - 1,
-            sy + SLOT - FontRenderer.GLYPH_H - 1,
-            0xFFFFFFFF);
-    }
+    // ------------------------------------------------------------------
+    // Mouse
+    // ------------------------------------------------------------------
 
     @Override
     public boolean mouseClicked(float mx, float my, int button) {
         ItemStack mouse = callbacks.mouseItem();
-        ItemStack result;
+        boolean shift = Game.isShiftDown();
 
         // Chest slots
-        int chestRows = (callbacks.container().size() > 27) ? CHEST_ROWS_DOUBLE : CHEST_ROWS_SINGLE;
-        if (inside(mx, my, chestX, chestY, COLS * SLOT, chestRows * SLOT)) {
-            int col = (int) ((mx - chestX) / SLOT);
-            int row = (int) ((my - chestY) / SLOT);
-            int slot = row * COLS + col;
-            if (slot >= 0 && slot < callbacks.container().size()) {
-                result = callbacks.container().getSlot(slot);
-                callbacks.container().setSlot(slot, mouse);
-                callbacks.onMouseItemChanged(result);
+        if (inside(mx, my, chestX, chestY, COLS * SLOT, chestRows() * SLOT)) {
+            int slot = chestSlotAt(mx, my);
+            if (slot >= 0) {
+                SlotEngine.Slot s = chestSlot(slot);
+                if (shift) {
+                    SlotEngine.quickMove(s, playerSlots());
+                } else {
+                    callbacks.onMouseItemChanged(SlotEngine.click(s, mouse, button == 0));
+                }
             }
             return true;
         }
@@ -205,27 +262,11 @@ public class ChestScreen extends Screen {
         if (inside(mx, my, hotbarX, hotbarY, Inventory.HOTBAR_SIZE * SLOT, SLOT)) {
             int slot = (int) ((mx - hotbarX) / SLOT);
             if (slot >= 0 && slot < Inventory.HOTBAR_SIZE) {
-                if (button == 0) {
-                    result = callbacks.inventory().getHotbarItem(slot);
-                    callbacks.inventory().setHotbarItem(slot, mouse.getBlockType(), mouse.getCount());
-                    callbacks.onMouseItemChanged(result);
+                SlotEngine.Slot s = hotbarSlot(slot);
+                if (shift) {
+                    SlotEngine.quickMove(s, chestSlots());
                 } else {
-                    // Right click: place one or pick up half
-                    if (mouse.isEmpty()) {
-                        ItemStack slotStack = callbacks.inventory().getHotbarItem(slot);
-                        if (!slotStack.isEmpty()) {
-                            int half = (slotStack.getCount() + 1) / 2;
-                            int remain = slotStack.getCount() - half;
-                            callbacks.inventory().setHotbarItem(slot, slotStack.getBlockType(), remain);
-                            callbacks.onMouseItemChanged(new ItemStack(slotStack.getBlockType(), half));
-                        }
-                    } else {
-                        ItemStack slotStack = callbacks.inventory().getHotbarItem(slot);
-                        if (slotStack.isEmpty()) {
-                            callbacks.inventory().setHotbarItem(slot, mouse.getBlockType(), 1);
-                            callbacks.onMouseItemChanged(decrement(mouse));
-                        }
-                    }
+                    callbacks.onMouseItemChanged(SlotEngine.click(s, mouse, button == 0));
                 }
             }
             return true;
@@ -234,41 +275,95 @@ public class ChestScreen extends Screen {
         // Storage area
         if (inside(mx, my, storageX, storageY,
                 COLS * SLOT, Inventory.MAIN_INVENTORY_SIZE / COLS * SLOT)) {
-            int col = (int) ((mx - storageX) / SLOT);
-            int row = (int) ((my - storageY) / SLOT);
-            int slot = row * COLS + col;
-            if (slot >= 0 && slot < Inventory.MAIN_INVENTORY_SIZE) {
-                if (button == 0) {
-                    result = callbacks.inventory().getInventoryItem(slot);
-                    callbacks.inventory().setInventoryItem(slot, mouse.getBlockType(), mouse.getCount());
-                    callbacks.onMouseItemChanged(result);
+            int slot = storageSlotAt(mx, my);
+            if (slot >= 0) {
+                SlotEngine.Slot s = storageSlot(slot);
+                if (shift) {
+                    SlotEngine.quickMove(s, chestSlots());
                 } else {
-                    if (mouse.isEmpty()) {
-                        ItemStack slotStack = callbacks.inventory().getInventoryItem(slot);
-                        if (!slotStack.isEmpty()) {
-                            int half = (slotStack.getCount() + 1) / 2;
-                            int remain = slotStack.getCount() - half;
-                            callbacks.inventory().setInventoryItem(slot, slotStack.getBlockType(), remain);
-                            callbacks.onMouseItemChanged(new ItemStack(slotStack.getBlockType(), half));
-                        }
-                    } else {
-                        ItemStack slotStack = callbacks.inventory().getInventoryItem(slot);
-                        if (slotStack.isEmpty()) {
-                            callbacks.inventory().setInventoryItem(slot, mouse.getBlockType(), 1);
-                            callbacks.onMouseItemChanged(decrement(mouse));
-                        }
-                    }
+                    callbacks.onMouseItemChanged(SlotEngine.click(s, mouse, button == 0));
                 }
             }
+            return true;
+        }
+
+        // Click outside the panel drops the cursor stack into the world
+        if (!mouse.isEmpty() && !insidePanel(mx, my) && !overDoneButton(mx, my)) {
+            callbacks.dropStack(mouse.copy());
+            callbacks.onMouseItemChanged(SlotEngine.empty());
             return true;
         }
 
         return super.mouseClicked(mx, my, button);
     }
 
-    private ItemStack decrement(ItemStack stack) {
-        if (stack.getCount() <= 1) return new ItemStack(BlockType.AIR, 0);
-        return new ItemStack(stack.getBlockType(), stack.getCount() - 1);
+    private boolean overDoneButton(float mx, float my) {
+        return my >= height - 32 && my < height - 8
+            && mx >= (width - 200) / 2 && mx < (width - 200) / 2 + 200;
+    }
+
+    private boolean insidePanel(float mx, float my) {
+        return mx >= panelX && mx < panelX + panelW && my >= panelY && my < panelY + panelH;
+    }
+
+    private int chestSlotAt(float mx, float my) {
+        int col = (int) ((mx - chestX) / SLOT);
+        int row = (int) ((my - chestY) / SLOT);
+        int slot = row * COLS + col;
+        return slot >= 0 && slot < callbacks.container().size() ? slot : -1;
+    }
+
+    private int storageSlotAt(float mx, float my) {
+        int col = (int) ((mx - storageX) / SLOT);
+        int row = (int) ((my - storageY) / SLOT);
+        int slot = row * COLS + col;
+        return slot >= 0 && slot < Inventory.MAIN_INVENTORY_SIZE ? slot : -1;
+    }
+
+    // ------------------------------------------------------------------
+    // Keyboard: Q drop, 1-9 hotbar swap
+    // ------------------------------------------------------------------
+
+    @Override
+    public boolean keyPressed(int key, int mods) {
+        if (key >= org.lwjgl.glfw.GLFW.GLFW_KEY_1 && key <= org.lwjgl.glfw.GLFW.GLFW_KEY_9) {
+            int index = key - org.lwjgl.glfw.GLFW.GLFW_KEY_1;
+            SlotEngine.Slot hovered = hoveredSlot();
+            if (hovered != null) {
+                SlotEngine.hotbarSwap(hovered, hotbarSlot(index));
+            } else {
+                return false;
+            }
+            return true;
+        }
+
+        if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_Q) {
+            SlotEngine.Slot hovered = hoveredSlot();
+            if (hovered != null) {
+                boolean entire = (mods & org.lwjgl.glfw.GLFW.GLFW_MOD_CONTROL) != 0;
+                ItemStack dropped = SlotEngine.pullForDrop(hovered, entire);
+                if (!dropped.isEmpty()) callbacks.dropStack(dropped);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private SlotEngine.Slot hoveredSlot() {
+        float mx = lastMx, my = lastMy;
+        int chestSlot = chestSlotAt(mx, my);
+        if (chestSlot >= 0) return chestSlot(chestSlot);
+        int storageSlot = storageSlotAt(mx, my);
+        if (storageSlot >= 0) return storageSlot(storageSlot);
+        if (inside(mx, my, hotbarX, hotbarY, Inventory.HOTBAR_SIZE * SLOT, SLOT)) {
+            int slot = (int) ((mx - hotbarX) / SLOT);
+            if (slot >= 0 && slot < Inventory.HOTBAR_SIZE) return hotbarSlot(slot);
+        }
+        return null;
+    }
+
+    private boolean inside(float mx, float my, int x, int y) {
+        return mx >= x && mx < x + SLOT && my >= y && my < y + SLOT;
     }
 
     private boolean inside(float mx, float my, int x, int y, int w, int h) {

@@ -26,6 +26,10 @@ public class Settings {
     public boolean clouds = true;
     public boolean ambientOcclusion = true;
     public boolean shadows = true;
+    /** [PP] Post-processing: HDR bloom glow. */
+    public boolean bloomEnabled = true;
+    /** [PP] Post-processing: FXAA edge smoothing. */
+    public boolean fxaaEnabled = false;
 
     /** [GR-065] 0 = Fast, 1 = Medium, 2 = Fancy, 3 = Ultra. */
     public int graphicsPreset = 2;
@@ -145,6 +149,8 @@ s.vsync = readBool(p, "vsync", s.vsync);
         s.clouds = readBool(p, "clouds", s.clouds);
         s.ambientOcclusion = readBool(p, "ambientOcclusion", s.ambientOcclusion);
         s.shadows = readBool(p, "shadows", s.shadows);
+        s.bloomEnabled = readBool(p, "bloomEnabled", s.bloomEnabled);
+        s.fxaaEnabled = readBool(p, "fxaaEnabled", s.fxaaEnabled);
         s.graphicsPreset = readInt(p, "graphicsPreset", s.graphicsPreset, 0, 3);
         s.fancyGraphics = readBool(p, "fancyGraphics", s.fancyGraphics);
         s.viewBobbing = readBool(p, "viewBobbing", s.viewBobbing);
@@ -192,6 +198,8 @@ p.setProperty("vsync", Boolean.toString(vsync));
         p.setProperty("clouds", Boolean.toString(clouds));
         p.setProperty("ambientOcclusion", Boolean.toString(ambientOcclusion));
         p.setProperty("shadows", Boolean.toString(shadows));
+        p.setProperty("bloomEnabled", Boolean.toString(bloomEnabled));
+        p.setProperty("fxaaEnabled", Boolean.toString(fxaaEnabled));
         p.setProperty("graphicsPreset", Integer.toString(graphicsPreset));
         p.setProperty("fancyGraphics", Boolean.toString(fancyGraphics));
         p.setProperty("viewBobbing", Boolean.toString(viewBobbing));

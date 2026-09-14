@@ -43,6 +43,12 @@ public final class StructureRegistry {
         t.setBlock(0, 2, 2, BlockType.GLASS);
         t.setBlock(4, 2, 2, BlockType.GLASS);
 
+        // Storage chest with household supplies
+        t.setBlock(3, 1, 3, BlockType.CHEST);
+        t.addLoot(3, 1, 3, 177, 3);   // bread
+        t.addLoot(3, 1, 3, 129, 4);   // coal
+        t.addLoot(3, 1, 3, 138, 2);   // wheat
+
         // Roof (flat)
         for (int x = 0; x < 5; x++) {
             for (int z = 0; z < 5; z++) {
@@ -94,6 +100,12 @@ public final class StructureRegistry {
                 t.setBlock(x, 1, z, BlockType.OAK_PLANKS);
             }
         }
+
+        // Storage chest with a richer household stock
+        t.setBlock(5, 2, 5, BlockType.CHEST);
+        t.addLoot(5, 2, 5, 130, 3);   // iron_ingot
+        t.addLoot(5, 2, 5, 177, 5);   // bread
+        t.addLoot(5, 2, 5, 189, 4);   // torch
 
         // Roof
         for (int x = 0; x < 7; x++) {

@@ -52,17 +52,17 @@ public final class TutorialToast implements Toast {
         int x = screenW - WIDTH - 6 + xOffset;
         int y = 6;
 
-        ui.drawNineSlice(gui.panel, x, y, WIDTH, HEIGHT,
-            GuiAssets.BORDER, GuiAssets.WIDGET, 0xEE181828);
-        ui.useSolidColor();
-        ui.drawRectOutline(x, y, WIDTH, HEIGHT, 0xFF444444);
+        ui.drawNineSlice(gui.glassPanel, x, y, WIDTH, HEIGHT,
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
+        ui.fillRect(x + 6, y + 1, WIDTH - 12, 1, 0x60FFFFFF);
 
         // Small book icon block on the left
         int iconSize = 20;
         int iconX = x + 6;
         int iconY = y + (HEIGHT - iconSize) / 2;
+        ui.useSolidColor();
         ui.fillRect(iconX, iconY, iconSize, iconSize, 0xFF8B6B3A);
-        ui.drawRectOutline(iconX, iconY, iconSize, iconSize, 0xFF000000);
+        ui.fillRect(iconX + 1, iconY + 1, iconSize - 2, 1, 0xFFB39A6A);
         ui.fillRect(iconX + 5, iconY + 5, 10, 10, 0xFFE8D8A8);
 
         int textX = iconX + iconSize + 6;

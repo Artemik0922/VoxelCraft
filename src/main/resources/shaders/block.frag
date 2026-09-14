@@ -24,10 +24,15 @@ uniform int shadowsEnabled;
 uniform float daylight;
 uniform float waterTime;
 /** Array layer holding the water tile, so it can be animated in place. */
+uniform int glassLayer;
+/** [GLASS] Layer index for ice; specular highlight and fresnel applied. */
+uniform int iceLayer;
 uniform int waterLayer;
 /** [GR-015] Lava flows with a slow upward drift and a flickering glow. */
 uniform float lavaTime;
 uniform int lavaLayer;
+/** [SHINE] Level of specular sheen applied to the surface. */
+uniform float specStrength;
 /** [GR-002] Chunk fade-in: 0 right after the mesh is built, 1 when settled. */
 uniform float fadeAlpha;
 
@@ -95,7 +100,7 @@ void main() {
     float rho = max(length(dFdx(texels)), length(dFdy(texels)));
     float mip = clamp(log2(max(rho, 1.0)), 0.0, 4.0);
     float alphaCutoff = 0.5 * max(1.0 - 0.22 * mip, 0.30);
-    if (texColor.a < alphaCutoff) discard;
+    if (Layer != glassLayer && texColor.a < alphaCutoff) discard;
 
     vec3 normal = normalize(Normal);
 
@@ -169,6 +174,35 @@ void main() {
          float flicker = 0.85 + 0.15 * sin(lavaTime * 2.1 + TexCoord.y * 3.0 + TexCoord.x * 1.3);
          result *= flicker;
      }
+
+    // [SHINE] Specular sheen: glossy materials (glass, ice, water) get a tight
+    // Blinn-Phong highlight; the rest get a gentle sheen so textures read as
+    // lit surfaces instead of flat matte.  A fresnel term catches grazing
+    // angles on glass/ice so they read as window panes rather than air.
+    float shininess = 24.0;
+    float sheen = specStrength;
+    if (Layer == glassLayer || Layer == iceLayer || Layer == waterLayer) {
+        shininess = 96.0;
+        sheen = specStrength * 1.6;
+    }
+
+    // Only add the beach-ball highlight when the sun side faces the camera,
+    // and fade it to zero at night like the diffuse term.
+    if (facingSun > 0.001) {
+        vec3 viewDir = normalize(cameraPos - FragPos);
+        vec3 halfVec = normalize(-sunDirection + viewDir);
+        float ndh = max(dot(normal, halfVec), 0.0);
+        float spec = pow(ndh, shininess) * sheen * daylight * (0.35 + 0.65 * baked);
+        result += spec * sunColor;
+    }
+
+    // [GLASS] Fresnel: window panes catch a faint sky reflection at grazing
+    // angles, so they read as glass instead of invisible air.
+    if (Layer == glassLayer || Layer == iceLayer) {
+        vec3 viewDir = normalize(cameraPos - FragPos);
+        float rim = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
+        result += skyColor * rim * 0.30 * (0.4 + 0.6 * daylight);
+    }
 
     // Fade distant geometry into the skybox horizon
     float dist = length(cameraPos - FragPos);

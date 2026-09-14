@@ -253,7 +253,7 @@ public class LightEngine {
                 int tx = nx & 15;
                 int tz = nz & 15;
 
-                int op = OPACITY[target.getBlock(tx, ny, tz)];
+                int op = opacity(target.getBlock(tx, ny, tz));
                 if (op >= Chunk.MAX_LIGHT) continue;
 
                 int value = (sky && NEIGHBOURS[i + 1] == -1 && current == Chunk.MAX_LIGHT)
@@ -358,7 +358,7 @@ public class LightEngine {
                 Chunk nc = w.chunkAt(nx, nz);
                 if (nc == null) continue;
 
-                int op = OPACITY[nc.getBlock(nx & 15, ny, nz & 15)];
+                int op = opacity(nc.getBlock(nx & 15, ny, nz & 15));
                 if (op >= Chunk.MAX_LIGHT) continue;
 
                 int next = Math.max(0, current - 1 - op);

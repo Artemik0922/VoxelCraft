@@ -5,6 +5,7 @@ import com.voxelgame.item.Item;
 import com.voxelgame.item.ItemStack;
 import com.voxelgame.item.ToolTier;
 import com.voxelgame.item.ToolType;
+import com.voxelgame.item.StatusEffect;
 import com.voxelgame.world.BlockType;
 import com.voxelgame.world.World;
 import com.voxelgame.world.Chunk;
@@ -42,22 +43,27 @@ public class Player {
 
     /** [GP-003][GP-004] Accumulated energy spent by sprinting/swimming. */
     private float exhaustion = 0;
-    /** Exhaustion per second while sprinting: ~1 hunger per 5 s of sprint. */
-    private static final float EXHAUSTION_SPRINT = 0.20f;
-    /** Exhaustion per second while swimming: ~1 hunger per 10 s of swim. */
-    private static final float EXHAUSTION_SWIM = 0.10f;
+    /** Exhaustion per second while sprinting: ~1 hunger per 7 s of sprint. */
+    private static final float EXHAUSTION_SPRINT = 0.14f;
+    /** Exhaustion per second while swimming: ~1 hunger per 100 s of swim. */
+    private static final float EXHAUSTION_SWIM = 0.01f;
     private int maxHunger = 20;
     private float saturation = 5.0f;
-    private int hungerTimer = 0;
-    private int healthRegenTimer = 0;
-    /** [BASE] Ticks between campfire heals (4 seconds at 60 fps). */
+    private float healthRegenTimer = 0;
+    /** [BASE] Seconds between campfire heals. */
     private int campfireRegenTimer = 0;
     private int damageTimer = 0;
     
-    // Air supply while underwater
-    private int air = 300;
-    private int maxAir = 300;
-    private int drownTimer = 0;
+    // Air supply while underwater (vanilla: 15 s submerged, then damage)
+    float air = 300;
+    float maxAir = 300;
+    /** Air points drained per second while the head is underwater. */
+    private static final float AIR_DRAIN_PER_SECOND = 20f;
+    /** Air points restored per second once the head clears the surface. */
+    private static final float AIR_REGEN_PER_SECOND = 120f;
+    private float drownTimer = 0;
+    /** True when the eye itself sits inside a water block. */
+    private boolean headUnderwater = false;
     
     // [GP-028] Fire/lava damage timers
     private boolean inFire = false;
@@ -78,6 +84,52 @@ public class Player {
     
     // Inventory
     private Inventory inventory;
+
+    // [POT] Active status effects, keyed by effect type.
+    private final java.util.Map<StatusEffect, ActiveEffect> activeEffects = new java.util.HashMap<>();
+
+    /** One active effect instance with its remaining time and power. */
+    public static final class ActiveEffect {
+        public final StatusEffect type;
+        public int power;
+        public int remainingTicks;
+
+        ActiveEffect(StatusEffect type, int power, int remainingTicks) {
+            this.type = type;
+            this.power = power;
+            this.remainingTicks = remainingTicks;
+        }
+    }
+
+    /** Apply a potion effect, refreshing an existing one with the stronger level. */
+    public void applyPotion(StatusEffect effect, int power, int durationTicks) {
+        ActiveEffect existing = activeEffects.get(effect);
+        if (existing != null) {
+            existing.power = java.lang.Math.max(existing.power, power);
+            existing.remainingTicks = java.lang.Math.max(existing.remainingTicks, durationTicks);
+        } else {
+            activeEffects.put(effect, new ActiveEffect(effect, power, durationTicks));
+        }
+    }
+
+    public boolean hasEffect(StatusEffect effect) {
+        ActiveEffect e = activeEffects.get(effect);
+        return e != null && e.remainingTicks > 0;
+    }
+
+    public int getEffectLevel(StatusEffect effect) {
+        ActiveEffect e = activeEffects.get(effect);
+        return e != null && e.remainingTicks > 0 ? e.power : 0;
+    }
+
+    public java.util.Map<StatusEffect, ActiveEffect> getActiveEffects() {
+        return activeEffects;
+    }
+
+    /** Clear every active effect (e.g. milk, respawn). */
+    public void clearEffects() {
+        activeEffects.clear();
+    }
 
     /** [UI-016] The survival inventory's 2x2 crafting grid; persists across
      *  screen opens so placed ingredients are never lost on close. */
@@ -113,6 +165,12 @@ public class Player {
     private static final float MAX_FALL_SPEED = 78.4f;
     private static final float FRICTION = 0.85f;
     private static final float AIR_FRICTION = 0.95f;
+
+    // [SPACE] Gravity multiplier: space planets pull much weaker.
+    private float gravityScale = 1.0f;
+
+    public void setGravityScale(float scale) { this.gravityScale = java.lang.Math.max(0.05f, scale); }
+    public float getGravityScale() { return gravityScale; }
     
     // Fall damage
     private float fallDistance = 0;
@@ -138,6 +196,9 @@ public class Player {
         
         // Update swimming state
         updateSwimming();
+        
+        // [POT] Tick active status effects (regen, timers)
+        tickStatusEffects();
         
         // [GP-028][GP-072] Check fire/lava contact and apply tick damage
         updateFireAndLavaDamage(fdt);
@@ -183,6 +244,34 @@ public class Player {
             world.pushOutOfBlocks(position);
         }
     }
+
+    private int regenTickCounter = 0;
+
+    /**
+     * [POT] Advance status-effect timers each tick and apply the
+     * regeneration effect every 2 seconds.
+     */
+    private void tickStatusEffects() {
+        if (activeEffects.isEmpty()) return;
+
+        if (hasEffect(StatusEffect.REGENERATION)) {
+            regenTickCounter++;
+            // Heal 1 HP every 40 ticks (2 s); higher power heals faster
+            int interval = 40 - (getEffectLevel(StatusEffect.REGENERATION) - 1) * 10;
+            if (interval < 15) interval = 15;
+            if (regenTickCounter >= interval) {
+                regenTickCounter = 0;
+                heal(1);
+            }
+        } else {
+            regenTickCounter = 0;
+        }
+
+        activeEffects.values().removeIf(e -> {
+            e.remainingTicks--;
+            return e.remainingTicks <= 0;
+        });
+    }
     
     private void updateSwimming() {
         // Check if player is in water
@@ -190,6 +279,11 @@ public class Player {
         int blockY = (int) java.lang.Math.floor(position.y);
         int blockZ = (int) java.lang.Math.floor(position.z);
         swimming = world.getBlock(blockX, blockY, blockZ) == 45; // WATER
+
+        // Air only matters when the eye itself sits inside a water block:
+        // wading or swimming with the head above the surface is free
+        int eyeY = (int) java.lang.Math.floor(position.y + eyeHeight);
+        headUnderwater = world.getBlock(blockX, eyeY, blockZ) == BlockType.WATER.id;
     }
     
     /**
@@ -223,6 +317,15 @@ public class Player {
         
         inFire = touchingFire;
         inLava = touchingLava;
+
+        // [POT] Fire resistance: no burn, damage or afterburn while active
+        if (hasEffect(StatusEffect.FIRE_RESISTANCE)) {
+            burningTimer = 0;
+            burnDamageTimer = 0;
+            fireDamageTimer = 0;
+            lavaDamageTimer = 0;
+            return;
+        }
         
         // Water extinguishes fire
         if (swimming) {
@@ -383,7 +486,7 @@ public class Player {
             velocity.y *= 0.5f; // Extreme drag in lava
         } else {
             // Normal gravity
-            velocity.y -= GRAVITY * dt;
+            velocity.y -= GRAVITY * dt * gravityScale;
         }
         
         if (velocity.y < -MAX_FALL_SPEED) {
@@ -469,10 +572,20 @@ public class Player {
             if (dy != 0) onGround = false;
         } else {
             if (dy < 0) {
-                // Falling - snap to ground
+                // Falling - snap to ground, or bounce off a slime block
                 position.y = findGroundBelow();
-                velocity.y = 0;
-                onGround = true;
+                if (blockBelowIsSlime()) {
+                    // Bounce: reflect the (capped) fall speed back upward.
+                    // onGround=true lets updateFallDistance() reset the fall
+                    // distance with a zero damage multiplier before the next
+                    // frame launches the player back into the air.
+                    float fall = java.lang.Math.max(0.0f, -velocity.y);
+                    velocity.y = java.lang.Math.min(fall, 14.0f) * 0.8f + 2.0f;
+                    onGround = true;
+                } else {
+                    velocity.y = 0;
+                    onGround = true;
+                }
             } else if (dy > 0) {
                 // Hit ceiling
                 velocity.y = 0;
@@ -581,28 +694,25 @@ public class Player {
         int bz = (int) java.lang.Math.floor(position.z);
         
         int blockBelow = world.getBlock(bx, by, bz);
-        // TODO: Add hay bale and slime block checks when those blocks are added
-        // For now, return 1.0 (full damage)
+        // [GP-009] Hay bales soften landings; slime blocks absorb all damage
+        if (blockBelow == BlockType.HAY_BALE.id) return 0.2f;
+        if (blockBelow == BlockType.SLIME_BLOCK.id) return 0.0f;
         return 1.0f;
+    }
+
+    /** True when the block under the player's feet is a slime block. */
+    private boolean blockBelowIsSlime() {
+        if (world == null) return false;
+        int bx = (int) java.lang.Math.floor(position.x);
+        int by = (int) java.lang.Math.floor(position.y - 0.1f);
+        int bz = (int) java.lang.Math.floor(position.z);
+        return world.getBlock(bx, by, bz) == BlockType.SLIME_BLOCK.id;
     }
     
     private void updateHungerAndHealth(float dt) {
-        hungerTimer++;
-        
-        // Hunger decreases over time (every 80 seconds at full saturation)
-        if (hungerTimer >= 4800) { // 80 seconds at 60fps
-            hungerTimer = 0;
-            if (saturation > 0) {
-                saturation -= 1;
-                if (saturation < 0) {
-                    saturation = 0;
-                    if (hunger > 0) hunger--;
-                }
-            } else if (hunger > 0) {
-                hunger--;
-            }
-        }
-        
+        // Vanilla hunger never drains while idle: only real activity
+        // (sprinting, swimming, jumping, healing) spends food.
+
         // [GP-003][GP-004] Sprinting and swimming burn exhaustion, which
         // drains saturation first, then hunger. Only while actually moving.
         float hSpeed = (float) java.lang.Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
@@ -624,14 +734,18 @@ public class Player {
                 }
             }
         }
-        
-        // Health regeneration when hunger is full
+
+        // Health regeneration when hunger is high: 1 HP every 4 s,
+        // costing 1.5 food points (vanilla exhaustion conversion)
         if (hunger >= 18 && health < maxHealth) {
-            healthRegenTimer++;
-            if (healthRegenTimer >= 2400) { // 40 seconds
+            healthRegenTimer += dt;
+            if (healthRegenTimer >= 4.0f) {
                 healthRegenTimer = 0;
                 health = java.lang.Math.min(health + 1, maxHealth);
+                exhaustion += 1.5f;
             }
+        } else {
+            healthRegenTimer = 0;
         }
 
         // [BASE] A campfire warms the survivor: +1 HP every ~4 seconds
@@ -649,11 +763,11 @@ public class Player {
         } else {
             campfireRegenTimer = 0;
         }
-        
-        // Starvation damage (skip on peaceful)
+
+        // Starvation damage (skip on peaceful): 1 HP every 4 s at zero hunger
         if (hunger <= 0 && gameMode != WorldMeta.GameMode.CREATIVE) {
-            healthRegenTimer++;
-            if (healthRegenTimer >= 4800) { // 80 seconds
+            healthRegenTimer += dt;
+            if (healthRegenTimer >= 4.0f) {
                 healthRegenTimer = 0;
                 takeDamage(1);
                 if (health <= 0 && deathCallback != null) {
@@ -662,17 +776,18 @@ public class Player {
                 }
             }
         }
-        
-        // Drowning
-        if (swimming && air > 0) {
-            air -= 1;
-        } else if (!swimming && air < maxAir) {
-            air = java.lang.Math.min(air + 5, maxAir);
+
+        // Drowning: air only drains while the EYE is submerged - wading or
+        // floating with the head above water costs nothing (vanilla rule)
+        if (headUnderwater) {
+            air = java.lang.Math.max(0f, air - AIR_DRAIN_PER_SECOND * dt);
+        } else if (air < maxAir) {
+            air = java.lang.Math.min(maxAir, air + AIR_REGEN_PER_SECOND * dt);
         }
-        
+
         if (air <= 0) {
-            drownTimer++;
-            if (drownTimer >= 40) { // Damage every ~0.6s
+            drownTimer += dt;
+            if (drownTimer >= 1.0f) { // 1 heart of damage per second
                 drownTimer = 0;
                 takeDamage(2);
                 if (health <= 0 && deathCallback != null) {
@@ -847,12 +962,8 @@ public class Player {
             velocity.y = sprinting ? SPRINT_JUMP_FORCE : JUMP_FORCE;
             onGround = false;
 
-            // Jumping costs hunger
-            if (sprinting) {
-                saturation -= 0.2f;
-            } else {
-                saturation -= 0.05f;
-            }
+            // Jumping costs hunger (vanilla: 0.05 exhaustion, 0.2 sprint-jump)
+            exhaustion += sprinting ? 0.05f : 0.0125f;
         } else if (swimming) {
             // Swim up
             velocity.y = 2.0f;
@@ -887,6 +998,14 @@ public class Player {
         }
     }
     
+    /** Force-flying setter, used by the rocket ride while travelling up. */
+    public void setFlying(boolean on) {
+        flying = on;
+        if (flying) {
+            velocity.y = 0;
+        }
+    }
+    
     public boolean isFlying() { return flying; }
     
     public WorldMeta.GameMode getGameMode() { return gameMode; }
@@ -897,9 +1016,22 @@ public class Player {
     public void setHorizontalVelocity(float x, float z) {
         // Sneaking slows movement [GP-006]
         float sneakMult = getSneakSpeedMultiplier();
-        velocity.x = x * sneakMult;
-        velocity.z = z * sneakMult;
+        // [POT] Speed effect boosts movement (+20% per level)
+        float speedMult = getPotionSpeedMultiplier();
+        velocity.x = x * sneakMult * speedMult;
+        velocity.z = z * sneakMult * speedMult;
     }
+
+    /** [POT] Movement multiplier from the Speed effect: 1 + 0.2 * level. */
+    private float getPotionSpeedMultiplier() {
+        return 1.0f + 0.2f * getEffectLevel(StatusEffect.SPEED);
+    }
+
+    /** [POT] Melee damage multiplier from the Strength effect. */
+    public float getStrengthMultiplier() {
+        return 1.0f + 0.5f * getEffectLevel(StatusEffect.STRENGTH);
+    }
+
 
     public void setVerticalVelocity(float y) {
         velocity.y = y;
@@ -956,8 +1088,8 @@ public class Player {
     public int getHunger() { return hunger; }
     public int getMaxHunger() { return maxHunger; }
     public float getSaturation() { return saturation; }
-    public int getAir() { return air; }
-    public int getMaxAir() { return maxAir; }
+    public int getAir() { return (int) air; }
+    public int getMaxAir() { return (int) maxAir; }
     public Inventory getInventory() { return inventory; }
     public float getEyeHeight() { return eyeHeight; }
 

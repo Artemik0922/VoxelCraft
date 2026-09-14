@@ -41,6 +41,7 @@ import com.voxelgame.ui.toast.ToastManager;
 import com.voxelgame.ui.FontRenderer;
 import com.voxelgame.ui.UIRenderer;
 import com.voxelgame.ui.GuiAssets;
+import com.voxelgame.ui.MenuTheme;
 import com.voxelgame.ui.screen.*;
 import com.voxelgame.ui.screen.ChestScreen;
 import com.voxelgame.ui.screen.FurnaceScreen;
@@ -72,7 +73,7 @@ public class Game {
     private long window;
     private int width = 1280;
     private int height = 720;
-    private String title = "Minecraft Clone";
+    private String title = "VoxelCraft";
     
     // Systems
     private Shader shader;
@@ -88,7 +89,11 @@ public class Game {
     private Skybox skybox;
     private CloudLayer cloudLayer;
     private ShadowMap shadowMap;
+    private PostProcess postProcess;
     private boolean shadowsEnabled = settings.shadows;
+    /** [OPT] Tracks the cached shadow pass: last chunk remesh seen + on/off edge. */
+    private long lastShadowRemesh = -1;
+    private boolean wasCastingShadows = false;
     private DayNightCycle dayNight;
     private ParticleSystem particles;
 
@@ -131,6 +136,8 @@ public class Game {
     private FontRenderer font;
     private GuiAssets uiTextures;
     private ScreenManager screens;
+    /** Tracks ScreenManager.revision() to re-apply cursor after fades. */
+    private int lastScreensRevision = -1;
     
     public static final String VERSION = "VoxelCraft 0.4 (LWJGL3)";
     // F7 toggles back-face culling. With correct winding the image must look
@@ -172,6 +179,13 @@ public class Game {
     private boolean firstMouse = true;
     private double lastSpacePress = -1.0;
     private ItemStack mouseItem = new ItemStack(BlockType.AIR, 0);
+
+    // Keyboard modifiers tracked globally so inventory screens can offer
+    // shift-click quick move and Ctrl+Q whole-stack drops
+    private static boolean shiftKeyDown = false;
+    private static boolean ctrlKeyDown = false;
+    public static boolean isShiftDown() { return shiftKeyDown; }
+    public static boolean isCtrlDown() { return ctrlKeyDown; }
     private final ToastManager toastManager = new ToastManager();
     private BiomeDiscovery biomeDiscovery = null;
     private String lastBiomeId = null;
@@ -202,10 +216,23 @@ public class Game {
     private float overcast = 0.0f;      // smoothed sky dimming 0..1
     private float lightningFlash = 0.0f; // 0..1, decays each frame
 
+    // [SPACE] Rocket ride and dimension switching
+    private boolean spaceMode = false;
+    private boolean rocketRiding = false;
+    private float rocketProgress = 0f;
+    private int rocketPadX, rocketPadY, rocketPadZ;
+    private final org.joml.Vector3f rocketReturnPos = new org.joml.Vector3f();
+    private float preRocketFov = 70f;
+    private static final float ROCKET_THRUST_MIN = 12f;
+    private static final float ROCKET_THRUST_MAX = 36f;
+    private static final float ROCKET_LAUNCH_Y = 248f;
+    private static final float SPACE_GRAVITY_SCALE = 0.30f;
+
     // Chat / commands
     private final com.voxelgame.chat.ChatManager chat = new com.voxelgame.chat.ChatManager();
     
     public void run() {
+        MenuTheme.setThemeIndex(settings.menuTheme);
         init();
         loop();
         cleanup();
@@ -280,6 +307,7 @@ public class Game {
             glViewport(0, 0, w, h);
             
             if (camera != null) camera.resize(w, h);
+            if (postProcess != null) postProcess.resize(w, h);
             if (ui != null) {
                 ui.resize(w, h);
                 screens.resize(ui.getWidth(), ui.getHeight());
@@ -299,6 +327,8 @@ public class Game {
                 c.charTyped((char) codepoint);
             } else if (top instanceof com.voxelgame.ui.screen.MultiplayerScreen m) {
                 m.charTyped((char) codepoint);
+            } else if (top instanceof com.voxelgame.ui.screen.CreativeInventoryScreen ci) {
+                ci.charTyped((char) codepoint);
             }
             if (chat.isOpen()) {
                 chat.charTyped((char) codepoint);
@@ -333,6 +363,8 @@ public class Game {
         skybox = new Skybox();
         cloudLayer = new CloudLayer();
         shadowMap = new ShadowMap();
+        // [PP] Post-processing stack (bloom/FXAA) sized to the current window
+        postProcess = new PostProcess(width, height);
         dayNight = new DayNightCycle();
         dayNight.setDayLengthSeconds(settings.dayLengthMinutes * 60.0);
         particles = new ParticleSystem();
@@ -506,18 +538,25 @@ public class Game {
     
     private void openCreativeInventory() {
         if (player.isCreative()) {
-            screens.open(new CreativeInventoryScreen(new CreativeInventoryScreen.Callbacks() {
+            CreativeInventoryScreen screen = new CreativeInventoryScreen(
+                new CreativeInventoryScreen.Callbacks() {
                 @Override public Inventory inventory() { return player.getInventory(); }
-                
+
                 @Override public void onPickBlock(BlockType block) {
                     player.getInventory().setHotbarItem(
                         player.getInventory().getSelectedSlot(), block, 64);
                 }
-                
+
                 @Override public void onSelectHotbarSlot(int index) {
                     player.getInventory().setSelectedSlot(index);
                 }
-            }, renderer.getTextureAtlas()));
+
+                @Override public ItemStack mouseItem() { return mouseItem; }
+                @Override public void onMouseItemChanged(ItemStack stack) { mouseItem = stack; }
+            }, renderer.getTextureAtlas());
+            // Creative destroys the cursor stack instead of dropping it
+            screen.onClose(() -> mouseItem.clear());
+            screens.open(screen);
         } else {
             openSurvivalInventory();
         }
@@ -535,8 +574,19 @@ public class Game {
                 }
                 @Override public ItemStack[] craftingGrid() { return player.getCraftingGrid(); }
                 @Override public void onCraft(ItemStack stack) { onCrafted(stack); }
+                @Override public void dropStack(ItemStack stack) {
+                    dropItem(player.getPosition(), stack);
+                }
             }, renderer.getTextureAtlas());
         screen.onClose(() -> {
+            // Vanilla: the 2x2 crafting grid empties back into the inventory
+            Inventory inv = player.getInventory();
+            ItemStack[] grid = player.getCraftingGrid();
+            for (int i = 0; i < grid.length; i++) {
+                if (grid[i] == null || grid[i].isEmpty()) continue;
+                ItemStack leftover = inv.addStack(grid[i]);
+                grid[i] = leftover.isEmpty() ? new ItemStack(BlockType.AIR, 0) : leftover;
+            }
             // Drop whatever is still on the cursor
             if (!mouseItem.isEmpty()) {
                 dropItem(player.getPosition(), mouseItem);
@@ -555,6 +605,9 @@ public class Game {
                 @Override public void onMouseItemChanged(ItemStack stack) { mouseItem = stack; }
                 @Override public void onClose() { closeScreens(); }
                 @Override public void onCraft(ItemStack stack) { onCrafted(stack); }
+                @Override public void dropStack(ItemStack stack) {
+                    dropItem(player.getPosition(), stack);
+                }
             }, renderer.getTextureAtlas());
         screen.onClose(() -> {
             if (!mouseItem.isEmpty()) {
@@ -610,6 +663,9 @@ public class Game {
                 @Override public ItemStack mouseItem() { return mouseItem; }
                 @Override public void onMouseItemChanged(ItemStack stack) { mouseItem = stack; }
                 @Override public ContainerData container() { return container; }
+                @Override public void dropStack(ItemStack stack) {
+                    dropItem(player.getPosition(), stack);
+                }
             }, renderer.getTextureAtlas());
         screen.onClose(() -> {
             if (!mouseItem.isEmpty()) {
@@ -631,6 +687,9 @@ public class Game {
                 @Override public int xpLevel() { return player.getXpLevel(); }
                 @Override public int xpProgress() { return player.getXpProgress(); }
                 @Override public boolean spendXp(int amount) { return player.spendXp(amount); }
+                @Override public void dropStack(ItemStack stack) {
+                    dropItem(player.getPosition(), stack);
+                }
             }, renderer.getTextureAtlas());
         screen.onClose(() -> {
             if (!mouseItem.isEmpty()) {
@@ -652,6 +711,9 @@ public class Game {
                 @Override public ItemStack mouseItem() { return mouseItem; }
                 @Override public void onMouseItemChanged(ItemStack stack) { mouseItem = stack; }
                 @Override public ContainerData container() { return container; }
+                @Override public void dropStack(ItemStack stack) {
+                    dropItem(player.getPosition(), stack);
+                }
             }, renderer.getTextureAtlas());
         screen.onClose(() -> {
             if (!mouseItem.isEmpty()) {
@@ -689,6 +751,12 @@ public class Game {
 
         // Use the new respawn method which finds a safe position
         player.respawn();
+
+        // Death wiped the inventory: hand out a fresh starter kit so
+        // respawning in survival is playable, like the first spawn
+        if (!player.isCreative() && player.getInventory().isCompletelyEmpty()) {
+            player.getInventory().giveStarterKit();
+        }
         
         // Update camera position
         camera.setPosition(new Vector3f(
@@ -709,12 +777,14 @@ public class Game {
             ItemStack stack = inv.getHotbarItem(i);
             if (!stack.isEmpty()) {
                 dropItem(pos, stack);
+                inv.setHotbarItem(i, new ItemStack(BlockType.AIR, 0));
             }
         }
         for (int i = 0; i < Inventory.MAIN_INVENTORY_SIZE; i++) {
             ItemStack stack = inv.getInventoryItem(i);
             if (!stack.isEmpty()) {
                 dropItem(pos, stack);
+                inv.setInventoryItem(i, new ItemStack(BlockType.AIR, 0));
             }
         }
     }
@@ -826,6 +896,12 @@ public class Game {
                 settings.shadows = on;
                 shadowsEnabled = on;
             }
+            @Override public void onBloomChanged(boolean on) {
+                settings.bloomEnabled = on;
+            }
+            @Override public void onFxaaChanged(boolean on) {
+                settings.fxaaEnabled = on;
+            }
             @Override public void onMenuThemeChanged(int theme) {
                 settings.menuTheme = theme;
             }
@@ -906,7 +982,16 @@ public class Game {
                 }
                 
                 if (item.isCloseTo(playerPos, 1.0f)) {
-                    if (player.getInventory().addItem(item.getStack().getBlockType(), item.getStack().getCount())) {
+                    ItemStack s = item.getStack();
+                    boolean picked;
+                    if (s.isBlock()) {
+                        picked = player.getInventory().addItem(s.getBlockType(), s.getCount());
+                    } else if (s.isItem() && s.getItem() != null) {
+                        picked = player.getInventory().addItem(s.getItem(), s.getCount());
+                    } else {
+                        picked = false;
+                    }
+                    if (picked) {
                         item.markDead();
                         toRemove.add(item);
                     }
@@ -962,12 +1047,14 @@ public class Game {
             + "' seed=" + meta.seed + " mode=" + meta.gameMode);
         
         activateWorld(meta, true);
+        configureDimension(meta);
     }
     
     /** Resume an existing save. */
     private void loadWorld(WorldMeta meta) {
         System.out.println("Loading world '" + meta.displayName + "'");
         activateWorld(meta, false);
+        configureDimension(meta);
     }
     
     /**
@@ -1044,6 +1131,14 @@ if (fresh) {
 
         // Load inventory from save
         deserializeInventory(player.getInventory(), meta.inventoryData);
+
+        // Survival always spawns with the starter kit: fresh worlds get it
+        // from the constructor, and a save with a wiped inventory (or a
+        // world converted from creative) is re-equipped here
+        if (meta.gameMode != WorldMeta.GameMode.CREATIVE
+                && player.getInventory().isCompletelyEmpty()) {
+            player.getInventory().giveStarterKit();
+        }
 
         panorama.setAnchor(spawnX, spawnY, spawnZ);
 
@@ -1122,61 +1217,353 @@ if (fresh) {
         System.out.println("Saved '" + meta.displayName + "' (" + chunks + " chunks)");
     }
 
+    // ------------------------------------------------------------------
+    // [SPACE] Dimension switching and rocket ride
+    // ------------------------------------------------------------------
+
+    /** Apply (or remove) the dark-sky space palette after a world swap. */
+    private void configureDimension(WorldMeta meta) {
+        spaceMode = "space".equals(meta.dimension);
+        dayNight.setSpaceMode(spaceMode);
+        dayNight.setPaused(spaceMode);
+        if (spaceMode) {
+            dayNight.setTime(0.35);
+            currentWeather = "clear";
+            overcast = 0;
+        }
+        if (player != null) {
+            player.setGravityScale(spaceMode ? SPACE_GRAVITY_SCALE : 1.0f);
+        }
+    }
+
+    /** True when the block type belongs to the rocket tower. */
+    private static boolean isRocketPart(int id) {
+        return id == BlockType.ROCKET_ENGINE.id
+            || id == BlockType.ROCKET_FUEL.id
+            || id == BlockType.ROCKET_BODY.id
+            || id == BlockType.ROCKET_WINDOW.id;
+    }
+
+    /**
+     * Scan upward from the launch pad and return {height, topBlockY} when the
+     * stack is a valid rocket: engine at the base, body parts in the middle,
+     * cone on top, nothing else above it.  Returns null on any mismatch.
+     */
+    private int[] detectRocket(int padX, int padY, int padZ) {
+        int base = padY + 1;
+        if (world.getBlock(padX, base, padZ) != BlockType.ROCKET_ENGINE.id) {
+            return null; // must start with the engine
+        }
+        int top = base;
+        boolean coneSeen = false;
+        for (int y = base; y < 256; y++) {
+            int b = world.getBlock(padX, y, padZ);
+            if (b == BlockType.ROCKET_CONE.id) {
+                top = y;
+                coneSeen = true;
+                break;
+            }
+            if (!isRocketPart(b)) {
+                return null;
+            }
+            top = y;
+        }
+        if (!coneSeen) return null;
+        // Nothing solid directly above the cone
+        int above = world.getBlock(padX, top + 1, padZ);
+        if (above != 0 && BlockType.fromId(above) != null && BlockType.fromId(above).solid) {
+            return null;
+        }
+        int height = top - base + 1;
+        return (height >= 3) ? new int[]{ height, top } : null;
+    }
+
+    /** Right-click handler for the launch pad: start the rocket or go home. */
+    private void handleLaunchPad(int px, int py, int pz) {
+        if (rocketRiding) return;
+        if (spaceMode) {
+            travelHome();
+            return;
+        }
+        if (world.getBlock(px, py - 1, pz) == BlockType.AIR.id) {
+            com.voxelgame.ui.toast.ToastManager tm = toastManager;
+            tm.enqueue(new com.voxelgame.ui.toast.AchievementToast(
+                "Запуск отменён", "Пад должен стоять на блоке", BlockType.ROCKET_LAUNCH_PAD.id, 0xFF808080));
+            return;
+        }
+        int[] tower = detectRocket(px, py, pz);
+        if (tower == null) {
+            toastManager.enqueue(new com.voxelgame.ui.toast.AchievementToast(
+                "Нет ракеты",
+                "Двигатель / корпус / конус над падом",
+                BlockType.ROCKET_LAUNCH_PAD.id, 0xFFFFAA00));
+            return;
+        }
+        startRocketRide(px, py, pz, tower[0], tower[1]);
+    }
+
+    private void startRocketRide(int px, int py, int pz, int height, int topY) {
+        rocketPadX = px; rocketPadY = py; rocketPadZ = pz;
+        rocketReturnPos.set(px + 0.5f, py + 1.1f, pz + 0.5f);
+        rocketRiding = true;
+        rocketProgress = 0f;
+        preRocketFov = camera.getFov();
+        player.setFlying(true);
+        player.getPosition().set(px + 0.5f, topY + 1.3f, pz + 0.5f);
+        camera.setPosition(new Vector3f(
+            player.getPosition().x, player.getPosition().y + eyeHeight, player.getPosition().z));
+        player.setVerticalVelocity(0);
+        player.setHorizontalVelocity(0, 0);
+        AudioManager.play("sounds/fuse", 1.0f, 0.6f);
+        toastManager.enqueue(new com.voxelgame.ui.toast.AchievementToast(
+            "Ракета в космос!", "Набор высоты...", BlockType.ROCKET_ENGINE.id, 0xFFFFAA00));
+    }
+
+    private void rocketRide(double dt) {
+        if (!rocketRiding || player == null) return;
+        float fdt = (float) dt;
+        rocketProgress += fdt;
+        float speed = java.lang.Math.min(ROCKET_THRUST_MAX, ROCKET_THRUST_MIN + rocketProgress * 22f);
+        player.setVerticalVelocity(speed);
+        // Camera stays attached to the player (updateViewBob runs after)
+        camera.setPosition(new Vector3f(
+            player.getPosition().x,
+            player.getPosition().y + eyeHeight,
+            player.getPosition().z));
+        // Thruster plume
+        Vector3f p = player.getPosition();
+        particles.emitRocketExhaust(p.x, p.y - 1.4f, p.z, speed / ROCKET_THRUST_MAX);
+        // Gentle camera shake
+        float t = java.lang.Math.min(1f, rocketProgress / 3f);
+        camera.setShake(
+            (float)(java.lang.Math.random() * 0.04) * t,
+            (float)(java.lang.Math.random() * 0.04) * t,
+            (float)(java.lang.Math.random() * 0.04) * t,
+            (float)(java.lang.Math.random() * 0.02) * t);
+        // Widen the fov for speed feel
+        camera.setFov(preRocketFov + 18f * java.lang.Math.min(1f, rocketProgress / 4f));
+        // Finish once high enough
+        if (player.getPosition().y >= ROCKET_LAUNCH_Y || rocketProgress >= 14f) {
+            rocketRiding = false;
+            camera.setFov(preRocketFov);
+            travelToSpace();
+        }
+    }
+
+    private void travelToSpace() {
+        if (currentSave == null || world == null) return;
+        WorldMeta homeMeta = currentSave.getMeta();
+        String homeFolder = homeMeta.folderName;
+
+        // Persist the overworld with the player standing on the pad
+        homeMeta.playerX = rocketReturnPos.x;
+        homeMeta.playerY = rocketReturnPos.y;
+        homeMeta.playerZ = rocketReturnPos.z;
+        homeMeta.playerYaw = camera.getYaw();
+        homeMeta.playerPitch = camera.getPitch();
+        homeMeta.playerHealth = player.getHealth();
+        homeMeta.playerHunger = player.getHunger();
+        homeMeta.inventoryData = serializeInventory(player.getInventory());
+        homeMeta.dayTime = dayNight.getTime();
+        homeMeta.selectedSlot = player.getInventory().getSelectedSlot();
+        currentSave.saveMeta();
+        // Flush modified chunks (the rocket you just rode) on a background thread
+        java.util.List<com.voxelgame.world.save.WorldSave.ChunkSnapshot> snaps =
+            world.snapshotDirtyChunks();
+        final com.voxelgame.world.save.WorldSave saveRef = currentSave;
+        final String homeName = homeMeta.displayName;
+        saveExecutor.submit(() -> {
+            int c = saveRef.writeSnapshots(snaps);
+            saveRef.createBackup();
+            System.out.println("Saved '" + homeName + "' (" + c + " chunks) before space jump");
+        });
+
+        // Create or load the linked space world
+        String spaceFolder = homeFolder + "_space";
+        boolean fresh = !com.voxelgame.world.save.WorldSave.exists(spaceFolder);
+        com.voxelgame.world.save.WorldSave spaceSave = null;
+        com.voxelgame.world.save.WorldMeta spaceMeta;
+        if (fresh) {
+            spaceMeta = new com.voxelgame.world.save.WorldMeta(
+                homeMeta.displayName + " Космос",
+                homeMeta.seed ^ 0x5DEECE66DL,
+                homeMeta.gameMode,
+                homeMeta.generateStructures);
+            spaceMeta.folderName = spaceFolder;
+            spaceMeta.dimension = "space";
+            spaceMeta.homeWorld = homeFolder;
+            spaceMeta.inventoryData = homeMeta.inventoryData;
+            spaceMeta.playerHealth = homeMeta.playerHealth;
+            spaceMeta.playerHunger = homeMeta.playerHunger;
+            spaceMeta.dayTime = 0.35;
+        } else {
+            spaceMeta = com.voxelgame.world.save.WorldSave.readWorld(spaceFolder);
+            if (spaceMeta == null) {
+                spaceMeta = new com.voxelgame.world.save.WorldMeta(
+                    homeMeta.displayName + " Космос",
+                    homeMeta.seed ^ 0x5DEECE66DL,
+                    homeMeta.gameMode,
+                    homeMeta.generateStructures);
+                spaceMeta.folderName = spaceFolder;
+                spaceMeta.dimension = "space";
+                spaceMeta.homeWorld = homeFolder;
+                spaceMeta.dayTime = 0.35;
+                fresh = true; // couldn't load; treat as new
+            } else {
+                spaceMeta.inventoryData = homeMeta.inventoryData;
+                spaceMeta.playerHealth = homeMeta.playerHealth;
+                spaceMeta.playerHunger = homeMeta.playerHunger;
+            }
+        }
+        activateWorld(spaceMeta, fresh);
+        configureDimension(spaceMeta);
+        if (fresh) {
+            // Build a landing pad with platform at the space spawn so the player
+            // can always fly home.
+            int sx = (int) spaceMeta.spawnX;
+            int sz = (int) spaceMeta.spawnZ;
+            int g = java.lang.Math.max(world.getGroundHeight(sx, sz), 62);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    world.setBlock(sx + dx, g, sz + dz, BlockType.SANDSTONE_BRICKS.id);
+                }
+            }
+            world.setBlock(sx, g + 1, sz, BlockType.ROCKET_LAUNCH_PAD.id);
+            float px = sx + 0.5f, py = g + 2.5f, pz = sz + 0.5f;
+            player.getPosition().set(px, py, pz);
+            camera.setPosition(new Vector3f(px, py + eyeHeight, pz));
+            currentSave.saveMeta();
+        }
+        toastManager.enqueue(new com.voxelgame.ui.toast.AchievementToast(
+            "Прибытие на планету",
+            "Радиация за бортом — готовь ракету",
+            BlockType.ROCKET_CONE.id, 0xFF40C0FF));
+    }
+
+    private void travelHome() {
+        if (currentSave == null || world == null || !spaceMode) return;
+        com.voxelgame.world.save.WorldSave spaceSave = currentSave;
+        com.voxelgame.world.save.WorldMeta spaceMeta = spaceSave.getMeta();
+        String homeFolder = spaceMeta.homeWorld;
+        if (homeFolder == null || !com.voxelgame.world.save.WorldSave.exists(homeFolder)) {
+            toastManager.enqueue(new com.voxelgame.ui.toast.AchievementToast(
+                "Ошибка", "Родной мир не найден", -1, 0xFFFF4040));
+            return;
+        }
+        // Persist the space world
+        Vector3f sp = player.getPosition();
+        spaceMeta.playerX = sp.x; spaceMeta.playerY = sp.y; spaceMeta.playerZ = sp.z;
+        spaceMeta.playerYaw = camera.getYaw(); spaceMeta.playerPitch = camera.getPitch();
+        spaceMeta.playerHealth = player.getHealth();
+        spaceMeta.playerHunger = player.getHunger();
+        spaceMeta.inventoryData = serializeInventory(player.getInventory());
+        spaceMeta.dayTime = dayNight.getTime();
+        spaceMeta.selectedSlot = player.getInventory().getSelectedSlot();
+        spaceSave.saveMeta();
+        java.util.List<com.voxelgame.world.save.WorldSave.ChunkSnapshot> snaps =
+            world.snapshotDirtyChunks();
+        saveExecutor.submit(() -> {
+            int c = spaceSave.writeSnapshots(snaps);
+            spaceSave.createBackup();
+            System.out.println("Saved space world (" + c + " chunks)");
+        });
+
+        // Load the home world and place the player back on the pad
+        com.voxelgame.world.save.WorldMeta homeMeta =
+            com.voxelgame.world.save.WorldSave.readWorld(homeFolder);
+        homeMeta.playerX = rocketReturnPos.x;
+        homeMeta.playerY = rocketReturnPos.y;
+        homeMeta.playerZ = rocketReturnPos.z;
+        homeMeta.playerHealth = spaceMeta.playerHealth;
+        homeMeta.playerHunger = spaceMeta.playerHunger;
+        homeMeta.inventoryData = spaceMeta.inventoryData;
+        homeMeta.selectedSlot = player.getInventory().getSelectedSlot();
+        activateWorld(homeMeta, false);
+        configureDimension(homeMeta);
+        toastManager.enqueue(new com.voxelgame.ui.toast.AchievementToast(
+            "Добро пожаловать домой!", homeMeta.displayName, BlockType.LANTERN.id, 0xFF80DDFF));
+    }
+
     /** Serialize inventory to string: "slot:id:count:durability;..." */
+    /**
+     * Slots as "slot:b:blockId:count:durability" / "slot:i:itemId:count:durability".
+     * The b/i letter disambiguates blocks with ids above 127 from items,
+     * which the old purely-numeric encoding could not do.
+     */
     private String serializeInventory(Inventory inv) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
-            ItemStack item = inv.getHotbarItem(i);
-            if (!item.isEmpty()) {
-                int id = item.isBlock() ? item.getBlockType().id : (item.getItem() != null ? 128 + item.getItem().id : 0);
-                if (id > 0) {
-                    if (sb.length() > 0) sb.append(';');
-                    sb.append(i).append(':').append(id).append(':').append(item.getCount()).append(':').append(item.getDurability());
-                }
-            }
+            appendInventorySlot(sb, i, inv.getHotbarItem(i));
         }
         for (int i = 0; i < Inventory.MAIN_INVENTORY_SIZE; i++) {
-            ItemStack item = inv.getInventoryItem(i);
-            if (!item.isEmpty()) {
-                int id = item.isBlock() ? item.getBlockType().id : (item.getItem() != null ? 128 + item.getItem().id : 0);
-                if (id > 0) {
-                    if (sb.length() > 0) sb.append(';');
-                    sb.append(i + 9).append(':').append(id).append(':').append(item.getCount()).append(':').append(item.getDurability());
-                }
-            }
+            appendInventorySlot(sb, 9 + i, inv.getInventoryItem(i));
         }
         return sb.toString();
     }
 
-    /** Deserialize inventory from string. */
+    private void appendInventorySlot(StringBuilder sb, int slot, ItemStack item) {
+        if (item.isEmpty()) return;
+        char kind;
+        int id;
+        if (item.isBlock()) {
+            kind = 'b';
+            id = item.getBlockType().id;
+        } else if (item.getItem() != null) {
+            kind = 'i';
+            id = item.getItem().id;
+        } else {
+            return;
+        }
+        if (sb.length() > 0) sb.append(';');
+        sb.append(slot).append(':').append(kind).append(':').append(id)
+          .append(':').append(item.getCount()).append(':').append(item.getDurability());
+    }
+
+    /**
+     * Deserialize inventory from string. Accepts the new lettered format and
+     * the legacy numeric one ("slot:id:count[:durability]", items stored as
+     * 128 + itemId). The old reader wrapped ids in a byte, so every item id
+     * above 127 turned negative and the item silently vanished on load.
+     */
     private void deserializeInventory(Inventory inv, String data) {
         if (data == null || data.isEmpty()) return;
         for (String entry : data.split(";")) {
             String[] parts = entry.split(":");
             if (parts.length < 3) continue;
-            int slot = Integer.parseInt(parts[0]);
-            int id = Integer.parseInt(parts[1]);
-            int count = Integer.parseInt(parts[2]);
-            int durability = parts.length > 3 ? Integer.parseInt(parts[3]) : 0;
+            try {
+                int slot = Integer.parseInt(parts[0]);
+                boolean isItem;
+                int id, count, durability;
+                if (parts.length >= 5 && (parts[1].equals("b") || parts[1].equals("i"))) {
+                    isItem = parts[1].equals("i");
+                    id = Integer.parseInt(parts[2]);
+                    count = Integer.parseInt(parts[3]);
+                    durability = Integer.parseInt(parts[4]);
+                } else {
+                    id = Integer.parseInt(parts[1]);
+                    count = Integer.parseInt(parts[2]);
+                    durability = parts.length > 3 ? Integer.parseInt(parts[3]) : 0;
+                    isItem = id >= 128;
+                    if (isItem) id -= 128;
+                }
 
-            if (id < 128) {
-                ItemStack stack = new ItemStack(com.voxelgame.world.BlockType.fromId((byte) id), count);
-                if (slot < 9) {
-                    inv.setHotbarItem(slot, stack.getBlockType(), count);
+                if (slot < 0 || slot >= 9 + Inventory.MAIN_INVENTORY_SIZE) continue;
+
+                if (isItem) {
+                    Item it = ItemRegistry.getById(id);
+                    if (it == null) continue;
+                    if (slot < 9) inv.setHotbarItem(slot, it, count);
+                    else inv.setInventoryItem(slot - 9, it, count);
+                    ItemStack stored = slot < 9
+                        ? inv.getHotbarItem(slot) : inv.getInventoryItem(slot - 9);
+                    stored.setDurability(durability);
                 } else {
-                    inv.setInventoryItem(slot - 9, stack.getBlockType(), count);
+                    BlockType block = BlockType.fromId(id);
+                    if (block == null) continue;
+                    if (slot < 9) inv.setHotbarItem(slot, block, count);
+                    else inv.setInventoryItem(slot - 9, block, count);
                 }
-            } else {
-                Item it = ItemRegistry.getById((byte) (id - 128));
-                if (it == null) continue;
-                if (slot < 9) {
-                    inv.setHotbarItem(slot, it, count);
-                } else {
-                    inv.setInventoryItem(slot - 9, it, count);
-                }
-                ItemStack stored = slot < 9 ? inv.getHotbarItem(slot) : inv.getInventoryItem(slot - 9);
-                stored.setDurability(durability);
-            }
+            } catch (NumberFormatException ignored) {}
         }
     }
     
@@ -1340,6 +1727,13 @@ if (fresh) {
         lightningFlash = java.lang.Math.max(0.0f, lightningFlash - dt * 2.5f);
 
         if (player == null) return;
+
+        // [SPACE] Space planets always have a clear sky
+        if (spaceMode) {
+            currentWeather = "clear";
+            overcast = 0;
+            return;
+        }
 
         float targetOvercast = switch (currentWeather == null ? "clear" : currentWeather) {
             case "thunder" -> 1.0f;
@@ -1522,6 +1916,7 @@ if (fresh) {
             deltaTime = currentFrame - lastFrame;
             lastFrame = currentFrame;
             frameCount++;
+            FrameTimer.reset();
             
             // Update FPS counter
             fpsTimer += deltaTime;
@@ -1564,6 +1959,7 @@ if (!paused) {
                 deltaTime = java.lang.Math.min(deltaTime, 0.1);
                 tickAccumulator += deltaTime;
                 // Run world logic at a fixed 60 Hz regardless of actual framerate
+                long worldStart = System.nanoTime();
                 while (tickAccumulator >= TICK_RATE) {
                     tickAccumulator -= TICK_RATE;
                     double realDelta = deltaTime;
@@ -1571,6 +1967,7 @@ if (!paused) {
                     updateWorld();
                     deltaTime = realDelta;
                 }
+                FrameTimer.add(FrameTimer.WORLD, System.nanoTime() - worldStart);
             } else {
                 player.setHorizontalVelocity(0, 0);
                 tickAccumulator = 0;
@@ -1589,6 +1986,13 @@ if (!paused) {
             }
             
             screens.update(deltaTime);
+
+            // Cursor follow-up: the open/pop fade defers the stack swap, so
+            // re-apply cursor mode whenever the visible top screen changes
+            if (screens.revision() != lastScreensRevision) {
+                lastScreensRevision = screens.revision();
+                applyCursorMode();
+            }
             
             // Earthquake shake: keep the world steady while a menu is open
             if (paused) {
@@ -1621,6 +2025,11 @@ if (!paused) {
         // Typing in chat blocks movement; stop the player so they don't
         // coast while the world around them keeps running
         if (chat.isOpen()) {
+            player.setHorizontalVelocity(0, 0);
+            return;
+        }
+        // [SPACE] The rocket flies itself; lock player input during the ascent
+        if (rocketRiding) {
             player.setHorizontalVelocity(0, 0);
             return;
         }
@@ -1683,6 +2092,9 @@ if (!paused) {
 
         // [BED] Sleeping: fade out, jump to sunrise, fade back in
         updateSleep();
+
+        // [SPACE] Autonomous rocket ascent while flying to the space dimension
+        rocketRide(deltaTime);
 
         // Update mobs
         world.updateMobs((float) deltaTime, player);
@@ -2438,6 +2850,15 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         AudioManager.play("sounds/steps/" + surface, pitch, 0.35f);
     }
 
+    /** [MC] Doors occupy two cells: breaking either half removes the other. */
+    private void removeDoorOtherHalf(int x, int y, int z) {
+        int below = world.getBlock(x, y - 1, z);
+        int otherY = com.voxelgame.world.block.DoorBlock.isDoorId(below) ? y - 1 : y + 1;
+        if (com.voxelgame.world.block.DoorBlock.isDoorId(world.getBlock(x, otherY, z))) {
+            localSetBlock(x, otherY, z, (byte) 0);
+        }
+    }
+
     /** Play a louder break sound when a block is destroyed. */
     private void playBreakSound(BlockType type) {
         String surface = blockToSurface(type);
@@ -2491,6 +2912,10 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             dropContainerContents(target.x, target.y, target.z);
         }
         localSetBlock(target.x, target.y, target.z, (byte) 0);
+        // [MC] The other half of a door breaks with it
+        if (type == BlockType.OAK_DOOR || type == BlockType.OAK_DOOR_OPEN) {
+            removeDoorOtherHalf(target.x, target.y, target.z);
+        }
         // [BED] The other half of a bed breaks with it, dropping nothing
         if (type == BlockType.BED || type == BlockType.BED_HEAD) {
             breakBedPair(target.x, target.y, target.z);
@@ -2514,6 +2939,11 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         }
 
         localSetBlock(breakingBlock.x, breakingBlock.y, breakingBlock.z, (byte) 0);
+
+        // [MC] The other half of a door breaks with it
+        if (type == BlockType.OAK_DOOR || type == BlockType.OAK_DOOR_OPEN) {
+            removeDoorOtherHalf(breakingBlock.x, breakingBlock.y, breakingBlock.z);
+        }
 
         // [BED] The other half of a bed breaks with it, dropping nothing
         if (type == BlockType.BED || type == BlockType.BED_HEAD) {
@@ -2749,28 +3179,44 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         glFrontFace(GL_CCW);
         
         // Build/refresh chunk meshes before anything reads them
+        long tRebuild = System.nanoTime();
         renderer.prepare(world);
+        FrameTimer.add(FrameTimer.REBUILD, System.nanoTime() - tRebuild);
         
         // Pass 1: scene depth from the sun, into the shadow FBO.
         // Skipped at night - there is no direct light to occlude, so the
-        // whole pass would be wasted work.
+        // whole pass would be wasted work. The depth map only ever holds
+        // chunk geometry, so it is cached and re-rendered only when chunk
+        // geometry changed or the light space crossed a texel boundary.
         boolean castingShadows = shadowsEnabled && dayNight.getDaylight() > 0.05f;
         if (castingShadows) {
-            shadowMap.update(camera.getPosition(), dayNight.getSunDirection());
-            shadowMap.beginDepthPass();
-            renderer.renderShadowPass(world, camera, shadowMap.getDepthShader(), shadowMap);
-            shadowMap.endDepthPass(width, height);
-            
-            // endDepthPass restores the viewport; re-assert world render state
-            glFrontFace(GL_CCW);
-            if (!cullingEnabled) glDisable(GL_CULL_FACE);
+            boolean forceShadow = !wasCastingShadows
+                || renderer.getRemeshGeneration() != lastShadowRemesh;
+            long tShadow = System.nanoTime();
+            boolean redrawShadow = shadowMap.updateIfNeeded(
+                camera.getPosition(), dayNight.getSunDirection(), forceShadow);
+            if (redrawShadow) {
+                shadowMap.beginDepthPass();
+                renderer.renderShadowPass(world, camera, shadowMap.getDepthShader(), shadowMap);
+                shadowMap.endDepthPass(width, height);
+                lastShadowRemesh = renderer.getRemeshGeneration();
+                wasCastingShadows = true;
+
+                // endDepthPass restores the viewport; re-assert world render state
+                glFrontFace(GL_CCW);
+                if (!cullingEnabled) glDisable(GL_CULL_FACE);
+            }
+            FrameTimer.add(FrameTimer.SHADOW, System.nanoTime() - tShadow);
+        } else {
+            wasCastingShadows = false;
         }
         
         // Clear to the current horizon colour: the skybox covers everything,
-        // but this keeps any gap consistent with the time of day
+        // but this keeps any gap consistent with the time of day. The whole
+        // 3D frame is rendered into the post-processing scene FBO.
+        long tScene = System.nanoTime();
         Vector3f horizon = dayNight.getHorizonColor();
-        glClearColor(horizon.x, horizon.y, horizon.z, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        postProcess.beginScene(width, height, horizon);
         
         // Sky first, while the depth buffer is still empty
         skybox.render(camera, dayNight, overcast, lightningFlash);
@@ -2791,7 +3237,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
 
         // [WG] Biome fog: mix the player's biome fog colour into the band
         Vector3f fogColor = dayNight.getHorizonColor();
-        if (world != null) {
+        if (!spaceMode && world != null) {
             com.voxelgame.world.biome.BiomeData biome = world.getDataBiomeAt(
                 (int) camera.getPosition().x, (int) camera.getPosition().z);
             if (biome != null && biome.fogColor != 0) {
@@ -2838,6 +3284,13 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         shader.setUniform3f("trampleOrigin", tmpTrample);
         shader.setUniform1f("trampleRadius", 1.5f);
         shader.setUniform1i("waterLayer", renderer.getTextureAtlas().getWaterLayer());
+
+        // [GLASS] Window panes: the glass layer skips the alpha test and gets
+        // a fresnel sky reflection; ice and glass share the same highlight
+        shader.setUniform1i("glassLayer", renderer.getTextureAtlas().getGlassLayer());
+        shader.setUniform1i("iceLayer", renderer.getTextureAtlas().getIceLayer());
+        // [SHINE] Subtle specular sheen on every surface (0 = off, ~0.3 = subtle)
+        shader.setUniform1f("specStrength", 0.30f);
 
         // [GR-015] Lava layer for shader-side animation
         shader.setUniform1i("lavaLayer", renderer.getTextureAtlas().getLavaLayer());
@@ -2901,8 +3354,11 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
 
         // Clouds pass after all opaque geometry: depth is tested against the
         // terrain but never written, so the deck blends at 80% opacity
-        cloudLayer.update(deltaTime, camera.getPosition());
-        cloudLayer.render(camera, dayNight.getDaylight());
+        // [SPACE] Space planets have no atmosphere — skip the cloud layer
+        if (!spaceMode) {
+            cloudLayer.update(deltaTime, camera.getPosition());
+            cloudLayer.render(camera, dayNight.getDaylight());
+        }
 
         // Particles sit between the world and the UI: depth-tested against
         // terrain, but not writing depth so they blend with each other
@@ -2929,8 +3385,27 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             crackOverlay.render(breakingBlock.x, breakingBlock.y, breakingBlock.z,
                 stage, camera, renderer.getTextureAtlas());
         }
+        FrameTimer.add(FrameTimer.SCENE, System.nanoTime() - tScene);
         
+        // [PP] Resolve the 3D frame and post-process it (bloom + FXAA),
+        // restoring the default framebuffer before the 2D interface draws
+        long tPost = System.nanoTime();
+        postProcess.renderScene(width, height, settings.bloomEnabled, settings.fxaaEnabled);
+
+        // [Glass] When a menu sits on top of the live world, frost the scene
+        // into a blurred backdrop so UI panels can read as frosted glass
+        Screen top = screens.current();
+        if (screens.isOpen() && top != null && top.usesBlurredBackdrop()) {
+            postProcess.blurSceneForBackdrop();
+            MenuTheme.blurredBackdrop = postProcess.getBackdropTexture();
+        } else {
+            MenuTheme.blurredBackdrop = 0;
+        }
+        FrameTimer.add(FrameTimer.POST, System.nanoTime() - tPost);
+
+        long tUi = System.nanoTime();
         renderInterface();
+        FrameTimer.add(FrameTimer.UI, System.nanoTime() - tUi);
     }
     
     /**
@@ -2956,7 +3431,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         // HUD only while actually playing
         if (!screens.isOpen()) {
             hud.update(deltaTime, player.getInventory().getSelectedSlot(), player.getHealth());
-            hud.render(ui, font, uiTextures, player.getInventory(), collectDebugInfo());
+            hud.render(ui, font, uiTextures, player.getInventory(), collectDebugInfo(), world);
         }
         
         screens.render(ui, font, uiTextures, guiMouseX(), guiMouseY());
@@ -3043,6 +3518,8 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         debugInfo.air = player.getAir();
         debugInfo.maxAir = player.getMaxAir();
         debugInfo.eatProgress = player.getEatProgress();
+        // [POT] Copy active effects for the HUD icons
+        debugInfo.activeEffects = player.getActiveEffects();
         debugInfo.gameMode = player.getGameMode();
         debugInfo.biomeName = world.getBiomeDisplayName((int) pos.x, (int) pos.z);
         debugInfo.guiScale = ui.getScale();
@@ -3057,6 +3534,13 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         debugInfo.workers = world.getLoader().getWorkerCount();
         debugInfo.leafTriangles = renderer.getLeafTriangles();
         debugInfo.leafChunks = renderer.getLeafChunks();
+        // [OPT] Per-pass frame timings from this frame
+        debugInfo.rebuildUs = FrameTimer.us(FrameTimer.REBUILD);
+        debugInfo.shadowUs = FrameTimer.us(FrameTimer.SHADOW);
+        debugInfo.worldUs = FrameTimer.us(FrameTimer.WORLD);
+        debugInfo.sceneUs = FrameTimer.us(FrameTimer.SCENE);
+        debugInfo.postUs = FrameTimer.us(FrameTimer.POST);
+        debugInfo.uiUs = FrameTimer.us(FrameTimer.UI);
         // [UI-009] Chunks still streaming in (or waiting for their mesh)
         debugInfo.loadingChunks = world.isLoadingChunks()
             || renderer.getMeshBacklog() > 0;
@@ -3214,6 +3698,9 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         boolean crit = !player.isOnGround() && vel.y < -0.5f;
         if (crit) dmg *= 1.5f;
 
+        // [POT] Strength effect boosts melee damage (+50% per level)
+        dmg *= player.getStrengthMultiplier();
+
         if (hitVillager != null) {
             hitVillager.takeDamage(dmg);
             if (hitVillager.isDead()) {
@@ -3358,6 +3845,10 @@ if (targeted == BlockType.CHEST) {
                         localSetBlock(targetedBlock.x, targetedBlock.y, targetedBlock.z, (byte) 0);
                         AudioManager.play("sounds/fuse", 1.0f, 0.5f);
                         return;
+                    } else if (targeted == BlockType.ROCKET_LAUNCH_PAD) {
+                        // [SPACE] Launch the rocket built above, or return home
+                        handleLaunchPad(targetedBlock.x, targetedBlock.y, targetedBlock.z);
+                        return;
                     }
                 }
 
@@ -3440,8 +3931,19 @@ if (targeted == BlockType.CHEST) {
                     }
                 }
 
-                // Survival + holding food = start eating (any food item or the apple block)
+                // [POT] Right-click a potion: drink it instantly and apply its effect
                 ItemStack heldStack = player.getInventory().getSelectedItem();
+                if (heldStack.isItem() && heldStack.getItem() != null
+                        && heldStack.getItem().isPotion()) {
+                    com.voxelgame.item.Item potion = heldStack.getItem();
+                    player.applyPotion(potion.potionEffect, 1, potion.potionEffect.baseDurationTicks);
+                    if (!player.isCreative()) {
+                        player.getInventory().removeSelectedItem();
+                    }
+                    return;
+                }
+
+                // Survival + holding food = start eating (any food item or the apple block)
                 boolean isFood = heldStack.isItem() && heldStack.getItem() != null
                     && heldStack.getItem().isFood();
                 if (heldStack.isBlock() && heldStack.getBlockType() == BlockType.APPLE) {
@@ -3466,6 +3968,25 @@ if (targeted == BlockType.CHEST) {
                                 if (placeBed(targetedBlock.placeX, targetedBlock.placeY,
                                         targetedBlock.placeZ)) {
                                     playPlaceSound(BlockType.BED);
+                                    AchievementRegistry.trigger("place_block");
+                                    if (!player.isCreative()) {
+                                        player.getInventory().removeSelectedItem();
+                                    }
+                                }
+                                return;
+                            }
+                            // [MC] Doors occupy two cells: the placement cell
+                            // takes the lower half, the cell above the upper
+                            if (blockId == BlockType.OAK_DOOR.id) {
+                                int lx = targetedBlock.placeX;
+                                int ly = targetedBlock.placeY;
+                                int lz = targetedBlock.placeZ;
+                                int above = world.getBlock(lx, ly + 1, lz);
+                                if (above != 0) return; // needs a free upper cell
+                                if (world.placeBlock(camera.getPosition(), camera.getFront(),
+                                        blockId, player.getPosition(), 0.6f, 1.8f)) {
+                                    world.setBlock(lx, ly + 1, lz, BlockType.OAK_DOOR.id);
+                                    playPlaceSound(BlockType.OAK_DOOR);
                                     AchievementRegistry.trigger("place_block");
                                     if (!player.isCreative()) {
                                         player.getInventory().removeSelectedItem();
@@ -3507,11 +4028,24 @@ netClient.sendBlockChange(world.getLastPlacedX(),
             screens.mouseScrolled(guiMouseX(), guiMouseY(), yoffset);
             return;
         }
+        // Wheel over the corner map zooms it instead of scrolling the hotbar
+        if (hud.isMinimapVisible() && hud.minimapHover(guiMouseX(), guiMouseY())) {
+            hud.minimapZoom(yoffset > 0 ? -1 : 1);
+            return;
+        }
         player.getInventory().scrollSlot(yoffset > 0 ? -1 : 1);
         heldItem.startEquip();
     }
     
     private void keyCallback(long win, int key, int scancode, int action, int mods) {
+        // Track modifiers for the inventory screens before anything else
+        if (key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT) {
+            shiftKeyDown = action != GLFW_RELEASE;
+        }
+        if (key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_RIGHT_CONTROL) {
+            ctrlKeyDown = action != GLFW_RELEASE;
+        }
+
         // --- Chat input takes priority when open ---
         if (chat.isOpen()) {
             if (action == GLFW_PRESS || action == GLFW_REPEAT) {
@@ -3578,12 +4112,17 @@ netClient.sendBlockChange(world.getLastPlacedX(),
         // Let the open screen consume the key first
         if (screens.isOpen()) {
             if (screens.keyPressed(key, mods)) return;
-            
+
             Screen top = screens.current();
-            
-            // E closes the inventory, mirroring the key that opened it
+
+            // E closes any container/inventory screen, mirroring the key
+            // that opened it
             if (key == keyBindings.get(KeyBindings.Action.INVENTORY)
-                && top instanceof CreativeInventoryScreen) {
+                && (top instanceof CreativeInventoryScreen
+                    || top instanceof SurvivalInventoryScreen
+                    || top instanceof CraftingScreen
+                    || top instanceof ChestScreen
+                    || top instanceof FurnaceScreen)) {
                 closeScreens();
                 return;
             }
@@ -3640,6 +4179,10 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                     break;
                 case GLFW_KEY_F3:
                     hud.toggleDebug();
+                    break;
+
+                case GLFW_KEY_M:
+                    hud.toggleMinimap();
                     break;
                 
                 case GLFW_KEY_SPACE:
@@ -3931,7 +4474,7 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                 catch (NumberFormatException e) {
                     throw new IllegalArgumentException("unknown block/item: " + arg(t, 1));
                 }
-                Item it = ItemRegistry.getById((byte) id);
+                Item it = ItemRegistry.getById(id);
                 if (it == null) throw new IllegalArgumentException("unknown item id: " + id);
                 player.getInventory().setHotbarItem(0, it, count);
                 out.accept("gave " + count + "x " + arg(t, 1));
@@ -3945,8 +4488,45 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                     : WorldMeta.GameMode.CREATIVE;
                 WorldMeta meta = new WorldMeta(name, seed, mode, true);
                 activateWorld(meta, true);
+                configureDimension(meta);
                 out.accept("created world '" + name + "' seed=" + seed + " mode=" + mode
                     + " spawn=" + player.getPosition());
+            }
+
+            case "space_world" -> {
+                // [SPACE] Debug: jump straight to a space dimension planet
+                requireWorld(out);
+                WorldMeta cur = currentSave.getMeta();
+                String spaceFolder = cur.folderName + "_space";
+                boolean fresh = !WorldSave.exists(spaceFolder);
+                WorldMeta spaceMeta = fresh
+                    ? new WorldMeta(cur.displayName + " Космос",
+                        cur.seed ^ 0x5DEECE66DL, cur.gameMode, cur.generateStructures)
+                    : WorldSave.readWorld(spaceFolder);
+                if (fresh) {
+                    spaceMeta.folderName = spaceFolder;
+                    spaceMeta.dimension = "space";
+                    spaceMeta.homeWorld = cur.folderName;
+                    spaceMeta.dayTime = 0.35;
+                }
+                activateWorld(spaceMeta, fresh);
+                configureDimension(spaceMeta);
+                if (fresh) {
+                    int sx = (int) spaceMeta.spawnX;
+                    int sz = (int) spaceMeta.spawnZ;
+                    int g = java.lang.Math.max(world.getGroundHeight(sx, sz), 62);
+                    for (int dx = -1; dx <= 1; dx++) {
+                        for (int dz = -1; dz <= 1; dz++) {
+                            world.setBlock(sx + dx, g, sz + dz, BlockType.SANDSTONE_BRICKS.id);
+                        }
+                    }
+                    world.setBlock(sx, g + 1, sz, BlockType.ROCKET_LAUNCH_PAD.id);
+                    float px = sx + 0.5f, py = g + 2.5f, pz = sz + 0.5f;
+                    player.getPosition().set(px, py, pz);
+                    camera.setPosition(new Vector3f(px, py + eyeHeight, pz));
+                    currentSave.saveMeta();
+                }
+                out.accept("teleported to space planet '" + spaceFolder + "'");
             }
 
             case "load_world" -> {
@@ -3959,6 +4539,7 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                 }
                 if (meta == null) throw new IllegalArgumentException("world not found: " + arg(t, 1));
                 activateWorld(meta, false);
+                configureDimension(meta);
                 out.accept("loaded world '" + meta.displayName + "'");
             }
 
@@ -3981,6 +4562,28 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                 int n = world.getMobs().size();
                 world.getMobs().clear();
                 out.accept("removed " + n + " mobs");
+            }
+
+            case "ui" -> {
+                // Debug helper: open a container screen for visual checks
+                String which = t.length > 1 ? t[1].toLowerCase(java.util.Locale.ROOT) : "inventory";
+                switch (which) {
+                    case "inventory", "survival" -> openSurvivalInventory();
+                    case "creative" -> openCreativeInventory();
+                    case "crafting" -> openCrafting();
+                    case "furnace" -> openFurnace(
+                        (int) java.lang.Math.floor(player.getPosition().x),
+                        (int) java.lang.Math.floor(player.getPosition().y),
+                        (int) java.lang.Math.floor(player.getPosition().z));
+                    case "chest" -> openChest(
+                        (int) java.lang.Math.floor(player.getPosition().x),
+                        (int) java.lang.Math.floor(player.getPosition().y),
+                        (int) java.lang.Math.floor(player.getPosition().z));
+                    case "enchanting" -> openEnchanting();
+                    default -> { out.accept("unknown screen: " + which); return; }
+                }
+                applyCursorMode();
+                out.accept("opened ui: " + which);
             }
 
             case "quit" -> glfwSetWindowShouldClose(window, true);
@@ -4037,12 +4640,14 @@ private void cleanup() {
         skybox.cleanup();
         cloudLayer.cleanup();
         shadowMap.cleanup();
+        if (postProcess != null) postProcess.cleanup();
         particles.cleanup();
         heldItem.cleanup();
         if (playerBodyRenderer != null) playerBodyRenderer.cleanup();
         if (blockOutline != null) blockOutline.cleanup();
         if (crackOverlay != null) crackOverlay.cleanup();
         skin.cleanup();
+        hud.cleanup();
         ui.cleanup();
         font.cleanup();
         uiTextures.cleanup();

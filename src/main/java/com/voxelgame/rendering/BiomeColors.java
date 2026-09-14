@@ -88,9 +88,11 @@ public final class BiomeColors {
 
     public static boolean isFoliage(int blockId) {
         BlockType t = BlockType.fromId(blockId);
-        // GRASS_BLOCK and BIRCH_LEAVES use colored PNG textures (no tint needed)
+        // Grass blocks and the leaf tiles now ship as desaturated bases: the
+        // biome tint supplies the hue, exactly like the vanilla colormap
         return t == BlockType.OAK_LEAVES || t == BlockType.SPRUCE_LEAVES
-            || t == BlockType.JUNGLE_LEAVES
+            || t == BlockType.JUNGLE_LEAVES || t == BlockType.BIRCH_LEAVES
+            || t == BlockType.GRASS_BLOCK
             || t == BlockType.GRASS_PLANT;
     }
 
@@ -150,6 +152,7 @@ public final class BiomeColors {
         if (type == BlockType.GRASS_BLOCK && face == 3) return NEUTRAL;
 
         if (type == BlockType.SPRUCE_LEAVES) return SPRUCE_TINT_F;
+        if (type == BlockType.BIRCH_LEAVES) return BIRCH_TINT_F;
 
         boolean grass = (type == BlockType.GRASS_BLOCK || type == BlockType.GRASS_PLANT);
 

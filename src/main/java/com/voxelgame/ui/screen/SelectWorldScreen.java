@@ -150,22 +150,9 @@ public class SelectWorldScreen extends Screen {
         font.drawScaledWithShadow(ui, title, (width - tw) / 2f, cardTop + 8, 2, 0xFFFFFFFF);
         MenuTheme.drawSeparator(ui, 0xFF000000, width / 2f, cardTop + 30, tw / 2f + 10);
 
-        // List background
-        ui.fillRect(listX, listY, listW, listH,
-            MenuTheme.col(0xFF000000, 200, MenuTheme.PANEL_BG));
-        // Inset bevel
-        ui.fillRect(listX, listY, listW, 1,
-            MenuTheme.col(0xFF000000, 255, MenuTheme.PANEL_BORDER));
-        ui.fillRect(listX, listY + listH - 1, listW, 1,
-            MenuTheme.col(0xFF000000, 255, MenuTheme.PANEL_BORDER));
-        ui.fillRect(listX, listY, 1, listH,
-            MenuTheme.col(0xFF000000, 255, MenuTheme.PANEL_BORDER));
-        ui.fillRect(listX + listW - 1, listY, 1, listH,
-            MenuTheme.col(0xFF000000, 255, MenuTheme.PANEL_BORDER));
-        ui.fillRect(listX + 1, listY + 1, listW - 2, 1,
-            MenuTheme.col(0xFF000000, 255, MenuTheme.PANEL_EDGE_D));
-        ui.fillRect(listX + 1, listY + 1, 1, listH - 2,
-            MenuTheme.col(0xFF000000, 255, MenuTheme.PANEL_EDGE_D));
+        // List background - rounded glass inset
+        ui.drawNineSlice(tex.glassTrack, listX, listY, listW, listH, 4,
+            GuiAssets.GLASS_WIDGET, MenuTheme.col(0xFF000000, 255, 0xFF101623));
 
         if (worlds.isEmpty()) {
             font.drawCenteredWithShadow(ui, tr("selectWorld.empty"),
@@ -215,7 +202,7 @@ public class SelectWorldScreen extends Screen {
             int tint = w.dead ? 0xFF555555 : 0xFFFFFFFF;
             ui.drawTiled(tex.dirt, iconX, iconY, iconS, iconS, 16, tint);
             ui.drawRectOutline(iconX, iconY, iconS, iconS,
-                w.dead ? 0xFF333333 : MenuTheme.col(0xFF000000, 255, MenuTheme.PANEL_BORDER));
+                w.dead ? 0x66304058 : 0x66A0B6D6);
 
             int textX = listX + 8 + iconS + 6;
             int textW = listW - 8 - iconS - 16;
@@ -240,8 +227,9 @@ public class SelectWorldScreen extends Screen {
             int thumbY = listY + (int) ((listH - thumbH) * t);
 
             ui.fillRect(listX + listW - 6, listY + 1, 4, listH - 2,
-                MenuTheme.col(0xFF000000, 180, MenuTheme.PANEL_BG));
-            ui.fillRect(listX + listW - 6, thumbY, 4, thumbH,
+                MenuTheme.col(0xFF000000, 90, 0x0A0E18));
+            ui.drawNineSlice(tex.glassPanel, listX + listW - 8, thumbY, 7, thumbH,
+                GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET,
                 0xFF000000 | MenuTheme.ACCENT_LIGHT);
         }
     }

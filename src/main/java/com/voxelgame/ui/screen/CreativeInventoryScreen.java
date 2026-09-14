@@ -1,27 +1,34 @@
 package com.voxelgame.ui.screen;
 
+import com.voxelgame.core.Game;
 import com.voxelgame.item.Inventory;
+import com.voxelgame.item.ItemRegistry;
+import com.voxelgame.item.ItemStack;
 import com.voxelgame.rendering.TextureAtlas;
 import com.voxelgame.ui.FontRenderer;
+import com.voxelgame.ui.GlassTooltip;
+import com.voxelgame.ui.GuiAssets;
+import com.voxelgame.ui.MenuTheme;
+import com.voxelgame.ui.StackIcons;
+import com.voxelgame.ui.UIRenderer;
+import com.voxelgame.ui.widget.TextField;
+import com.voxelgame.world.BlockType;
 
 import static com.voxelgame.core.Language.tr;
-import com.voxelgame.ui.GuiAssets;
-import com.voxelgame.ui.InventoryItemRenderer;
-import com.voxelgame.ui.UIRenderer;
-import com.voxelgame.world.BlockType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * Creative block picker.
+ * Creative inventory: every block and item in one searchable, scrollable
+ * grid above a live hotbar mirror.
  *
- * The layout is computed once per resize into explicit rectangles so the
- * title, the scrolling grid and the hotbar strip all sit inside the panel
- * and cannot overlap - see {@link #layout()} for the vertical budget.
- *
- * Slots are drawn directly rather than through Slot widgets so the grid can
- * be clipped to the viewport and scrolled by whole pixels.
+ * Vanilla cursor semantics: clicking a palette entry puts a full stack on
+ * the cursor (one with right click), shift-click sends it straight into the
+ * selected hotbar slot, clicking a hotbar slot with the cursor overwrites it
+ * (empty cursor selects), Q clears a hotbar slot and clicking outside the
+ * panel destroys the cursor stack - creative deletes instead of dropping.
  */
 public class CreativeInventoryScreen extends Screen {
 
@@ -29,6 +36,10 @@ public class CreativeInventoryScreen extends Screen {
         Inventory inventory();
         void onPickBlock(BlockType block);
         void onSelectHotbarSlot(int index);
+
+        /** Cursor stack carried between clicks (creative destroys on close). */
+        default ItemStack mouseItem() { return new ItemStack(BlockType.AIR, 0); }
+        default void onMouseItemChanged(ItemStack stack) {}
     }
 
     private static final int SLOT = GuiAssets.SLOT_SIZE;   // 18
@@ -43,41 +54,50 @@ public class CreativeInventoryScreen extends Screen {
 
     private final Callbacks callbacks;
     private final TextureAtlas atlas;
-    private final List<BlockType> blocks = new ArrayList<>();
+    private final List<ItemStack> palette = new ArrayList<>();
+    private final List<ItemStack> filtered = new ArrayList<>();
 
     // Layout rectangles, all in whole GUI pixels
     private int panelX, panelY, panelW, panelH;
     private int gridX, gridY, gridW, gridH;
     private int hotbarX, hotbarY;
     private int scrollX;
+    private int searchX, searchY, searchW, searchH;
 
     private int visibleRows;
     private int totalRows;
     private int scrollRow = 0;
 
     private boolean draggingScrollbar = false;
-    private BlockType hovered = null;
+    private ItemStack hovered = null;
+    private final TextField searchField = new TextField(0, 0, 10, 12, 32);
 
     public CreativeInventoryScreen(Callbacks callbacks, TextureAtlas atlas) {
         this.callbacks = callbacks;
         this.atlas = atlas;
 
         for (BlockType t : BlockType.values()) {
-            if (t != BlockType.AIR) blocks.add(t);
+            if (t != BlockType.AIR) palette.add(new ItemStack(t, 1));
+        }
+        for (com.voxelgame.item.Item item : ItemRegistry.all()) {
+            palette.add(new ItemStack(item, 1));
         }
     }
 
     @Override
+    public boolean usesBlurredBackdrop() { return true; }
+
+    @Override
     protected void layout() {
-        totalRows = (blocks.size() + COLS - 1) / COLS;
+        rebuildFiltered();
 
         int contentW = COLS * SLOT;
         int hotbarStripH = SLOT;
 
         // Vertical budget inside the panel:
-        //   pad | title | grid | gap | hotbar | pad
-        int fixedH = PANEL_PAD * 2 + TITLE_H + SECTION_GAP + hotbarStripH;
-        int availableForGrid = height - 20 - fixedH;   // 20px breathing room
+        //   pad | title | search | grid | gap | hotbar | pad
+        int fixedH = PANEL_PAD * 2 + TITLE_H + searchH + 4 + SECTION_GAP + hotbarStripH;
+        int availableForGrid = height - 20 - fixedH;
 
         visibleRows = Math.max(3, availableForGrid / SLOT);
         visibleRows = Math.min(visibleRows, totalRows);
@@ -91,15 +111,37 @@ public class CreativeInventoryScreen extends Screen {
         panelX = (width - panelW) / 2;
         panelY = (height - panelH) / 2;
 
-        gridX = panelX + PANEL_PAD;
-        gridY = panelY + PANEL_PAD + TITLE_H;
+        searchW = contentW;
+        searchH = 14;
+        searchX = panelX + PANEL_PAD;
+        searchY = panelY + PANEL_PAD + TITLE_H;
+
+        gridX = searchX;
+        gridY = searchY + searchH + 4;
 
         scrollX = gridX + gridW + SCROLLBAR_GAP;
 
         hotbarX = gridX;
         hotbarY = gridY + gridH + SECTION_GAP;
 
+        searchField.x = searchX;
+        searchField.y = searchY;
+        searchField.width = searchW;
+        searchField.height = searchH;
+
         clampScroll();
+    }
+
+    private void rebuildFiltered() {
+        String query = searchField.getText().trim().toLowerCase(Locale.ROOT);
+        filtered.clear();
+        for (ItemStack stack : palette) {
+            if (query.isEmpty()
+                    || StackIcons.displayName(stack).toLowerCase(Locale.ROOT).contains(query)) {
+                filtered.add(stack);
+            }
+        }
+        totalRows = (filtered.size() + COLS - 1) / COLS;
     }
 
     private int maxScrollRow() {
@@ -116,23 +158,49 @@ public class CreativeInventoryScreen extends Screen {
 
     @Override
     protected void renderBackground(UIRenderer ui, FontRenderer font, GuiAssets gui) {
-        ui.fillRect(0, 0, width, height, 0xB0101010);
-        ui.drawNineSlice(gui.panel, panelX, panelY, panelW, panelH,
-            GuiAssets.BORDER, GuiAssets.WIDGET, 0xFFFFFFFF);
+        MenuTheme.drawWorldOverlay(ui, width, height);
+        ui.drawNineSlice(gui.glassPanel, panelX, panelY, panelW, panelH,
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
+    }
+
+    @Override
+    public void update(double deltaTime) {
+        super.update(deltaTime);
+        searchField.update(deltaTime);
     }
 
     @Override
     protected void renderForeground(UIRenderer ui, FontRenderer font, GuiAssets gui,
                                     float mx, float my) {
-        font.draw(ui, tr("container.creative"), gridX, panelY + PANEL_PAD, GuiAssets.TEXT_TITLE);
+        lastMx = mx;
+        lastMy = my;
+
+        font.draw(ui, tr("container.creative"), gridX, panelY + PANEL_PAD, 0xFFE8EEFF);
 
         hovered = null;
+        drawSearchField(ui, font, gui, mx, my);
         drawGrid(ui, font, gui, mx, my);
         drawScrollbar(ui, gui, mx, my);
         drawHotbarStrip(ui, font, gui, mx, my);
 
-        if (hovered != null) {
-            drawTooltip(ui, font, hovered, mx, my);
+        // Cursor stack follows the mouse
+        ItemStack mouse = callbacks.mouseItem();
+        if (!mouse.isEmpty()) {
+            StackIcons.drawStack(ui, font, atlas, mouse,
+                (int) mx - ICON / 2, (int) my - ICON / 2);
+        }
+
+        if (hovered != null && mouse.isEmpty()) {
+            StackIcons.drawTooltip(ui, font, atlas, hovered, mx, my, width, height);
+        }
+    }
+
+    private void drawSearchField(UIRenderer ui, FontRenderer font, GuiAssets gui,
+                                 float mx, float my) {
+        searchField.render(ui, font, gui, mx, my);
+        if (searchField.getText().isEmpty() && !searchField.isFocused()) {
+            font.draw(ui, tr("creative.search"), searchX + 6,
+                searchY + (searchH - FontRenderer.GLYPH_H) / 2, 0xFF6B7488);
         }
     }
 
@@ -142,25 +210,26 @@ public class CreativeInventoryScreen extends Screen {
 
             for (int col = 0; col < COLS; col++) {
                 int index = dataRow * COLS + col;
-                if (index >= blocks.size()) return;
+                if (index >= filtered.size()) return;
 
                 int sx = gridX + col * SLOT;
                 int sy = gridY + row * SLOT;
 
                 boolean over = inside(mx, my, sx, sy, SLOT, SLOT);
-                BlockType block = blocks.get(index);
-                if (over) hovered = block;
+                ItemStack stack = filtered.get(index);
+                if (over) hovered = stack;
 
-                ui.drawSprite(over ? gui.slotHover : gui.slot, sx, sy, SLOT, SLOT);
-                drawIcon(ui, block, sx + 1, sy + 1);
+                ui.drawNineSlice(over ? gui.glassSlotHover : gui.glassSlot,
+                    sx, sy, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+                StackIcons.drawIcon(ui, atlas, stack, sx + 1, sy + 1, ICON);
             }
         }
     }
 
-    /** Bevelled track with a mini-button thumb. */
+    /** Recessed glass track with a rounded glass thumb. */
     private void drawScrollbar(UIRenderer ui, GuiAssets gui, float mx, float my) {
-        ui.drawNineSlice(gui.scrollTrack, scrollX, gridY, SCROLLBAR_W, gridH,
-            GuiAssets.BORDER, GuiAssets.WIDGET, 0xFFFFFFFF);
+        ui.drawNineSlice(gui.glassTrack, scrollX, gridY, SCROLLBAR_W, gridH,
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF151A2A);
 
         if (maxScrollRow() <= 0) return;
 
@@ -169,10 +238,10 @@ public class CreativeInventoryScreen extends Screen {
         int thumbY = gridY + travel * scrollRow / maxScrollRow();
 
         boolean over = inside(mx, my, scrollX, thumbY, SCROLLBAR_W, thumbH);
-        int tex = (over || draggingScrollbar) ? gui.buttonHover : gui.scrollThumb;
+        int tint = (over || draggingScrollbar) ? MenuTheme.ACCENT : 0xFF8EA2C2;
 
-        ui.drawNineSlice(tex, scrollX, thumbY, SCROLLBAR_W, thumbH,
-            GuiAssets.BORDER, GuiAssets.WIDGET, 0xFFFFFFFF);
+        ui.drawNineSlice(gui.glassPanel, scrollX, thumbY, SCROLLBAR_W, thumbH,
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, tint);
     }
 
     /** Live mirror of the hotbar along the bottom of the panel. */
@@ -185,55 +254,23 @@ public class CreativeInventoryScreen extends Screen {
             boolean over = inside(mx, my, sx, hotbarY, SLOT, SLOT);
             boolean selected = i == inv.getSelectedSlot();
 
-            ui.drawSprite(over ? gui.slotHover : gui.slot, sx, hotbarY, SLOT, SLOT);
+            ui.drawNineSlice(over ? gui.glassSlotHover : gui.glassSlot,
+                sx, hotbarY, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
 
-            BlockType block = inv.getHotbarItem(i).getBlockType();
-            if (block != BlockType.AIR) {
-                drawIcon(ui, block, sx + 1, hotbarY + 1);
-                if (over) hovered = block;
+            ItemStack stack = inv.getHotbarItem(i);
+            if (!stack.isEmpty()) {
+                StackIcons.drawStack(ui, font, atlas, stack, sx + 1, hotbarY + 1);
+                if (over) hovered = stack;
             }
 
             if (selected) {
                 ui.useSolidColor();
-                for (int k = 0; k < 2; k++) {
-                    ui.drawRectOutline(sx - 1 - k, hotbarY - 1 - k,
-                        SLOT + 2 + k * 2, SLOT + 2 + k * 2, 0xFFFFFFFF);
-                }
+                ui.fillRect(sx - 1, hotbarY - 1, SLOT + 2, 1, MenuTheme.ACCENT);
+                ui.fillRect(sx - 1, hotbarY + SLOT, SLOT + 2, 1, MenuTheme.ACCENT);
+                ui.fillRect(sx - 1, hotbarY, 1, SLOT, MenuTheme.ACCENT);
+                ui.fillRect(sx + SLOT, hotbarY, 1, SLOT, MenuTheme.ACCENT);
             }
         }
-    }
-
-    private void drawIcon(UIRenderer ui, BlockType block, int x, int y) {
-        TextureAtlas.TextureCoords uv = atlas.getIconCoords(block.id);
-        ui.drawTexture(atlas.getTexture().getId(), x, y, ICON, ICON,
-            uv.u1, uv.v2, uv.u2, uv.v1, 0xFFFFFFFF);
-    }
-
-    /**
-     * Tooltip offset from the cursor and clamped so it never leaves the
-     * screen or covers the slot it describes.
-     */
-    private void drawTooltip(UIRenderer ui, FontRenderer font, BlockType block,
-                             float mx, float my) {
-        String name = prettyName(block);
-        int tw = font.width(name);
-        int boxW = tw + 6;
-        int boxH = FontRenderer.GLYPH_H + 6;
-
-        int tx = (int) mx + 12;
-        int ty = (int) my - 12;
-
-        // Flip to the other side of the cursor rather than overlapping it
-        if (tx + boxW > width - 2) tx = (int) mx - 12 - boxW;
-        if (tx < 2) tx = 2;
-        if (ty < 2) ty = 2;
-        if (ty + boxH > height - 2) ty = height - 2 - boxH;
-
-        ui.useSolidColor();
-        ui.fillRect(tx, ty, boxW, boxH, GuiAssets.TOOLTIP_BG);
-        ui.drawRectOutline(tx, ty, boxW, boxH, GuiAssets.TOOLTIP_EDGE);
-
-        font.drawWithShadow(ui, name, tx + 3, ty + 3, 0xFFFFFFFF);
     }
 
     // ------------------------------------------------------------------
@@ -242,6 +279,13 @@ public class CreativeInventoryScreen extends Screen {
 
     @Override
     public boolean mouseClicked(float mx, float my, int button) {
+        // Search field grabs clicks first
+        if (searchField.contains(mx, my)) {
+            searchField.setFocused(true);
+            return true;
+        }
+        searchField.setFocused(false);
+
         // Scrollbar thumb
         if (maxScrollRow() > 0 && inside(mx, my, scrollX, gridY, SCROLLBAR_W, gridH)) {
             draggingScrollbar = true;
@@ -249,14 +293,26 @@ public class CreativeInventoryScreen extends Screen {
             return true;
         }
 
-        // Grid
+        ItemStack mouse = callbacks.mouseItem();
+
+        // Palette grid
         if (inside(mx, my, gridX, gridY, gridW, gridH)) {
             int col = (int) ((mx - gridX) / SLOT);
             int row = (int) ((my - gridY) / SLOT);
             int index = (row + scrollRow) * COLS + col;
 
-            if (col >= 0 && col < COLS && index >= 0 && index < blocks.size()) {
-                callbacks.onPickBlock(blocks.get(index));
+            if (col >= 0 && col < COLS && index >= 0 && index < filtered.size()) {
+                ItemStack proto = filtered.get(index);
+                if (Game.isShiftDown()) {
+                    // Straight into the selected hotbar slot
+                    callbacks.inventory().setHotbarItem(
+                        callbacks.inventory().getSelectedSlot(),
+                        proto.copyWithCount(proto.getMaxStackSize()));
+                } else if (button == 0) {
+                    callbacks.onMouseItemChanged(proto.copyWithCount(proto.getMaxStackSize()));
+                } else {
+                    callbacks.onMouseItemChanged(proto.copyWithCount(1));
+                }
             }
             return true;
         }
@@ -265,12 +321,30 @@ public class CreativeInventoryScreen extends Screen {
         if (inside(mx, my, hotbarX, hotbarY, Inventory.HOTBAR_SIZE * SLOT, SLOT)) {
             int i = (int) ((mx - hotbarX) / SLOT);
             if (i >= 0 && i < Inventory.HOTBAR_SIZE) {
-                callbacks.onSelectHotbarSlot(i);
+                if (!mouse.isEmpty()) {
+                    // Creative overwrite with whatever is on the cursor
+                    callbacks.inventory().setHotbarItem(i, mouse.copy());
+                } else if (button == 2) {
+                    // Middle click: clear the slot
+                    callbacks.inventory().setHotbarItem(i, new ItemStack(BlockType.AIR, 0));
+                } else {
+                    callbacks.onSelectHotbarSlot(i);
+                }
             }
             return true;
         }
 
+        // Clicking outside the panel destroys the cursor stack (creative)
+        if (!mouse.isEmpty() && !insidePanel(mx, my)) {
+            callbacks.onMouseItemChanged(new ItemStack(BlockType.AIR, 0));
+            return true;
+        }
+
         return false;
+    }
+
+    private boolean insidePanel(float mx, float my) {
+        return mx >= panelX && mx < panelX + panelW && my >= panelY && my < panelY + panelH;
     }
 
     @Override
@@ -294,6 +368,7 @@ public class CreativeInventoryScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(float mx, float my, double delta) {
+        if (searchField.isFocused()) return false;
         scrollRow -= (int) Math.signum(delta);
         clampScroll();
         return true;
@@ -301,33 +376,67 @@ public class CreativeInventoryScreen extends Screen {
 
     @Override
     public boolean keyPressed(int key, int mods) {
+        if (searchField.isFocused() && searchField.keyPressed(key, mods)) {
+            layout();
+            return true;
+        }
+
         if (key >= org.lwjgl.glfw.GLFW.GLFW_KEY_1 && key <= org.lwjgl.glfw.GLFW.GLFW_KEY_9) {
             callbacks.onSelectHotbarSlot(key - org.lwjgl.glfw.GLFW.GLFW_KEY_1);
+            return true;
+        }
+
+        // Q clears the hotbar slot under the cursor (creative delete)
+        if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_Q) {
+            Inventory inv = callbacks.inventory();
+            int hotbarSlot = hotbarSlotAt();
+            if (hotbarSlot >= 0) {
+                inv.setHotbarItem(hotbarSlot, new ItemStack(BlockType.AIR, 0));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Typed characters land in the search field (routed by Game). */
+    public boolean charTyped(char c) {
+        if (searchField.charTyped(c)) {
+            layout();
             return true;
         }
         return false;
     }
 
+    private int hotbarSlotAt() {
+        float mx = lastMx, my = lastMy;
+        if (inside(mx, my, hotbarX, hotbarY, Inventory.HOTBAR_SIZE * SLOT, SLOT)) {
+            int i = (int) ((mx - hotbarX) / SLOT);
+            if (i >= 0 && i < Inventory.HOTBAR_SIZE) return i;
+        }
+        return -1;
+    }
+
     // ------------------------------------------------------------------
+
+    private Runnable onClosedCallback;
+
+    /** Registers a callback fired when the screen closes for any reason. */
+    public void onClose(Runnable cb) { this.onClosedCallback = cb; }
+
+    @Override
+    public void onClosed() {
+        if (onClosedCallback != null) {
+            Runnable cb = onClosedCallback;
+            onClosedCallback = null;
+            cb.run();
+        }
+    }
+
+    // ------------------------------------------------------------------
+
+    private float lastMx, lastMy;
 
     private static boolean inside(float mx, float my, int x, int y, int w, int h) {
         return mx >= x && mx < x + w && my >= y && my < y + h;
-    }
-
-    private static String prettyName(BlockType type) {
-        // Try localized name first
-        String localized = com.voxelgame.core.Language.tr("block." + type.name);
-        if (localized != null && !localized.equals("block." + type.name)) {
-            return localized;
-        }
-        // Fallback to formatted English name
-        String[] parts = type.name.split("_");
-        StringBuilder sb = new StringBuilder();
-        for (String p : parts) {
-            if (p.isEmpty()) continue;
-            if (sb.length() > 0) sb.append(' ');
-            sb.append(Character.toUpperCase(p.charAt(0))).append(p.substring(1));
-        }
-        return sb.toString();
     }
 }

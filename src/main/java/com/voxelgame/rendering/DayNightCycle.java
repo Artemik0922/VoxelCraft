@@ -30,8 +30,14 @@ public class DayNightCycle {
     private static final Vector3f SUN_DAWN  = new Vector3f(1.00f, 0.72f, 0.45f);
     private static final Vector3f MOON_TINT = new Vector3f(0.55f, 0.62f, 0.80f);
 
+    // [SPACE] Space planets keep full daylight for surface lighting but paint
+    // the sky near-black so the planet reads as floating in empty space.
+    private static final Vector3f SPACE_ZENITH  = new Vector3f(0.003f, 0.004f, 0.020f);
+    private static final Vector3f SPACE_HORIZON = new Vector3f(0.012f, 0.016f, 0.045f);
+
     private double time;
     private boolean paused = false;
+    private boolean space = false;
 
     // Reused so the render loop allocates nothing
     private final Vector3f sunDirection = new Vector3f();
@@ -71,6 +77,14 @@ public class DayNightCycle {
 
     public void setPaused(boolean paused) { this.paused = paused; }
     public boolean isPaused() { return paused; }
+
+    /** [SPACE] Toggle the dark space-sky palette (daylight stays high). */
+    public void setSpaceMode(boolean on) {
+        this.space = on;
+        recompute();
+    }
+
+    public boolean isSpaceMode() { return space; }
 
     public Vector3f getSunDirection() { return sunDirection; }
     public Vector3f getMoonDirection() { return moonDirection; }
@@ -135,6 +149,16 @@ public class DayNightCycle {
             sunColor.set(SUN_DAWN).lerp(SUN_DAY, clamp01(elevation / 0.35f));
         } else {
             sunColor.set(MOON_TINT);
+        }
+
+        // [SPACE] Dark sky islands: keep the sun parked high so the surface
+        // stays lit, but make the sky itself near-black for the star field.
+        if (space) {
+            sunDirection.set(0.30f, -0.92f, 0.25f).normalize();
+            moonDirection.set(sunDirection).negate();
+            zenithColor.set(SPACE_ZENITH);
+            horizonColor.set(SPACE_HORIZON);
+            sunColor.set(SUN_DAY);
         }
     }
 

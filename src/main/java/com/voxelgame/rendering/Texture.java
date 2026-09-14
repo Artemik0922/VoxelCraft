@@ -171,6 +171,26 @@ public class Texture {
     public void bind() {
         glBindTexture(GL_TEXTURE_2D, id);
     }
+
+    /**
+     * Replace the pixel contents in place, keeping size and GL state.
+     * Pixels are ARGB ints, row-major from the top-left corner. Used by
+     * dynamically repainted textures such as the minimap raster.
+     */
+    public void update(int[] pixels) {
+        if (pixels.length != width * height) return;
+        ByteBuffer buffer = org.lwjgl.system.MemoryUtil.memAlloc(pixels.length * 4);
+        for (int pixel : pixels) {
+            buffer.put((byte) ((pixel >> 16) & 0xFF)); // R
+            buffer.put((byte) ((pixel >> 8) & 0xFF));  // G
+            buffer.put((byte) (pixel & 0xFF));         // B
+            buffer.put((byte) ((pixel >> 24) & 0xFF)); // A
+        }
+        buffer.flip();
+        bind();
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+        org.lwjgl.system.MemoryUtil.memFree(buffer);
+    }
     
     public void unbind() {
         glBindTexture(GL_TEXTURE_2D, 0);

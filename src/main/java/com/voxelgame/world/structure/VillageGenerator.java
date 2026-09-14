@@ -304,7 +304,71 @@ public class VillageGenerator {
                 }
             }
         }
+
+        // Trees at the boundary: the flat clear line slices their canopies
+        // in half, leaving half a canopy hanging in the air. Sweep an
+        // extended band around the site and remove every affected tree
+        // WHOLE (trunk + canopy), touching only log and leaf cells.
+        int minX = cx - radius - 3, maxX = cx + radius + 3;
+        int minZ = cz - radius - 3, maxZ = cz + radius + 3;
+        int margin = 6; // largest canopy overhang past the trunk
+        for (int x = minX - margin; x <= maxX + margin; x++) {
+            for (int z = minZ - margin; z <= maxZ + margin; z++) {
+                boolean inCore = x >= minX && x <= maxX && z >= minZ && z <= maxZ;
+                if (inCore) continue; // already cleared by the flatten pass
+
+                int surface = terrainGen.getHeight(x, z);
+                int scanTop = Math.max(surface, flatY) + 20;
+                int scanBottom = Math.min(surface, flatY) + 1;
+                for (int y = scanBottom; y <= scanTop && y < Chunk.HEIGHT; y++) {
+                    if (isLogId(blockAt(chunks, x, y, z))) {
+                        removeWholeTree(chunks, x, y, z);
+                        break;
+                    }
+                }
+            }
+        }
         return flatY;
+    }
+
+    private int blockAt(Map<Long, Chunk> chunks, int x, int y, int z) {
+        if (y < 0 || y >= Chunk.HEIGHT) return 0;
+        Chunk chunk = chunks.get(Chunk.key(x >> 4, z >> 4));
+        if (chunk == null) return 0;
+        return chunk.getBlock(x & 15, y, z & 15);
+    }
+
+    private static boolean isLogId(int id) {
+        return id == BlockType.OAK_LOG.id || id == BlockType.SPRUCE_LOG.id
+            || id == BlockType.BIRCH_LOG.id || id == BlockType.JUNGLE_LOG.id
+            || id == BlockType.CHARRED_LOG.id || id == BlockType.CHARRED_LOG_TOP.id
+            || id == BlockType.PETRIFIED_LOG.id || id == BlockType.PETRIFIED_LOG_TOP.id;
+    }
+
+    private static boolean isLeafId(int id) {
+        return id == BlockType.OAK_LEAVES.id || id == BlockType.SPRUCE_LEAVES.id
+            || id == BlockType.BIRCH_LEAVES.id || id == BlockType.JUNGLE_LEAVES.id
+            || id == BlockType.AUTUMN_LEAVES.id || id == BlockType.CHERRY_LEAVES.id;
+    }
+
+    /** Remove a whole tree: trunk and canopy, leaving the terrain alone. */
+    private void removeWholeTree(Map<Long, Chunk> chunks, int tx, int ty, int tz) {
+        int top = ty;
+        while (top < Chunk.HEIGHT - 1
+                && (isLogId(blockAt(chunks, tx, top + 1, tz))
+                    || isLeafId(blockAt(chunks, tx, top + 1, tz)))) {
+            top++;
+        }
+        for (int y = ty; y <= top; y++) {
+            for (int dx = -4; dx <= 4; dx++) {
+                for (int dz = -4; dz <= 4; dz++) {
+                    int id = blockAt(chunks, tx + dx, y, tz + dz);
+                    if (isLogId(id) || isLeafId(id)) {
+                        setBlock(chunks, tx + dx, y, tz + dz, BlockType.AIR);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -1462,15 +1526,15 @@ public class VillageGenerator {
     }
 
     /**
-     * [SD] РЈСЃС‚Р°РЅР°РІР»РёРІР°РµС‚ СЂР°Р·РґРІРёР¶РЅСѓСЋ РґРІРµСЂСЊ РІ СЃС‚РµРЅРµ РґРѕРјР°: СЃС‚РµРЅР° СѓР¶Рµ Р·Р°РЅСЏР»Р°
-     * РєР»РµС‚РєРё РїСЂРѕС‘РјР°, РїРѕСЌС‚РѕРјСѓ СЃРЅР°С‡Р°Р»Р° РѕРЅРё РѕСЃРІРѕР±РѕР¶РґР°СЋС‚СЃСЏ, Р·Р°С‚РµРј СЃС‚Р°РІСЏС‚СЃСЏ РѕР±Рµ
-     * РїРѕР»РѕРІРёРЅС‹ (РЅРёР· + РІРµСЂС…) С‡РµСЂРµР· World.installSlidingDoor.
+     * [MC] Ставит обычную дубовую дверь в проём дома: обе половины (низ +
+     * верх) занимают клетки проёма. Раньше здесь стояли раздвижные двери
+     * [SD]; теперь деревни используют ванильную дверь с поворотом.
      */
     private void installSlidingDoor(Map<Long, Chunk> chunks, int wx, int wy, int wz) {
-        if (worldRef == null) return;
         setBlock(chunks, wx, wy + 1, wz, (byte) 0);
         setBlock(chunks, wx, wy + 2, wz, (byte) 0);
-        worldRef.installSlidingDoor(chunks, wx, wy + 1, wz);
+        setBlock(chunks, wx, wy + 1, wz, BlockType.OAK_DOOR.id);
+        setBlock(chunks, wx, wy + 2, wz, BlockType.OAK_DOOR.id);
     }
 
     private long hashPos(int x, int z, int salt) {

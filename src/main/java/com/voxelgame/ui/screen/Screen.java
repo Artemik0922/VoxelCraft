@@ -30,6 +30,14 @@ public abstract class Screen {
     /** Whether the world is still drawn behind this screen. */
     public boolean rendersWorld() { return true; }
 
+    /**
+     * Whether the live scene behind this screen should be blurred into a
+     * frosted-glass backdrop. Defaults to {@link #rendersWorld()}; overlay
+     * screens that draw their own procedural backdrop return false and
+     * inventory screens opt in explicitly.
+     */
+    public boolean usesBlurredBackdrop() { return rendersWorld(); }
+
     /** Whether Escape closes this screen. */
     public boolean closableWithEscape() { return true; }
 
@@ -52,7 +60,11 @@ public abstract class Screen {
         return widget;
     }
 
-    public void update(double deltaTime) {}
+    /** Ticks every widget (hover animations and the like). Override and
+     *  call super so widget motion keeps running. */
+    public void update(double deltaTime) {
+        for (Widget w : widgets) w.update(deltaTime);
+    }
 
     public void render(UIRenderer ui, FontRenderer font, GuiAssets tex, float mx, float my) {
         renderBackground(ui, font, tex);

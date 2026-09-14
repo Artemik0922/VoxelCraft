@@ -7,23 +7,20 @@ import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.*;
 
 /**
- * OpenGL Mesh with VAO, position, texCoord, normal, and color buffers
+ * OpenGL Mesh with a VAO and one buffer per vertex attribute.
+ *
+ * The chunk path uploads straight from {@link MeshGeom} (primitive arrays, no
+ * boxing) and re-uploads into the same buffers on rebuild instead of
+ * deleting and re-creating GL objects every frame.
  */
 public class Mesh {
     private int vaoId;
-    private int posVbo;
-    private int texCoordVbo;
-    private int normalVbo;
-    private int colorVbo;
-private int layerVbo = 0;
-    private int aoVbo = 0;
-    private int waveVbo = 0;
-    private int emissiveVbo = 0;
-    private int blockLightVbo = 0;
+    private int[] vboIds = new int[ATTRIBUTE_COUNT];
     private int eboId;
     private int indexCount;
-    
+
     // Vertex attribute locations
+    private static final int ATTRIBUTE_COUNT = 9;
     private static final int POS_LOC = 0;
     private static final int TEXCOORD_LOC = 1;
     private static final int NORMAL_LOC = 2;
@@ -36,118 +33,153 @@ private int layerVbo = 0;
     private static final int EMISSIVE_LOC = 7;
     /** Block light (torch contribution): 0..1. */
     private static final int BLOCKLIGHT_LOC = 8;
-    
-    public Mesh(List<Float> positions, List<Float> texCoords, List<Float> normals, List<Float> colors, List<Integer> indices) {
-        this(positions, texCoords, normals, colors, null, null, null, indices);
+
+    /** Components per attribute location, in location order. */
+    private static final int[] COMPONENTS = {3, 2, 3, 3, 1, 1, 1, 1, 1};
+
+    private static final FloatList EMPTY_F = new FloatList(0);
+
+    public Mesh(MeshGeom geom) {
+        vaoId = glGenVertexArrays();
+        upload(geom);
     }
-    
+
+    /**
+     * Re-upload new vertex data into the existing buffers. Uses the same
+     * attribute layout as the chunk mesher (all nine attributes present), so
+     * pointer setup from the initial creation stays valid.
+     */
+    public void upload(MeshGeom geom) {
+        indexCount = geom.indices.size();
+        glBindVertexArray(vaoId);
+        fillVBO(POS_LOC, geom.positions);
+        fillVBO(TEXCOORD_LOC, geom.texCoords);
+        fillVBO(NORMAL_LOC, geom.normals);
+        fillVBO(COLOR_LOC, geom.colors);
+        fillVBO(LAYER_LOC, geom.layers);
+        fillVBO(AO_LOC, geom.ao);
+        fillVBO(WAVE_LOC, geom.wave);
+        fillVBO(EMISSIVE_LOC, geom.emissive);
+        fillVBO(BLOCKLIGHT_LOC, geom.blockLight);
+
+        if (eboId == 0) {
+            eboId = glGenBuffers();
+        }
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eboId);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, geom.indices.toArray(), GL_STATIC_DRAW);
+        glBindVertexArray(0);
+    }
+
+    /**
+     * Upload CPU geometry into {@code existing} if present and non-empty,
+     * otherwise clean up unused geometry and return a fresh (or null) mesh.
+     * Lets a RenderChunk keep its GPU objects across rebuilds.
+     */
+    public static Mesh rebind(Mesh existing, MeshGeom geom) {
+        if (geom == null || geom.isEmpty()) {
+            if (existing != null) existing.cleanup();
+            return null;
+        }
+        if (existing != null) {
+            existing.upload(geom);
+            return existing;
+        }
+        return new Mesh(geom);
+    }
+
+    private void fillVBO(int loc, FloatList data) {
+        if (data == null || data.isEmpty()) return;
+        int vbo = vboIds[loc];
+        if (vbo == 0) {
+            vbo = glGenBuffers();
+            vboIds[loc] = vbo;
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glVertexAttribPointer(loc, COMPONENTS[loc], GL_FLOAT, false, 0, 0);
+            glEnableVertexAttribArray(loc);
+        } else {
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        }
+        glBufferData(GL_ARRAY_BUFFER, data.toArray(), GL_STATIC_DRAW);
+    }
+
+    private static FloatList toFloatList(List<Float> src) {
+        if (src == null || src.isEmpty()) return EMPTY_F;
+        FloatList out = new FloatList(src.size());
+        for (float f : src) out.add(f);
+        return out;
+    }
+
+    // ---- Legacy List-based constructors (item previews, doors) -----------
+
+    public Mesh(List<Float> positions, List<Float> texCoords, List<Float> normals, List<Float> colors, List<Integer> indices) {
+        this(buildGeom(positions, texCoords, normals, colors, null, null, null, null, null, indices));
+    }
+
     public Mesh(List<Float> positions, List<Float> texCoords, List<Float> normals,
                 List<Float> colors, List<Float> layers, List<Integer> indices) {
-        this(positions, texCoords, normals, colors, layers, null, null, indices);
+        this(buildGeom(positions, texCoords, normals, colors, layers, null, null, null, null, indices));
     }
-    
+
     public Mesh(List<Float> positions, List<Float> texCoords, List<Float> normals,
                 List<Float> colors, List<Float> layers, List<Float> ao,
                 List<Float> wave, List<Integer> indices) {
-        this(positions, texCoords, normals, colors, layers, ao, wave, null, indices);
+        this(buildGeom(positions, texCoords, normals, colors, layers, ao, wave, null, null, indices));
     }
 
     public Mesh(List<Float> positions, List<Float> texCoords, List<Float> normals,
                 List<Float> colors, List<Float> layers, List<Float> ao,
                 List<Float> wave, List<Float> emissive, List<Integer> indices) {
-        this(positions, texCoords, normals, colors, layers, ao, wave, emissive, null, indices);
+        this(buildGeom(positions, texCoords, normals, colors, layers, ao, wave, emissive, null, indices));
     }
 
     public Mesh(List<Float> positions, List<Float> texCoords, List<Float> normals,
                 List<Float> colors, List<Float> layers, List<Float> ao,
                 List<Float> wave, List<Float> emissive, List<Float> blockLight,
                 List<Integer> indices) {
-        indexCount = indices.size();
-
-        vaoId = glGenVertexArrays();
-        glBindVertexArray(vaoId);
-
-        // Position buffer
-        posVbo = createVBO(positions, POS_LOC, 3);
-
-        // Texture coordinate buffer
-        texCoordVbo = createVBO(texCoords, TEXCOORD_LOC, 2);
-
-        // Normal buffer
-        normalVbo = createVBO(normals, NORMAL_LOC, 3);
-
-        // Color/AO buffer
-        colorVbo = createVBO(colors, COLOR_LOC, 3);
-
-        // Texture array layer index (one float per vertex)
-        if (layers != null && !layers.isEmpty()) {
-            layerVbo = createVBO(layers, LAYER_LOC, 1);
-        }
-
-        // Per-vertex ambient occlusion, kept separate from the light term so
-        // the shader can weight them independently
-        if (ao != null && !ao.isEmpty()) {
-            aoVbo = createVBO(ao, AO_LOC, 1);
-        }
-
-        // Sway weight: zero for solid blocks, tapering to 1 at plant tips
-        if (wave != null && !wave.isEmpty()) {
-            waveVbo = createVBO(wave, WAVE_LOC, 1);
-        }
-
-        // Emissive: 1.0 for glowing blocks, 0.0 for normal
-        if (emissive != null && !emissive.isEmpty()) {
-            emissiveVbo = createVBO(emissive, EMISSIVE_LOC, 1);
-        }
-
-        // Block light: torch contribution to this vertex's light
-        if (blockLight != null && !blockLight.isEmpty()) {
-            blockLightVbo = createVBO(blockLight, BLOCKLIGHT_LOC, 1);
-        }
-
-        // Index buffer
-        eboId = glGenBuffers();
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eboId);
-        int[] indexArray = new int[indices.size()];
-        for (int i = 0; i < indices.size(); i++) indexArray[i] = indices.get(i);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexArray, GL_STATIC_DRAW);
-
-        glBindVertexArray(0);
+        this(buildGeom(positions, texCoords, normals, colors, layers, ao, wave, emissive, blockLight, indices));
     }
-    
-    private int createVBO(List<Float> data, int attribLoc, int components) {
-        int vbo = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        float[] arr = new float[data.size()];
-        for (int i = 0; i < data.size(); i++) arr[i] = data.get(i);
-        glBufferData(GL_ARRAY_BUFFER, arr, GL_STATIC_DRAW);
-        glVertexAttribPointer(attribLoc, components, GL_FLOAT, false, 0, 0);
-        glEnableVertexAttribArray(attribLoc);
-        return vbo;
+
+    private static MeshGeom buildGeom(List<Float> positions, List<Float> texCoords,
+                                      List<Float> normals, List<Float> colors, List<Float> layers,
+                                      List<Float> ao, List<Float> wave, List<Float> emissive,
+                                      List<Float> blockLight, List<Integer> indices) {
+        MeshGeom g = new MeshGeom();
+        g.positions.addAll(toFloatList(positions));
+        g.texCoords.addAll(toFloatList(texCoords));
+        g.normals.addAll(toFloatList(normals));
+        g.colors.addAll(toFloatList(colors));
+        if (layers != null && !layers.isEmpty()) g.layers.addAll(toFloatList(layers));
+        if (ao != null && !ao.isEmpty()) g.ao.addAll(toFloatList(ao));
+        if (wave != null && !wave.isEmpty()) g.wave.addAll(toFloatList(wave));
+        if (emissive != null && !emissive.isEmpty()) g.emissive.addAll(toFloatList(emissive));
+        if (blockLight != null && !blockLight.isEmpty()) g.blockLight.addAll(toFloatList(blockLight));
+        if (indices != null && !indices.isEmpty()) {
+            for (int i : indices) g.indices.add(i);
+        }
+        return g;
     }
-    
+
     public void render() {
         glBindVertexArray(vaoId);
         glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
     }
-    
-    public void cleanup() {
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glDeleteBuffers(posVbo);
-        glDeleteBuffers(texCoordVbo);
-        glDeleteBuffers(normalVbo);
-        glDeleteBuffers(colorVbo);
-        if (layerVbo != 0) glDeleteBuffers(layerVbo);
-        if (aoVbo != 0) glDeleteBuffers(aoVbo);
-        if (waveVbo != 0) glDeleteBuffers(waveVbo);
-        if (emissiveVbo != 0) glDeleteBuffers(emissiveVbo);
-        if (blockLightVbo != 0) glDeleteBuffers(blockLightVbo);
-        glDeleteBuffers(eboId);
 
+    public void cleanup() {
+        for (int i = 0; i < ATTRIBUTE_COUNT; i++) {
+            if (vboIds[i] != 0) {
+                glDeleteBuffers(vboIds[i]);
+                vboIds[i] = 0;
+            }
+        }
+        if (eboId != 0) {
+            glDeleteBuffers(eboId);
+            eboId = 0;
+        }
         glBindVertexArray(0);
         glDeleteVertexArrays(vaoId);
+        vaoId = 0;
     }
-    
+
     public int getIndexCount() { return indexCount; }
 }

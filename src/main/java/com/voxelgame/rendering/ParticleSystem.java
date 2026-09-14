@@ -187,6 +187,33 @@ public class ParticleSystem {
     // ------------------------------------------------------------------
 
     /**
+     * [SPACE] Thruster plume below a flying rocket: a white-hot core and
+     * slower smoke, thrown downward as the rocket climbs.
+     */
+    public void emitRocketExhaust(float x, float y, float z, float power) {
+        for (int i = 0; i < 4; i++) {
+            spawn(x + (random.nextFloat() - 0.5f) * 0.5f,
+                y - 0.2f + (random.nextFloat() - 0.5f) * 0.4f,
+                z + (random.nextFloat() - 0.5f) * 0.5f,
+                (random.nextFloat() - 0.5f) * 0.8f,
+                -3.0f * power - random.nextFloat() * 2.0f,
+                (random.nextFloat() - 0.5f) * 0.8f,
+                -1, 0.14f + random.nextFloat() * 0.08f,
+                0.5f + random.nextFloat() * 0.4f);
+        }
+        if (random.nextFloat() < 0.5f) {
+            spawn(x + (random.nextFloat() - 0.5f) * 0.9f,
+                y - 0.4f + (random.nextFloat() - 0.5f) * 0.6f,
+                z + (random.nextFloat() - 0.5f) * 0.9f,
+                (random.nextFloat() - 0.5f) * 1.4f,
+                -2.0f * power - random.nextFloat() * 2.0f,
+                (random.nextFloat() - 0.5f) * 1.4f,
+                -1, 0.24f + random.nextFloat() * 0.12f,
+                0.9f + random.nextFloat() * 0.6f);
+        }
+    }
+
+    /**
      * [AST] Fiery trail behind a falling asteroid: a smoke puff plus
      * glowing embers that drift up past the rock.
      */

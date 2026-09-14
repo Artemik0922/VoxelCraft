@@ -35,6 +35,9 @@ public class Button extends Widget {
 
     public void setPanelStyle(boolean on) { this.usePanelStyle = on; }
 
+    /** Animated hover amount 0..1, eased in {@link #update}. */
+    public float hoverProgress() { return hoverProgress; }
+
     private float hoverProgress = 0;
 
     @Override
@@ -59,28 +62,29 @@ public class Button extends Widget {
 
     private void renderPanelStyle(UIRenderer ui, FontRenderer font, int fadeAlpha, int textY) {
         if (!enabled) {
-            // Greyed out panel
-            ui.fillRect(x, y, width, height, MenuTheme.col(fadeAlpha << 24, 180, 0x12162B));
-            int border = MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.PANEL_BORDER);
-            ui.fillRect(x, y, width, 1, border);
-            ui.fillRect(x, y + height - 1, width, 1, border);
-            ui.fillRect(x, y, 1, height, border);
-            ui.fillRect(x + width - 1, y, 1, height, border);
+            // Dim glass panel
+            ui.drawNineSlice(GuiAssets.INSTANCE.glassShadow, x + 2, y + 3, width, height,
+                GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET,
+                MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.GLASS_SHADOW));
+            ui.drawNineSlice(GuiAssets.INSTANCE.glassPanel, x, y, width, height,
+                GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET,
+                MenuTheme.col(fadeAlpha << 24, 90, MenuTheme.GLASS_ACTIVE));
             font.drawCenteredWithShadow(ui, label,
                 x + width / 2.0f, textY,
-                MenuTheme.col(fadeAlpha << 24, 120, MenuTheme.TEXT_DIM));
+                MenuTheme.col(fadeAlpha << 24, 160, MenuTheme.TEXT_DIM));
             return;
         }
 
-        boolean hov = hovered || hoverProgress > 0.01f;
-        MenuTheme.drawPanel(ui, fadeAlpha << 24, x, y, width, height, hov);
+        MenuTheme.drawPanel(ui, fadeAlpha << 24, x, y, width, height, hoverProgress);
 
-        int textCol = hov ? MenuTheme.TEXT_BRIGHT : MenuTheme.TEXT_LABEL;
+        int textCol = MenuTheme.lerp(MenuTheme.TEXT_LABEL, MenuTheme.TEXT_BRIGHT, hoverProgress);
         textCol = (fadeAlpha << 24) | (textCol & 0xFFFFFF);
         font.drawCenteredWithShadow(ui, label, x + width / 2.0f, textY, textCol);
 
-        if (hov && hoverProgress > 0.3f) {
-            font.drawWithShadow(ui, ">", x + width - 12, textY, MenuTheme.ACCENT);
+        if (hoverProgress > 0.05f) {
+            int a = (int) (hoverProgress * 255);
+            font.drawWithShadow(ui, ">", x + width - 12, textY,
+                (a << 24) | (MenuTheme.ACCENT & 0xFFFFFF));
         }
     }
 

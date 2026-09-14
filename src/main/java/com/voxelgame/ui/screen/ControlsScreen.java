@@ -109,14 +109,9 @@ public class ControlsScreen extends Screen {
             cardTop + 8, 2, 0xFFFFFFFF);
         MenuTheme.drawSeparator(ui, 0xFF000000, width / 2f, cardTop + 30, tw / 2f + 10);
 
-        // List area
-        ui.fillRect(listX, listY, listW, listH,
-            MenuTheme.col(0xFF000000, 200, MenuTheme.PANEL_BG));
-        int bdr = MenuTheme.col(0xFF000000, 255, MenuTheme.PANEL_BORDER);
-        ui.fillRect(listX, listY, listW, 1, bdr);
-        ui.fillRect(listX, listY + listH - 1, listW, 1, bdr);
-        ui.fillRect(listX, listY, 1, listH, bdr);
-        ui.fillRect(listX + listW - 1, listY, 1, listH, bdr);
+        // List area - rounded glass inset
+        ui.drawNineSlice(tex.glassTrack, listX, listY, listW, listH, 4,
+            GuiAssets.GLASS_WIDGET, MenuTheme.col(0xFF000000, 255, 0xFF101623));
 
         KeyBindings.Action[] all = KeyBindings.Action.values();
         int visible = listH / ROW_H;

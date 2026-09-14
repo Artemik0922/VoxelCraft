@@ -34,6 +34,13 @@ public class ShadowMap {
     private final Matrix4f lightView = new Matrix4f();
     private final Matrix4f lightSpace = new Matrix4f();
 
+    /** The light space last committed to the depth pass. */
+    private final Matrix4f lastLightSpace = new Matrix4f();
+    private final float[] compA = new float[16];
+    private final float[] compB = new float[16];
+    /** True once the depth FBO has been rendered into at least once. */
+    private boolean valid = false;
+
     public ShadowMap() {
         depthShader = new Shader("shaders/depth.vert", "shaders/depth.frag");
 
@@ -73,19 +80,36 @@ public class ShadowMap {
     }
 
     /**
-     * Recompute the light matrices for the current camera position.
+     * Recompute the light matrices for the current camera position and return
+     * true when the depth FBO must be re-rendered.
+     *
+     * Both the shadow centre and the eye offset are snapped to the shadow
+     * texel grid, so the light space is perfectly stable between whole-texel
+     * crossings. The sun's own movement redraws only every texel step
+     * (~8x/sec), and the camera snap makes the whole map cacheable while
+     * standing or walking slowly - a large fixed per-frame cost disappears
+     * with no visible change to the shadows.
+     *
+     * @param force when true (chunk geometry changed, shadows switched on) the
+     *              map is always re-rendered even if the matrix is unchanged.
      */
-    public void update(Vector3f cameraPos, Vector3f sunDirection) {
+    public boolean updateIfNeeded(Vector3f cameraPos, Vector3f sunDirection, boolean force) {
         Vector3f dir = new Vector3f(sunDirection).normalize();
 
         // Snap the shadow centre to whole texels to stop edge crawling
         float texelSize = (2.0f * EXTENT) / SHADOW_RESOLUTION;
-        float cx = Math.round(cameraPos.x / texelSize) * texelSize;
-        float cz = Math.round(cameraPos.z / texelSize) * texelSize;
-        float cy = Math.round(cameraPos.y / texelSize) * texelSize;
+        float cx = snap(cameraPos.x, texelSize);
+        float cz = snap(cameraPos.z, texelSize);
+        float cy = snap(cameraPos.y, texelSize);
         Vector3f center = new Vector3f(cx, cy, cz);
 
-        Vector3f eye = new Vector3f(dir).mul(-DEPTH_RANGE * 0.5f).add(center);
+        // Snap the eye offset too, so a slowly moving sun does not force a
+        // redraw on every single frame.
+        Vector3f eyeOffset = new Vector3f(dir).mul(-DEPTH_RANGE * 0.5f);
+        eyeOffset.x = snap(eyeOffset.x, texelSize);
+        eyeOffset.y = snap(eyeOffset.y, texelSize);
+        eyeOffset.z = snap(eyeOffset.z, texelSize);
+        Vector3f eye = new Vector3f(center).add(eyeOffset);
 
         // Sun is near-vertical, so use Z as the up hint to keep lookAt stable
         Vector3f up = (Math.abs(dir.y) > 0.99f)
@@ -95,12 +119,33 @@ public class ShadowMap {
         lightView.identity().lookAt(eye, center, up);
         lightProjection.identity().ortho(-EXTENT, EXTENT, -EXTENT, EXTENT, 1.0f, DEPTH_RANGE);
         lightProjection.mul(lightView, lightSpace);
+
+        boolean changed = force || !valid || !matricesEqual();
+        lastLightSpace.set(lightSpace);
+        return changed;
     }
+
+    private static float snap(float v, float grid) {
+        return Math.round(v / grid) * grid;
+    }
+
+    private boolean matricesEqual() {
+        lastLightSpace.get(compA);
+        lightSpace.get(compB);
+        for (int i = 0; i < 16; i++) {
+            if (Math.abs(compA[i] - compB[i]) > 0.0002f) return false;
+        }
+        return true;
+    }
+
+    /** True once the depth FBO holds a valid render. */
+    public boolean isValid() { return valid; }
 
     /**
      * Bind the FBO and prepare state for the depth-only pass.
      */
     public void beginDepthPass() {
+        valid = true;
         glViewport(0, 0, SHADOW_RESOLUTION, SHADOW_RESOLUTION);
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         glClear(GL_DEPTH_BUFFER_BIT);

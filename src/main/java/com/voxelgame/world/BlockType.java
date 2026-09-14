@@ -118,7 +118,7 @@ public enum BlockType {
     AUTUMN_LEAVES(80, "autumn_leaves", false, 0xB0541F),
     CHERRY_LEAVES(81, "cherry_leaves", false, 0xE8B7C8),
     LAVENDER(82, "lavender", false, 0x7E4BB5),
-    CRYSTAL(83, "crystal", true, 0x9B59D0),
+    CRYSTAL(83, "crystal", false, 0x9B59D0),
     BASALT(84, "basalt", true, 0x3A3A3E),
     SALT(85, "salt", true, 0xE8E8E4),
     ASH(86, "ash", true, 0x9A9A9A),
@@ -373,7 +373,23 @@ public enum BlockType {
     /** Snow bricks: carved ice blocks for cold biome bases. */
     SNOW_BRICKS(260, "snow_bricks", true, 0xE8ECF0),
     /** Sandstone bricks: carved blocks for desert bases. */
-    SANDSTONE_BRICKS(261, "sandstone_bricks", true, 0xD8C890);
+    SANDSTONE_BRICKS(261, "sandstone_bricks", true, 0xD8C890),
+    /** Slime block: bouncy green block; landing on it absorbs fall damage
+     *  and reflects the player upward. */
+    SLIME_BLOCK(262, "slime_block", true, 0x4AE868),
+    // --- [SPACE] Rocket parts: build a launcher pad and a rocket tower ---
+    /** Launch pad: right-click primes a fully assembled rocket above it. */
+    ROCKET_LAUNCH_PAD(266, "rocket_launch_pad", true, 0x6A7280),
+    /** Engine: the base of the rocket tower, exhaust flares during launch. */
+    ROCKET_ENGINE(267, "rocket_engine", true, 0x39434E),
+    /** Fuel tank: barrel section of the rocket tower. */
+    ROCKET_FUEL(268, "rocket_fuel", true, 0xC8D0DC),
+    /** Hull: body segment of the rocket tower. */
+    ROCKET_BODY(269, "rocket_body", true, 0xE8ECF2),
+    /** Porthole: window segment with a blue viewport. */
+    ROCKET_WINDOW(270, "rocket_window", true, 0x2A3850),
+    /** Cone: nose cap that tops off a rocket. */
+    ROCKET_CONE(271, "rocket_cone", true, 0xE04040);
 
     public final int id;
     public final String name;
@@ -413,7 +429,10 @@ public enum BlockType {
             SOLID[idx] = t.solid;
             TRANSPARENT[idx] = !t.solid || t == WATER || t == GLASS || t == ICE
                 || t == OAK_LEAVES || t == SPRUCE_LEAVES || t == BIRCH_LEAVES
-                || t == AUTUMN_LEAVES || t == CHERRY_LEAVES;
+                || t == AUTUMN_LEAVES || t == CHERRY_LEAVES
+                // Doors are thin 3/16 panels: neighbouring wall faces must
+                // stay visible around them, and the mesher draws the panel
+                || t == OAK_DOOR || t == OAK_DOOR_OPEN;
         }
         // Emissive blocks glow on their own
         EMISSIVE[GLOWSTONE.id] = true;

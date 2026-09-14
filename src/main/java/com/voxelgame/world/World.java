@@ -433,6 +433,8 @@ public class World {
             published++;
             // Apply structure blocks and loot deferred from the worker threads
             applyPendingStructureWrites(chunk);
+            // Fresh chunks light+mesh from scratch; queue them themselves
+            markRemeshChunk(chunk);
             // Neighbours must re-light and re-mesh now this one exists
             markNeighboursDirty(chunk.getChunkX(), chunk.getChunkZ());
 
@@ -814,9 +816,43 @@ public class World {
     private void markDirty(int cx, int cz) {
         Chunk chunk = chunks.get(Chunk.key(cx, cz));
         if (chunk != null) {
-            chunk.setDirty(true);
-            chunk.setLightDirty(true);
+            markDirtyChunk(chunk);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // [OPT] Dirty-chunk queue.
+    //
+    // The renderer used to scan the whole chunk map every frame to find
+    // work; with a queue it just drains these lists, and a settled world
+    // does zero chunk-map iteration per frame.
+    // ------------------------------------------------------------------
+
+    private final ArrayDeque<Chunk> dirtyChunks = new ArrayDeque<>();
+
+    /** Flags both dirty + lightDirty and queues the chunk for relight+remesh. */
+    public void markDirtyChunk(Chunk chunk) {
+        chunk.setDirty(true);
+        chunk.setLightDirty(true);
+        dirtyChunks.addLast(chunk);
+    }
+
+    /** Flags the chunk dirty (remesh only; light already correct). */
+    public void markRemeshChunk(Chunk chunk) {
+        chunk.setDirty(true);
+        dirtyChunks.addLast(chunk);
+    }
+
+    /**
+     * Collects every chunk queued since the last call. Returns the freshly
+     * queued chunks, or null when nothing is pending.
+     */
+    public List<Chunk> drainDirtyChunks() {
+        if (dirtyChunks.isEmpty()) return null;
+        List<Chunk> out = new ArrayList<>(dirtyChunks.size());
+        Chunk c;
+        while ((c = dirtyChunks.pollFirst()) != null) out.add(c);
+        return out;
     }
     
     /**
@@ -1118,7 +1154,11 @@ public class World {
                 || getBlock(wx, wy + 1, wz) != BlockType.SLIDING_DOOR.id) {
                 continue; // stale meta, e.g. a door that was broken
             }
-            slidingDoors.put(doorKey(wx, wy, wz), SlidingDoor.fromMeta(wx, wy, wz, (byte) e[3]));
+            // [MC] Villages now use vanilla oak doors: migrate any sliding
+            // door blocks found in older saves once, on first load
+            chunk.setBlock(wx & 15, wy, wz & 15, BlockType.OAK_DOOR.id);
+            chunk.setBlock(wx & 15, wy + 1, wz & 15, BlockType.OAK_DOOR.id);
+            chunk.setDirty(true);
         }
     }
 
@@ -1437,7 +1477,7 @@ public class World {
         java.util.List<int[]> writes = chunk.drainPendingWrites();
         if (writes != null) {
             for (int[] w : writes) {
-                chunk.setBlock(w[0], w[1], w[2], (byte) w[3]);
+                chunk.setBlock(w[0], w[1], w[2], w[3]);
                 if (w[3] == BlockType.MOB_SPAWNER.id) {
                     chunk.addSpawner(w[0], w[1], w[2]);
                 }
@@ -1447,11 +1487,25 @@ public class World {
         java.util.List<int[]> loot = chunk.drainPendingLoot();
         if (loot != null) {
             for (int[] l : loot) {
-                com.voxelgame.item.Item item = com.voxelgame.item.ItemRegistry.getById((byte) l[3]);
+                // Item ids live above 127, so no byte cast here - (byte) 130
+                // wraps negative and getById used to return null, leaving
+                // every structure chest empty
+                com.voxelgame.item.Item item = com.voxelgame.item.ItemRegistry.getById(l[3]);
                 if (item == null) continue;
-                // Chest position is the cell the loot entry points at
-                containerManager.getChest(l[0], l[1], l[2])
-                    .insertItem(new com.voxelgame.item.ItemStack(item, l[4]));
+
+                com.voxelgame.world.container.ContainerData chest =
+                    containerManager.getChest(l[0], l[1], l[2]);
+                chest.insertItem(new com.voxelgame.item.ItemStack(item, l[4]));
+
+                // Bonus rolls on top of the guaranteed template loot, seeded
+                // by position so a given chest always rolls the same way
+                java.util.Random rng = new java.util.Random(
+                    31L * l[0] + 1543L * l[1] + 1299709L * l[2]);
+                int rolls = 2 + rng.nextInt(3);
+                for (com.voxelgame.item.ItemStack stack :
+                        com.voxelgame.item.LootTable.STRUCTURE_CHEST.roll(rolls, rng)) {
+                    chest.insertItem(stack);
+                }
             }
         }
 
@@ -1678,9 +1732,12 @@ public class World {
         if (java.lang.Math.random() < 0.15f) {
             spawnDrop(p, BlockType.ITEM_GUNPOWDER, 1);
         }
+        // [POT] Slimy Zoloys occasionally drop slime balls
+        if (java.lang.Math.random() < 0.15f) {
+            spawnItemDrop(p, com.voxelgame.item.ItemRegistry.SLIME_BALL, 1 + (int) (java.lang.Math.random() * 2));
+        }
     }
 
-    /** Drop a stack of items as a loose entity with a random nudge. */
     /** Drop a loose item entity near a position. */
     public void spawnDrop(Vector3f at, BlockType type, int count) {
         Vector3f pos = new Vector3f(
@@ -1688,6 +1745,15 @@ public class World {
             at.y + 0.3f,
             at.z + (float) (java.lang.Math.random() - 0.5) * 0.4f);
         itemEntities.add(new ItemEntity(this, pos, new ItemStack(type, count)));
+    }
+
+    /** [POT] Drop an item (not a block) as a loose entity. */
+    public void spawnItemDrop(Vector3f at, com.voxelgame.item.Item item, int count) {
+        Vector3f pos = new Vector3f(
+            at.x + (float) (java.lang.Math.random() - 0.5) * 0.4f,
+            at.y + 0.3f,
+            at.z + (float) (java.lang.Math.random() - 0.5) * 0.4f);
+        itemEntities.add(new ItemEntity(this, pos, new ItemStack(item, count)));
     }
 
     // --- [ENCH] Experience orbs ---

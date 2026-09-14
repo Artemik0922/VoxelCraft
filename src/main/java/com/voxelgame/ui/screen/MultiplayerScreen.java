@@ -85,6 +85,7 @@ public class MultiplayerScreen extends Screen {
 
     @Override
     public void update(double deltaTime) {
+        super.update(deltaTime);
         if (nameField != null) nameField.update(deltaTime);
         if (hostField != null) hostField.update(deltaTime);
         if (portField != null) portField.update(deltaTime);

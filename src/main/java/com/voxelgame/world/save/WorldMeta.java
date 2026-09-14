@@ -38,6 +38,11 @@ public class WorldMeta {
     public String folderName = "world";
     public String displayName = "New World";
 
+    /** Dimension key: "overworld" by default, "space" for rocket planets. */
+    public String dimension = "overworld";
+    /** For space worlds: folderName of the overworld this planet orbits. */
+    public String homeWorld = null;
+
     public long seed;
     public GameMode gameMode = GameMode.SURVIVAL;
     public boolean generateStructures = true;
@@ -83,6 +88,8 @@ public class WorldMeta {
         Map<String, String> m = new LinkedHashMap<>();
         m.put("displayName", displayName);
         m.put("seed", Long.toString(seed));
+        m.put("dimension", dimension);
+        m.put("homeWorld", homeWorld == null ? "" : homeWorld);
         m.put("gameMode", gameMode.name());
         m.put("generateStructures", Boolean.toString(generateStructures));
         m.put("dead", Boolean.toString(dead));
@@ -128,6 +135,9 @@ public class WorldMeta {
             WorldMeta w = new WorldMeta();
             w.displayName = m.getOrDefault("displayName", "World");
             w.seed = parseLong(m.get("seed"), 0);
+            w.dimension = m.getOrDefault("dimension", "overworld");
+            w.homeWorld = m.getOrDefault("homeWorld", "");
+            if (w.homeWorld.isEmpty()) w.homeWorld = null;
             // Pre-mode saves default to creative rather than losing progress
             w.gameMode = GameMode.parse(m.getOrDefault("gameMode", "CREATIVE"));
             w.generateStructures = !"false".equals(m.get("generateStructures"));

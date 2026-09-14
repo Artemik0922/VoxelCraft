@@ -55,18 +55,11 @@ public class Slider extends Widget {
 
         int fadeAlpha = (alpha >>> 24) & 0xFF;
 
-        // Draw groove as a panel (darker inside)
-        ui.fillRect(x, y, width, height, MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.PANEL_BG));
-        int border = MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.PANEL_BORDER);
-        ui.fillRect(x, y, width, 1, border);
-        ui.fillRect(x, y + height - 1, width, 1, border);
-        ui.fillRect(x, y, 1, height, border);
-        ui.fillRect(x + width - 1, y, 1, height, border);
-        // Inner bevel
-        ui.fillRect(x + 1, y + height - 2, width - 2, 1, MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.PANEL_EDGE_L));
-        ui.fillRect(x + width - 2, y + 1, 1, height - 2, MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.PANEL_EDGE_L));
+        // Draw groove as a rounded glass inset
+        ui.drawNineSlice(tex.glassTrack, x, y, width, height, 4,
+            GuiAssets.GLASS_WIDGET, MenuTheme.col(fadeAlpha << 24, 255, 0xFF10141F));
 
-        // Knob
+        // Knob - a glass bead riding on the groove
         int knobX = x + 1 + (int) (normalized * (width - KNOB_WIDTH - 2));
         boolean hot = hovered || dragging;
         MenuTheme.drawPanel(ui, fadeAlpha << 24, knobX, y + 1, KNOB_WIDTH, height - 2, hot);

@@ -8,6 +8,8 @@ import com.voxelgame.item.ItemStack;
 import com.voxelgame.player.Player;
 import com.voxelgame.rendering.TextureAtlas;
 import com.voxelgame.world.BlockType;
+import com.voxelgame.world.Chunk;
+import com.voxelgame.world.World;
 import com.voxelgame.world.save.WorldMeta;
 
 /**
@@ -38,6 +40,10 @@ public class GameHud {
     private double selectionPulse = 0;
     private int lastSelectedSlot = -1;
 
+    // [MINIMAP] Live corner map, rewritten as its own renderer (see Minimap)
+    private boolean minimapVisible = true;
+    private final Minimap minimap = new Minimap();
+
     // Damage flash
     private int lastHealth = Integer.MIN_VALUE;
     private double damageFlash = 0;
@@ -48,6 +54,26 @@ public class GameHud {
 
     public void toggleDebug() { debugVisible = !debugVisible; }
     public boolean isDebugVisible() { return debugVisible; }
+
+    /** Toggle the corner map (M). */
+    public void toggleMinimap() { minimapVisible = !minimapVisible; }
+    public boolean isMinimapVisible() { return minimapVisible; }
+
+    /** True when the gui cursor is over the rendered map (wheel zoom). */
+    public boolean minimapHover(float mx, float my) {
+        return minimapVisible && minimap.hover(mx, my);
+    }
+
+    /** Zoom the map one step; positive = farther out. */
+    public void minimapZoom(int step) { minimap.zoomBy(step); }
+
+    /** Extra top inset so status icons clear the map when it is shown. */
+    public int minimapTopInset() {
+        return minimapVisible ? minimap.totalHeight() + 2 : 6;
+    }
+
+    /** Releases the minimap GL textures. */
+    public void cleanup() { minimap.cleanup(); }
 
     /** Values panel shown while adjusting the first-person view model. */
     private void drawTuningPanel(UIRenderer ui, FontRenderer font, String[] lines) {
@@ -108,6 +134,7 @@ public class GameHud {
             selectionPulse = 1.0;
         }
         selectionPulse = Math.max(0, selectionPulse - deltaTime * 3.0);
+        minimap.update(deltaTime);
 
         // Flash the hearts when health drops
         if (lastHealth != Integer.MIN_VALUE && health < lastHealth) {
@@ -120,7 +147,7 @@ public class GameHud {
     // ------------------------------------------------------------------
 
     public void render(UIRenderer ui, FontRenderer font, GuiAssets gui,
-                       Inventory inventory, DebugInfo debug) {
+                       Inventory inventory, DebugInfo debug, World world) {
         int w = ui.getWidth();
         int h = ui.getHeight();
 
@@ -131,23 +158,29 @@ public class GameHud {
 
         drawCrosshair(ui, gui, w, h);
         drawHotbar(ui, font, gui, inventory, hotbarX, hotbarY, hotbarW, hotbarH);
-        // Creative hides health, hunger and stack counts
-        if (debug.gameMode != WorldMeta.GameMode.CREATIVE) {
-            drawHearts(ui, gui, hotbarX, hotbarY, debug.health, debug.maxHealth);
-            drawHunger(ui, gui, hotbarX, hotbarY, debug.hunger, debug.maxHunger);
+
+        // Status stack above the hotbar, vanilla-style: XP bar sits directly
+        // on the hotbar, hearts and hunger share the row above it, air
+        // bubbles float above that. Nothing overlaps.
+        boolean survival = debug.gameMode != WorldMeta.GameMode.CREATIVE;
+        int statusY = hotbarY - HEART - 2;
+        if (survival) statusY -= 5 + 4; // XP bar height + breathing gap
+
+        if (survival) {
+            drawHearts(ui, gui, hotbarX, hotbarW, statusY, debug.health, debug.maxHealth);
+            drawHunger(ui, gui, hotbarX, hotbarW, statusY, debug.hunger, debug.maxHunger);
             if (debug.air < debug.maxAir) {
-                drawAirBubbles(ui, gui, hotbarX, hotbarY, debug.air, debug.maxAir);
+                drawAirBubbles(ui, gui, hotbarX, hotbarW, statusY, debug.air, debug.maxAir);
             }
             if (debug.eatProgress > 0) {
-                drawEatProgress(ui, gui, hotbarX, hotbarY, debug.eatProgress);
+                drawEatProgress(ui, gui, hotbarX, statusY, debug.eatProgress);
             }
-        }
-        // [ENCH] Experience bar above the hotbar (survival only)
-        if (debug.gameMode != WorldMeta.GameMode.CREATIVE) {
             drawXpBar(ui, font, hotbarX, hotbarY, hotbarW,
                 debug.xpLevel, debug.xpProgress, debug.xpToNext);
         }
-drawHeldItemName(ui, font, inventory, w, hotbarY);
+        // [POT] Active status-effect icons in the top-right corner
+        drawEffectIcons(ui, debug.activeEffects, w);
+        drawHeldItemName(ui, font, inventory, w, statusY);
 
         // [UI-009] World still filling in: brief corner note so the empty
         // distance is not mistaken for a bug
@@ -169,6 +202,12 @@ drawHeldItemName(ui, font, inventory, w, hotbarY);
         if (atlasVisible) {
             drawAtlasOverlay(ui, font);
         }
+
+        // [MINIMAP] Corner block map (top-right, below effect icons when both on)
+        if (minimapVisible && world != null) {
+            minimap.render(ui, font, world, debug.x, debug.y, debug.z, debug.yaw,
+                debug.daylight, debug.biomeName, debug.clock);
+        }
     }
 
 private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
@@ -189,11 +228,15 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
         int barY = hotbarY - barH - 2;
 
         ui.useSolidColor();
-        ui.fillRect(barX - 1, barY - 1, barW + 2, barH + 2, 0x80000000);
+        // Recessed glass track
+        ui.fillRect(barX - 1, barY - 1, barW + 2, barH + 2, 0x40000000);
+        ui.fillRect(barX, barY, barW, barH, 0xFF1B2332);
+        ui.fillRect(barX, barY - 1, barW, 1, 0xFF2A3450);
 
         float fraction = xpToNext <= 0 ? 0 : (float) xpProgress / xpToNext;
         if (fraction > 0) {
             ui.fillRect(barX, barY, (int) (barW * fraction), barH, 0xFF8CF080);
+            ui.fillRect(barX, barY, (int) (barW * fraction), 1, 0xFFC9FFB0);
         }
 
         if (xpLevel > 0) {
@@ -207,8 +250,8 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
      */
     private void drawHotbar(UIRenderer ui, FontRenderer font, GuiAssets gui,
                             Inventory inventory, int px, int py, int pw, int ph) {
-        ui.drawNineSlice(gui.hotbarPanel, px, py, pw, ph,
-            GuiAssets.BORDER, GuiAssets.WIDGET, 0xFFFFFFFF);
+        ui.drawNineSlice(gui.glassPanel, px, py, pw, ph,
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
 
         int selected = inventory.getSelectedSlot();
 
@@ -216,11 +259,12 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
             int sx = px + HOTBAR_PAD + i * SLOT;
             int sy = py + HOTBAR_PAD;
 
-            ui.drawSprite(gui.slot, sx, sy, SLOT, SLOT);
+            ui.drawNineSlice(gui.glassSlot, sx, sy, SLOT, SLOT,
+                3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
 
             ItemStack stack = inventory.getHotbarItem(i);
             if (!stack.isEmpty()) {
-                drawBlockIcon(ui, stack.getBlockType(), sx + 1, sy + 1, ICON, 1.0f);
+                drawItemStackIcon(ui, stack, sx + 1, sy + 1, ICON);
                 drawCount(ui, font, stack.getCount(), sx, sy);
                 // Draw durability bar for tools
                 drawDurabilityBar(ui, stack, sx, sy);
@@ -258,8 +302,8 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
     }
 
     /**
-     * 2px white outline around the active slot, briefly expanded after the
-     * selection moves.
+     * Accent frame around the active slot with a soft glow, briefly expanded
+     * after the selection moves.
      */
     private void drawSelectionFrame(UIRenderer ui, int sx, int sy) {
         int grow = selectionPulse > 0.5 ? 1 : 0;
@@ -269,9 +313,12 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
         int size = SLOT + 2 + grow * 2;
 
         ui.useSolidColor();
-        for (int i = 0; i < 2; i++) {
-            ui.drawRectOutline(x - i, y - i, size + i * 2, size + i * 2, 0xFFFFFFFF);
-        }
+        // Soft halo so the frame reads against the glass slots
+        ui.fillRect(x - 1, y - 1, size + 2, size + 2, 0x2A000000 | MenuTheme.ACCENT);
+        ui.fillRect(x, y, size, 1, MenuTheme.ACCENT_LIGHT);
+        ui.fillRect(x, y + size - 1, size, 1, MenuTheme.ACCENT);
+        ui.fillRect(x, y, 1, size, MenuTheme.ACCENT_LIGHT);
+        ui.fillRect(x + size - 1, y, 1, size, MenuTheme.ACCENT);
     }
 
     /**
@@ -296,16 +343,45 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
             uv.u1, uv.v2, uv.u2, uv.v1, 0xFFFFFFFF);
     }
 
+    /** Flat sprite icon for a block or an item tile (tools, potions...). */
+    private void drawItemStackIcon(UIRenderer ui, ItemStack stack, int x, int y, int size) {
+        if (stack.isBlock()) {
+            drawBlockIcon(ui, stack.getBlockType(), x, y, size, 1.0f);
+            return;
+        }
+        com.voxelgame.item.Item item = stack.getItem();
+        if (item != null && item.spriteName != null) {
+            int slot = atlas.getLayerOf(item.spriteName);
+            if (slot >= 0) {
+                TextureAtlas.TextureCoords uv = new TextureAtlas.TextureCoords(slot);
+                ui.drawTexture(atlas.getTexture().getId(), x, y, size, size,
+                    uv.u1, uv.v2, uv.u2, uv.v1, 0xFFFFFFFF);
+                return;
+            }
+        }
+        ui.useSolidColor();
+        ui.drawRectOutline(x + 2, y + 2, size - 4, size - 4, 0xFFFF55AA);
+    }
+
+    /** Vanilla strips the status rows to a 182px bar centred on the hotbar,
+     *  so hearts and hunger keep a clear gap in the middle. */
+    private static final int STATUS_BAR_W = 182;
+
+    private int statusBarX(int hotbarX, int hotbarW) {
+        return hotbarX + (hotbarW - STATUS_BAR_W) / 2;
+    }
+
     /**
-     * Ten hearts sitting directly above the hotbar, left aligned with it.
+     * Ten hearts sitting on the status row, left aligned with the 182px bar.
      */
-    private void drawHearts(UIRenderer ui, GuiAssets gui, int hotbarX, int hotbarY,
-                            int health, int maxHealth) {
+    private void drawHearts(UIRenderer ui, GuiAssets gui, int hotbarX, int hotbarW,
+                            int statusY, int health, int maxHealth) {
         final int hearts = 10;
-        int y = hotbarY - HEART - 2;
+        int y = statusY;
 
         // Each heart covers a tenth of max health; halves show the odd point
         float perHeart = Math.max(1, maxHealth) / (float) hearts;
+        int barX = statusBarX(hotbarX, hotbarW);
 
         // Jitter and brighten briefly when damaged
         boolean flash = damageFlash > 0 && ((int) (damageFlash * 20) % 2 == 0);
@@ -313,7 +389,7 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
         int bump = (damageFlash > 0) ? -1 : 0;
 
         for (int i = 0; i < hearts; i++) {
-            int x = hotbarX + HOTBAR_PAD + i * (HEART - 1);
+            int x = barX + i * (HEART - 1);
             float filled = health - i * perHeart;
 
             int sprite;
@@ -334,51 +410,50 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
     }
 
     /**
-     * Ten hunger bars mirrored to the right of the hotbar. Each covers two
-     * points; halves show the odd point.
+     * Ten hunger drumsticks mirrored to the right of the hotbar, vanilla
+     * style: the bar depletes from the left, halves fill the icon's right.
      */
-    private void drawHunger(UIRenderer ui, GuiAssets gui, int hotbarX, int hotbarY,
-                            int hunger, int maxHunger) {
+    private void drawHunger(UIRenderer ui, GuiAssets gui, int hotbarX, int hotbarW,
+                            int statusY, int hunger, int maxHunger) {
         final int bars = 10;
-        int y = hotbarY - HEART - 2;
+        int y = statusY;
         float perBar = Math.max(1, maxHunger) / (float) bars;
-        int panelW = hotbarPanelWidth();
+        int barX = statusBarX(hotbarX, hotbarW);
 
         for (int i = 0; i < bars; i++) {
-            // Right-aligned, growing leftward from the panel's right edge
-            int x = hotbarX + panelW - HOTBAR_PAD - (bars - i) * (HEART - 1);
+            // Right-aligned, growing leftward from the status bar's right edge
+            int x = barX + STATUS_BAR_W - HOTBAR_PAD - (bars - i) * (HEART - 1);
             float filled = hunger - i * perBar;
 
             int sprite;
             if (filled >= perBar - 0.001f) {
-                sprite = gui.heartFull;
+                sprite = gui.drumstickFull;
             } else if (filled >= perBar * 0.5f) {
-                sprite = gui.heartHalf;
+                sprite = gui.drumstickHalf;
             } else {
-                sprite = gui.heartEmpty;
+                sprite = gui.drumstickEmpty;
             }
-            if (sprite != gui.heartEmpty) {
-                ui.drawSprite(gui.heartEmpty, x, y, HEART, HEART);
-            }
-            // Hunger uses a warm tint to distinguish from health
-            ui.drawSprite(sprite, x, y, HEART, HEART, 0xFFFFCC66);
+            ui.drawSprite(sprite, x, y, HEART, HEART);
         }
     }
 
     /**
-     * Air bubbles shown above the hearts when the player is underwater.
+     * Air bubbles shown above the hearts when the head is underwater. One
+     * bubble pops per 1/10th of the supply, like vanilla.
      */
-    private void drawAirBubbles(UIRenderer ui, GuiAssets gui, int hotbarX, int hotbarY,
-                                int air, int maxAir) {
+    private void drawAirBubbles(UIRenderer ui, GuiAssets gui, int hotbarX, int hotbarW,
+                                int statusY, int air, int maxAir) {
         final int bubbles = 10;
-        int y = hotbarY - HEART * 2 - 6;
+        int y = statusY - HEART - 2;
         float perBubble = Math.max(1, maxAir) / (float) bubbles;
+        int barX = statusBarX(hotbarX, hotbarW);
 
         for (int i = 0; i < bubbles; i++) {
-            int x = hotbarX + HOTBAR_PAD + i * (HEART - 1);
             float filled = air - i * perBubble;
-            int sprite = filled >= perBubble - 0.001f ? gui.heartFull : gui.heartEmpty;
-            ui.drawSprite(sprite, x, y, HEART, HEART, 0xFF88CCFF);
+            if (filled <= 0) break;
+            // Partial last bubble still reads as one bubble, like vanilla pops
+            int x = barX + HOTBAR_PAD + i * (HEART - 1);
+            ui.drawSprite(gui.bubble, x, y, HEART, HEART);
         }
     }
 
@@ -386,28 +461,69 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
      * Eating progress bar above the hotbar. Fills from left to right while the
      * player holds right-click with food.
      */
-    private void drawEatProgress(UIRenderer ui, GuiAssets gui, int hotbarX, int hotbarY,
+    private void drawEatProgress(UIRenderer ui, GuiAssets gui, int hotbarX, int statusY,
                                   float progress) {
         int barW = Inventory.HOTBAR_SIZE * SLOT;
         int barH = 3;
         int x = hotbarX + HOTBAR_PAD;
-        int y = hotbarY - barH - 4;
+        int y = statusY - barH - 4;
 
         ui.useSolidColor();
-        ui.fillRect(x, y, barW, barH, 0xFF444444);
+        ui.fillRect(x, y, barW, barH, 0xFF1B2332);
+        ui.fillRect(x, y - 1, barW, 1, 0xFF2A3450);
         ui.fillRect(x, y, (int) (barW * progress), barH, 0xFF88FF44);
+        if (progress > 0) {
+            ui.fillRect(x, y, (int) (barW * progress), 1, 0xFFC9FFB0);
+        }
     }
 
-    /** Name of the held block, fading out with the selection pulse. */
+    /**
+     * [POT] Status-effect icons stacked down the top-right corner. A dark
+     * slice over each icon shrinks as the remaining time runs out.
+     */
+    private void drawEffectIcons(UIRenderer ui,
+                                 java.util.Map<com.voxelgame.item.StatusEffect,
+                                     com.voxelgame.player.Player.ActiveEffect> effects,
+                                 int w) {
+        if (effects == null || effects.isEmpty()) return;
+        int size = 22;
+        int gap = 2;
+        int x = w - size - 4;
+        // Shift icons below the minimap when it is visible
+        int y = minimapTopInset();
+        for (com.voxelgame.player.Player.ActiveEffect e : effects.values()) {
+            // Frosted chip behind the icon
+            ui.useSolidColor();
+            ui.fillRect(x - 1, y - 1, size + 2, size + 2, 0x55000000);
+            ui.fillRect(x, y - 1, size, 1, 0x30FFFFFF);
+
+            int slot = atlas.getLayerOf(e.type.spriteName);
+            if (slot >= 0) {
+                TextureAtlas.TextureCoords uv = new TextureAtlas.TextureCoords(slot);
+                ui.drawTexture(atlas.getTexture().getId(), x, y, size, size,
+                    uv.u1, uv.v2, uv.u2, uv.v1, 0xFFFFFFFF);
+            }
+            float maxTicks = Math.max(1, e.type.baseDurationTicks);
+            float left = java.lang.Math.min(1.0f, (float) e.remainingTicks / maxTicks);
+            int fadeH = (int) (size * (1.0f - left));
+            if (fadeH > 0) {
+                ui.useSolidColor();
+                ui.fillRect(x, y + size - fadeH, size, fadeH, 0x90000000);
+            }
+            y += size + gap;
+        }
+    }
+
+    /** Name of the held block or item, fading out with the selection pulse. */
     private void drawHeldItemName(UIRenderer ui, FontRenderer font,
-                                  Inventory inventory, int w, int hotbarY) {
+                                  Inventory inventory, int w, int statusY) {
         ItemStack held = inventory.getSelectedItem();
         if (held.isEmpty() || selectionPulse <= 0) return;
 
         int alpha = (int) (255 * Math.min(1.0, selectionPulse * 1.6));
-        String name = prettyName(held.getBlockType());
+        String name = StackIcons.displayName(held);
 
-        font.drawCenteredWithShadow(ui, name, w / 2, hotbarY - GuiAssets.HEART_SIZE - 12,
+        font.drawCenteredWithShadow(ui, name, w / 2, statusY - GuiAssets.HEART_SIZE - 10,
             (alpha << 24) | 0xFFFFFF);
     }
 
@@ -444,6 +560,8 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
         public int lightBacklog;
         public int meshBacklog;
         public int workers;
+        /** [OPT] Per-pass frame time in microseconds (0 when idle/skipped). */
+        public long rebuildUs, shadowUs, worldUs, sceneUs, postUs, uiUs;
         /** [UI-009] True while chunks are still streaming in. */
         public boolean loadingChunks;
         public long leafTriangles;
@@ -454,6 +572,9 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
         public int xpLevel;
         public int xpProgress;
         public int xpToNext;
+        /** [POT] Active status effects and their remaining ticks. */
+        public java.util.Map<com.voxelgame.item.StatusEffect, com.voxelgame.player.Player.ActiveEffect> activeEffects
+            = java.util.Collections.emptyMap();
     }
 
     private void drawDebug(UIRenderer ui, FontRenderer font, DebugInfo d) {
@@ -476,6 +597,10 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
             String.format(java.util.Locale.ROOT, "Time: %s  (daylight %.2f)", d.clock, d.daylight),
             String.format(java.util.Locale.ROOT, "Particles: %d", d.particles),
             String.format(java.util.Locale.ROOT, "Biome: %s", d.biomeName),
+            String.format(java.util.Locale.ROOT, "Pass ms: rebuild %.2f shadow %.2f world %.2f",
+                d.rebuildUs / 1000.0, d.shadowUs / 1000.0, d.worldUs / 1000.0),
+            String.format(java.util.Locale.ROOT, "Pass ms: scene %.2f post %.2f ui %.2f",
+                d.sceneUs / 1000.0, d.postUs / 1000.0, d.uiUs / 1000.0),
         };
 
         int pad = 3;
@@ -492,6 +617,10 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
             y += FontRenderer.LINE_HEIGHT;
         }
     }
+
+    // ------------------------------------------------------------------
+    // [MINIMAP] rendered by the dedicated Minimap renderer
+    // ------------------------------------------------------------------
 
     /** Cardinal direction from yaw, matching Minecraft's convention. */
     private static String facingName(float yaw) {

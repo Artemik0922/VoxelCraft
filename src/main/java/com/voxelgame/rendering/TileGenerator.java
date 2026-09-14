@@ -117,10 +117,10 @@ public final class TileGenerator {
             case "cactus_side"  -> cactusSide(variant);
             case "cactus_top"   -> cactusTop(variant);
             // --- Biome blocks ---
-            case "autumn_leaves" -> noisy(new int[]{0xB0541F, 0xC86822, 0xD97F26, 0xA04818}, variant, 3);
-            case "cherry_leaves" -> noisy(new int[]{0xE8B7C8, 0xF2D0DA, 0xDDB0C0, 0xF5E0E8}, variant, 3);
+            case "autumn_leaves" -> leaves(new int[]{0xA04818, 0xB0541F, 0xC86822, 0xD97F26}, variant, false);
+            case "cherry_leaves" -> leaves(new int[]{0xDDB0C0, 0xE8B7C8, 0xF2D0DA, 0xF5E0E8}, variant, false);
             case "lavender"      -> flower(0x7E4BB5, 0xE0C8F0, variant); // purple flower
-            case "crystal"       -> noisy(new int[]{0x5E2A8C, 0x7E3ABE, 0x9B59D0, 0x4A1A6C}, variant, 3);
+            case "crystal"       -> crystal(variant);
             case "basalt"        -> noisy(new int[]{0x2A2A2E, 0x3A3A3E, 0x4A4A50, 0x1A1A1E}, variant, 2);
             case "salt"          -> noisy(new int[]{0xE8E8E4, 0xF0F0EC, 0xD8D8D4, 0xE0E0DC}, variant, 2);
             case "ash"           -> noisy(new int[]{0x9A9A9A, 0xA8A8A8, 0x8A8A8A, 0x7A7A7A}, variant, 3);
@@ -230,6 +230,17 @@ public final class TileGenerator {
             case "snow_bricks" -> noisy(new int[]{0xE8EEF2, 0xF2F6F8, 0xD8E2E8, 0xFFFFFF}, variant, 3);
             case "sandstone_bricks" -> noisy(new int[]{0xC8B488, 0xD4C098, 0xB8A478, 0xE0D0A8}, variant, 3);
 
+            // --- [GP-009] Slime block: bouncy translucent green gel ---
+            case "slime_block" -> slimeBlock(variant);
+
+            // --- [SPACE] Rocket tower parts ---
+            case "rocket_launch_pad" -> rocketPad();
+            case "rocket_engine" -> rocketEngine();
+            case "rocket_fuel" -> rocketFuel();
+            case "rocket_body" -> rocketBody();
+            case "rocket_window" -> rocketWindow();
+            case "rocket_cone" -> rocketCone();
+
             // Logs
             case "spruce_log"    -> noisy(new int[]{0x4A3020, 0x5A4030, 0x3A2010, 0x6A5040}, variant, 3);
             case "spruce_log_top" -> noisy(new int[]{0x7A5A3A, 0x8A6A4A, 0x6A4A2A, 0x9A7A5A}, variant, 2);
@@ -237,8 +248,8 @@ public final class TileGenerator {
             case "jungle_log_top" -> noisy(new int[]{0xB08050, 0xC09060, 0xA07040, 0xD0A070}, variant, 2);
 
             // Leaves
-            case "spruce_leaves" -> noisy(new int[]{0x1A4A1A, 0x2A5A2A, 0x0A3A0A, 0x3A6A3A}, variant, 3);
-            case "jungle_leaves" -> noisy(new int[]{0x3A7A2A, 0x4A8A3A, 0x2A6A1A, 0x5A9A4A}, variant, 3);
+            case "spruce_leaves" -> leaves(new int[]{0x0A3A0A, 0x1A4A1A, 0x2A5A2A, 0x3A6A3A}, variant, false);
+            case "jungle_leaves" -> leaves(new int[]{0x2A6A1A, 0x3A7A2A, 0x4A8A3A, 0x5A9A4A}, variant, false);
 
             // Ores
             case "emerald_ore"   -> ore(0x30E050, 0x50FF70, variant);
@@ -320,6 +331,23 @@ public final class TileGenerator {
             case "shears" -> shearsSprite();
             case "bucket" -> bucketSprite();
             case "milk" -> milkSprite();
+
+            // --- [GP-009] Slime ---
+            case "slime_ball" -> slimeBallSprite();
+
+            // --- [POT] Potions and brewing ---
+            case "water_bottle" -> potionSprite(0xFF80C8F0);
+            case "potion_healing" -> potionSprite(0xFFE858A0);
+            case "potion_speed" -> potionSprite(0xFF50E0C8);
+            case "potion_strength" -> potionSprite(0xFFE05040);
+            case "potion_fire_resistance" -> potionSprite(0xFFE89830);
+            case "sugar" -> sugarSprite();
+
+            // --- [POT] HUD status-effect icons ---
+            case "effect_regeneration" -> effectIconSprite(0xFFE858A0, "heart");
+            case "effect_speed" -> effectIconSprite(0xFF50E0C8, "chevron");
+            case "effect_strength" -> effectIconSprite(0xFFE05040, "sword");
+            case "effect_fire_resistance" -> effectIconSprite(0xFFE89830, "flame");
 
             // --- [ENCH] Enchanting ---
             case "enchanting_table" -> noisy(new int[]{0x3A1050, 0x4A2060, 0x2A0A40, 0x5A3070}, variant, 3);
@@ -429,9 +457,202 @@ public final class TileGenerator {
         return out;
     }
 
+    /**
+     * Slime block: a block of translucent green gel with a darker border and
+     * a few glossy highlights, so it reads as sticky and bouncy.
+     */
+    private static int[] slimeBlock(int variant) {
+        int[] out = noisy(new int[]{0x2DD85A, 0x3FF06F, 0x26B84C, 0x57F08A}, variant, 3);
+        java.util.Random rnd = new java.util.Random(0x51E + variant * 31);
+        for (int y = 0; y < SIZE; y++) {
+            for (int x = 0; x < SIZE; x++) {
+                int edge = Math.min(Math.min(x, SIZE - 1 - x), Math.min(y, SIZE - 1 - y));
+                if (edge <= 1) {
+                    blendPixel(out, y * SIZE + x, 0x1E, 0x9A, 0x3E, 170);
+                }
+            }
+        }
+        for (int h = 0; h < 3; h++) {
+            int hx = 2 + rnd.nextInt(SIZE - 6);
+            int hy = 2 + rnd.nextInt(SIZE - 6);
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    int px = hx + dx, py = hy + dy;
+                    if (px < 0 || py < 0 || px >= SIZE || py >= SIZE) continue;
+                    blendPixel(out, py * SIZE + px, 0xB4, 0xFF, 0xC8, 120);
+                }
+            }
+        }
+        return out;
+    }
+
     // ------------------------------------------------------------------
     // Specific tiles
     // ------------------------------------------------------------------
+
+    /** [SPACE] Launch pad: armoured plate with braces and corner rivets. */
+    private static int[] rocketPad() {
+        int[] out = new int[SIZE * SIZE];
+        for (int y = 0; y < SIZE; y++) {
+            for (int x = 0; x < SIZE; x++) {
+                int c = (((x ^ y) & 1) == 0) ? 0x565E6E : 0x525A68;
+                out[y * SIZE + x] = 0xFF000000 | c;
+            }
+        }
+        for (int i = 0; i < SIZE; i++) {
+            out[i * SIZE + 0] = 0xFF000000 | 0x8A94A6;
+            out[i * SIZE + 15] = 0xFF000000 | 0x8A94A6;
+            out[15 * SIZE + i] = 0xFF000000 | 0x98A2B2;
+            out[0 * SIZE + i] = 0xFF000000 | 0x48505E;
+        }
+        for (int i = 2; i < 14; i++) {
+            out[7 * SIZE + i] = 0xFF000000 | 0x464E5C;
+            out[8 * SIZE + i] = 0xFF000000 | 0x464E5C;
+            out[i * SIZE + 7] = 0xFF000000 | 0x464E5C;
+            out[i * SIZE + 8] = 0xFF000000 | 0x464E5C;
+        }
+        rocketRivet(out, 2, 2);
+        rocketRivet(out, 13, 2);
+        rocketRivet(out, 2, 13);
+        rocketRivet(out, 13, 13);
+        return out;
+    }
+
+    /** [SPACE] Engine block: dark finned casing with a nozzle and flame rim. */
+    private static int[] rocketEngine() {
+        int[] out = new int[SIZE * SIZE];
+        java.util.Random rnd = new java.util.Random(0xE97);
+        for (int y = 0; y < SIZE; y++) {
+            for (int x = 0; x < SIZE; x++) {
+                int c = 0x333D49;
+                if (y <= 2) c = 0x475360;
+                else if (y >= 13) c = 0x2A323C;
+                if (rnd.nextInt(4) == 0) c = 0x232A33;
+                out[y * SIZE + x] = 0xFF000000 | c;
+            }
+        }
+        for (int y = 3; y <= 12; y++) {
+            out[y * SIZE + 5] = 0xFF000000 | 0x1C222A;
+            out[y * SIZE + 10] = 0xFF000000 | 0x1C222A;
+        }
+        for (int x = 5; x <= 10; x++) {
+            out[13 * SIZE + x] = 0xFF000000 | 0x14181E;
+            out[14 * SIZE + x] = 0xFF000000 | 0x14181E;
+        }
+        for (int x = 6; x <= 9; x++) {
+            out[15 * SIZE + x] = 0xFF000000 | 0x14181E;
+        }
+        for (int x = 5; x <= 10; x++) out[12 * SIZE + x] = 0xFF000000 | 0xD85A1A;
+        for (int x = 6; x <= 9; x++) out[11 * SIZE + x] = 0xFF000000 | 0xE8681A;
+        return out;
+    }
+
+    /** [SPACE] Fuel tank: pale barrel with straps and rivets. */
+    private static int[] rocketFuel() {
+        int[] out = new int[SIZE * SIZE];
+        java.util.Random rnd = new java.util.Random(0xF02);
+        for (int y = 0; y < SIZE; y++) {
+            for (int x = 0; x < SIZE; x++) {
+                int c = 0xC2CBD8;
+                if (rnd.nextInt(6) == 0) c = 0xAEB8C6;
+                out[y * SIZE + x] = 0xFF000000 | c;
+            }
+        }
+        for (int x = 0; x < SIZE; x++) {
+            out[4 * SIZE + x] = 0xFF000000 | 0x8690A0;
+            out[11 * SIZE + x] = 0xFF000000 | 0x8690A0;
+            out[3 * SIZE + x] = 0xFF000000 | 0x95A0B0;
+            out[12 * SIZE + x] = 0xFF000000 | 0x95A0B0;
+        }
+        for (int x = 3; x <= 12; x += 3) {
+            out[4 * SIZE + x] = 0xFF000000 | 0x6E7887;
+            out[11 * SIZE + x] = 0xFF000000 | 0x6E7887;
+        }
+        for (int y = 7; y <= 8; y++)
+            for (int x = 7; x <= 8; x++)
+                out[y * SIZE + x] = 0xFF000000 | 0x77818F;
+        return out;
+    }
+
+    /** [SPACE] Hull section: white plating with a specular edge and rivets. */
+    private static int[] rocketBody() {
+        int[] out = new int[SIZE * SIZE];
+        java.util.Random rnd = new java.util.Random(0xB0D);
+        for (int y = 0; y < SIZE; y++) {
+            for (int x = 0; x < SIZE; x++) {
+                int c = 0xE2E7EF;
+                if (x < 2) c = 0xF2F6FA;
+                else if (x >= 13) c = 0xC8CFDA;
+                if (rnd.nextInt(5) == 0) c = 0xD6DCE6;
+                out[y * SIZE + x] = 0xFF000000 | c;
+            }
+        }
+        for (int x = 0; x < SIZE; x++) out[7 * SIZE + x] = 0xFF000000 | 0xADB6C2;
+        for (int x = 2; x <= 13; x += 3) {
+            out[2 * SIZE + x] = 0xFF000000 | 0x9AA4B2;
+            out[13 * SIZE + x] = 0xFF000000 | 0x9AA4B2;
+        }
+        return out;
+    }
+
+    /** [SPACE] Porthole: hull with a dark circular window and glint. */
+    private static int[] rocketWindow() {
+        int[] out = new int[SIZE * SIZE];
+        for (int y = 0; y < SIZE; y++) {
+            for (int x = 0; x < SIZE; x++) {
+                int dx = x - 8, dy = y - 8;
+                int d = dx * dx + dy * dy;
+                int c;
+                if (d < 16) {
+                    c = (dy < -1 && Math.abs(dx) < 4) ? 0x4A69A0 : 0x31466E;
+                } else if (d <= 25) {
+                    c = 0x1C2638;
+                } else {
+                    c = 0xB9C2D0;
+                }
+                out[y * SIZE + x] = 0xFF000000 | c;
+            }
+        }
+        out[5 * SIZE + 5] = 0xFF000000 | 0x9FD0F4;
+        out[5 * SIZE + 6] = 0xFF000000 | 0x9FD0F4;
+        return out;
+    }
+
+    /** [SPACE] Nose cone: red wedge that tapers toward the tip. */
+    private static int[] rocketCone() {
+        int[] out = new int[SIZE * SIZE];
+        for (int y = 0; y < 2; y++) {
+            for (int x = 3; x <= 12; x++) {
+                out[y * SIZE + x] = 0xFF000000 | 0xC8443A;
+            }
+        }
+        for (int y = 2; y <= 14; y++) {
+            int cx = 8;
+            int half = (y - 2) * 8 / 12;
+            int lo = Math.max(0, cx - half);
+            int hi = Math.min(SIZE - 1, cx + half);
+            for (int x = 0; x < SIZE; x++) {
+                int c = (x >= lo && x <= hi) ? 0xD83830 : 0xE04038;
+                out[y * SIZE + x] = 0xFF000000 | c;
+            }
+            if (lo <= hi) {
+                out[y * SIZE + lo] = 0xFF000000 | 0xF4705E;
+                out[y * SIZE + hi] = 0xFF000000 | 0xAD2A26;
+            }
+        }
+        out[14 * SIZE + 7] = 0xFF000000 | 0xF2F4F8;
+        out[14 * SIZE + 8] = 0xFF000000 | 0xF2F4F8;
+        return out;
+    }
+
+    /** [SPACE] 2x2 rivet dot helper for the rocket tiles. */
+    private static void rocketRivet(int[] out, int cx, int cy) {
+        for (int dy = 0; dy < 2; dy++) {
+            for (int dx = 0; dx < 2; dx++) {
+                out[(cy + dy) * SIZE + cx + dx] = 0xFF000000 | 0x9AA4B4;
+            }
+        }
+    }
 
     /**
      * Dirt with a grass cap hanging over the top rows.
@@ -518,35 +739,102 @@ public final class TileGenerator {
         return out;
     }
 
-    /** Vertical bark grain. */
+    /**
+     * Tree bark: wide vertical ridges of differing browns, wandering dark
+     * grooves between them, a knot or two and fine grain noise. Much richer
+     * than the old per-pixel column stripes.
+     */
     private static int[] logSide(int variant) {
         int[] out = new int[SIZE * SIZE];
+
+        // Bark palette: groove shadow, two mid browns, lit ridge
+        int groove = 0x4A3115;
+        int[] ridge = {0x6B4A28, 0x7A5730, 0x8A6538, 0x977140, 0xA67E4C};
+
+        // Ridge phase per column: smooth value noise over x gives bands
+        // 1-3 px wide that keep their shade down the whole trunk
+        int[] band = new int[SIZE];
+        double prev = -1;
+        int bandIdx = 2;
         for (int x = 0; x < SIZE; x++) {
-            // Each column picks a shade and keeps it, giving vertical strands
-            double col = hash(x, 0, variant * 23 + 11);
-            for (int y = 0; y < SIZE; y++) {
-                double n = col * 0.7 + hash(x, y, variant) * 0.3;
-                int idx = (int) (n * P_WOOD.length);
-                idx = Math.min(P_WOOD.length - 1, idx);
-                out[y * SIZE + x] = 0xFF000000 | P_WOOD[idx];
+            double n = hash(x / 2, 0, variant * 23 + 11) * 0.65
+                     + hash(x, 0, variant * 23 + 11) * 0.35;
+            if (n < prev - 0.13 || n > prev + 0.13) bandIdx = (int) (n * 3.99) % ridge.length;
+            band[x] = bandIdx;
+            prev = n;
+        }
+
+        // One wandering groove line and one knot, both seeded per variant
+        int grooveX = 2 + (int) (hash(7, 3, variant * 31 + 5) * (SIZE - 5));
+        int knotX = 3 + (int) (hash(11, 5, variant * 17 + 9) * (SIZE - 7));
+        int knotY = 3 + (int) (hash(13, 7, variant * 17 + 9) * (SIZE - 7));
+
+        for (int y = 0; y < SIZE; y++) {
+            // The groove wanders sideways as it climbs
+            int gx = grooveX + (int) Math.round((hash(y / 3, 1, variant * 41) - 0.5) * 3);
+            for (int x = 0; x < SIZE; x++) {
+                int idx = band[x];
+
+                // Fine grain along the trunk
+                double n = hash(x, y, variant) * 0.35;
+                idx = (int) (band[x] + n - 0.17 + 0.5);
+                idx = Math.max(0, Math.min(ridge.length - 1, idx));
+
+                int c = ridge[idx];
+
+                // Wandering groove: dark core with a soft shoulder
+                int d = Math.abs(x - gx);
+                if (d == 0) c = groove;
+                else if (d == 1 && hash(x, y, variant * 3) > 0.4) c = ridge[0];
+
+                // Knot: dark eye with a lit rim
+                int kx = x - knotX, ky = y - knotY;
+                int kd = kx * kx * 3 + ky * ky;
+                if (kd <= 3) c = groove;
+                else if (kd == 4) c = ridge[ridge.length - 1];
+
+                out[y * SIZE + x] = 0xFF000000 | c;
             }
         }
         return out;
     }
 
-    /** Concentric growth rings. */
+    /**
+     * Log top: a ring of bark around the faces, then growth rings with
+     * wobble, a darker seam every few rings and radial grain.
+     */
     private static int[] logTop(int variant) {
         int[] out = new int[SIZE * SIZE];
         double cx = 7.5, cy = 7.5;
+
+        int[] bark = {0x5E4224, 0x6B4A28, 0x7A5730};
+        int[] wood = {0x9A7440, 0xA88049, 0xB58C52, 0xC29A60};
+        int seam = 0x87642F;
 
         for (int y = 0; y < SIZE; y++) {
             for (int x = 0; x < SIZE; x++) {
                 double dx = x - cx, dy = y - cy;
                 double r = Math.sqrt(dx * dx + dy * dy);
-                double wobble = hash(x, y, variant * 13) * 0.6;
-                int ring = (int) ((r + wobble) / 1.6);
-                int idx = ring % P_PLANK.length;
-                out[y * SIZE + x] = 0xFF000000 | P_PLANK[idx];
+                double wobble = hash(x, y, variant * 13) * 0.9 - 0.45;
+
+                int c;
+                if (r > 7.2) {
+                    // Bark rim, using the side palette's mid shades
+                    int idx = (int) (hash(x, y, variant) * bark.length);
+                    idx = Math.min(bark.length - 1, idx);
+                    c = bark[idx];
+                } else {
+                    int ring = (int) ((r + wobble) / 1.7);
+                    c = wood[ring % wood.length];
+                    // A dark seam every third ring reads as a year boundary
+                    if (ring % 3 == 2) c = seam;
+                    // Radial grain: streaks running out from the centre
+                    double ang = Math.atan2(dy, dx);
+                    if (hash((int) (ang * 4), (int) (r * 2), variant * 7) > 0.82) {
+                        c = wood[0];
+                    }
+                }
+                out[y * SIZE + x] = 0xFF000000 | c;
             }
         }
         return out;
@@ -742,46 +1030,74 @@ public final class TileGenerator {
     }
 
     /**
-     * Leaves: clumps of foliage separated by real gaps.
+     * Leaves: overlapping sprigs stamped around the tile, separated by real
+     * gaps, so the canopy reads as clusters of foliage instead of TV static.
      *
-     * Roughly a third of the tile is punched out, which is what lets you see
-     * sky through a canopy. Holes are clustered rather than single stray
-     * pixels - sampling the noise at half resolution groups them into 2x2-ish
-     * gaps, so the leaves read as overlapping sprigs instead of TV static.
-     */
-    /**
      * @param cutout true for Fancy, punching real holes; false for Fast,
      *               where the gaps become dark foliage instead so the tile
      *               stays fully opaque
      */
     private static int[] leaves(int variant, boolean cutout) {
-        int[] out = new int[SIZE * SIZE];
+        return leaves(P_LEAF, variant, cutout);
+    }
 
+    /** Sprig-based foliage in an arbitrary darkest-to-lightest palette. */
+    private static int[] leaves(int[] palette, int variant, boolean cutout) {
+        int[] out = new int[SIZE * SIZE];
+        int dark = 0xFF000000 | palette[0];
+
+        // Coarse gap field: where sprigs refuse to grow, giving clumps room.
+        // High threshold: vanilla canopies read as a near-solid mass with
+        // only scattered peep holes, not as sparse cards
+        boolean[] gap = new boolean[SIZE * SIZE];
         for (int y = 0; y < SIZE; y++) {
             for (int x = 0; x < SIZE; x++) {
-                // Coarse field decides gap vs foliage, fine field shades it
                 double coarse = hash(x / 2, y / 2, variant * 37 + 19) * 0.7
                               + hash(x, y, variant * 11 + 3) * 0.3;
+                gap[y * SIZE + x] = coarse > 0.86;
+            }
+        }
 
-                if (coarse > 0.63) {
-                    // Fast keeps the pattern but fills it in, so the canopy
-                    // still reads as leaves rather than a flat green cube
-                    out[y * SIZE + x] = cutout
-                        ? 0x00000000
-                        : (0xFF000000 | P_LEAF[0]);
-                    continue;
+        // Stamp 24 small leaf sprigs, wrapping around the tile edges so the
+        // texture stays seamless when the canopy repeats. Small + many keeps
+        // the grain fine, like the busy vanilla leaf texture
+        for (int i = 0; i < 24; i++) {
+            int cx = (int) (hash(i, 1, variant * 53 + 7) * SIZE);
+            int cy = (int) (hash(i, 2, variant * 53 + 7) * SIZE);
+            double r = 1.3 + hash(i, 3, variant * 53 + 7) * 1.1;
+            int reach = (int) r + 1;
+
+            for (int dy = -reach; dy <= reach; dy++) {
+                for (int dx = -reach; dx <= reach; dx++) {
+                    double d2 = dx * dx + dy * dy;
+                    if (d2 > r * r + 0.4) continue;
+
+                    int x = (cx + dx + SIZE) % SIZE;
+                    int y = (cy + dy + SIZE) % SIZE;
+                    if (gap[y * SIZE + x]) continue;
+
+                    // Light towards the sprig centre, dark on the rim,
+                    // with per-pixel jitter so no two leaves match
+                    double t = Math.sqrt(d2) / (r + 0.001);
+                    double n = hash(x, y, variant * 5 + 1) * 1.4 - 0.7;
+                    int idx = (int) ((1.0 - t) * (palette.length - 1) + n + 0.5);
+                    idx = Math.max(0, Math.min(palette.length - 1, idx));
+                    out[y * SIZE + x] = 0xFF000000 | palette[idx];
                 }
+            }
+        }
 
-                double n = hash(x, y, variant * 53 + 7);
-                int idx = (int) (n * P_LEAF.length);
-                idx = Math.min(P_LEAF.length - 1, idx);
+        // Uncovered pixels: real holes in Fancy, dark foliage in Fast
+        for (int i = 0; i < out.length; i++) {
+            if (out[i] == 0) out[i] = cutout ? 0x00000000 : dark;
+        }
 
-                // Darken pixels next to a gap, giving the clumps some depth
-                boolean nearGap = hash((x + 1) / 2, y / 2, variant * 37 + 19) * 0.7
-                                + hash(x + 1, y, variant * 11 + 3) * 0.3 > 0.63;
-                if (nearGap && idx > 0) idx--;
-
-                out[y * SIZE + x] = 0xFF000000 | P_LEAF[idx];
+        // A few bright singles catching the light on top of the clumps
+        for (int i = 0; i < 6; i++) {
+            int x = (int) (hash(i, 9, variant * 71 + 3) * SIZE);
+            int y = (int) (hash(i, 11, variant * 71 + 3) * SIZE);
+            if (out[y * SIZE + x] != dark) {
+                out[y * SIZE + x] = 0xFF000000 | palette[palette.length - 1];
             }
         }
         return out;
@@ -1200,6 +1516,38 @@ public final class TileGenerator {
         return out;
     }
 
+    /** Crystal shard: a faceted gem standing on the block below. */
+    private static int[] crystal(int variant) {
+        int[] out = new int[SIZE * SIZE];
+        int[] pal = {0x3A1A5E, 0x5E2A8C, 0x7E3ABE, 0x9B59D0, 0xC99BF0};
+
+        // Apex near the top of the cell, prism widening toward the base
+        int top = 1 + (int) (hash(0, 0, variant) * 3);
+        int apexX = 6 + (variant % 3) + (variant / 3);
+        int lean = ((variant & 1) == 0) ? 1 : -1;
+        int baseHalf = 3 + (variant % 2);
+
+        for (int y = top; y <= SIZE - 2; y++) {
+            float t = (y - top) / (float) (SIZE - 1 - top);
+            int half = 1 + (int) (t * baseHalf);
+            int cx = apexX + lean * (int) (t * 2);
+
+            for (int dx = -half; dx <= half; dx++) {
+                int x = cx + dx;
+                if (x < 0 || x >= SIZE) continue;
+                int c;
+                if (dx <= 0 && dx >= -half / 2) c = pal[4];   // lit facet
+                else if (dx < 0) c = pal[3];
+                else if (dx < half - 1) c = pal[2];
+                else c = pal[0];                               // dark rim
+                // Occasional dark internal striation
+                if (dx == -half / 2 && ((y + variant) & 1) == 0) c = pal[1];
+                out[y * SIZE + x] = 0xFF000000 | c;
+            }
+        }
+        return out;
+    }
+
     private static int[] deadBush(int variant) {
         int[] out = new int[SIZE * SIZE];
         int[] pal = {0x6B5628, 0x7C6530, 0x8A7038};
@@ -1262,17 +1610,23 @@ public final class TileGenerator {
         return out;
     }
 
+    /**
+     * Vanilla glass: a thin frame and two diagonal glints, everything else
+     * fully transparent so windows read as clear panes, not frosted blocks.
+     */
     private static int[] glass() {
         int[] out = new int[SIZE * SIZE];
         for (int y = 0; y < SIZE; y++) {
             for (int x = 0; x < SIZE; x++) {
                 boolean border = x == 0 || y == 0 || x == SIZE - 1 || y == SIZE - 1;
                 if (border) {
-                    out[y * SIZE + x] = 0xFFC8E4F0;
-                } else if ((x == 1 && y < 6) || (y == 1 && x < 6)) {
-                    out[y * SIZE + x] = 0x60FFFFFF;   // corner glint
+                    // Frame: pale glass edge, slightly shaded at the corners
+                    boolean corner = (x == 0 || x == SIZE - 1) && (y == 0 || y == SIZE - 1);
+                    out[y * SIZE + x] = corner ? 0xFFB8D8E0 : 0xFFDCEFF4;
+                } else if ((x - y == 3 && x < 11) || (x - y == 4 && x < 10)) {
+                    out[y * SIZE + x] = 0x66FFFFFF;   // diagonal glint
                 } else {
-                    out[y * SIZE + x] = 0x14C8E4F0;
+                    out[y * SIZE + x] = 0x00000000;   // clear pane
                 }
             }
         }
@@ -2102,6 +2456,155 @@ public final class TileGenerator {
         out[3 * SIZE + 7] = 0xFF000000 | cap;
         out[2 * SIZE + 8] = 0xFF000000 | cap;
         out[3 * SIZE + 8] = 0xFF000000 | cap;
+        return out;
+    }
+
+    /**
+     * [GP-009] Slime ball: a small round translucent green blob with a
+     * glossy highlight in the top-left.
+     */
+    private static int[] slimeBallSprite() {
+        int[] out = new int[SIZE * SIZE];
+        int dark = 0xFF1E9A3E;
+        int mid = 0xFF2DD85A;
+        int light = 0xFF57F08A;
+        int shine = 0xFFB4FFC8;
+        // Circular blob roughly rows 4..12, columns 4..12
+        for (int y = 0; y < SIZE; y++) {
+            for (int x = 0; x < SIZE; x++) {
+                int dx = (x - 8) * 2, dy = (y - 8) * 2;
+                int d2 = dx * dx + dy * dy;
+                if (d2 <= 16) {
+                    int c = (d2 > 11) ? dark : (d2 > 5 ? mid : light);
+                    out[y * SIZE + x] = 0xFF000000 | c;
+                }
+            }
+        }
+        // Glossy highlight
+        out[5 * SIZE + 5] = 0xFF000000 | shine;
+        out[5 * SIZE + 6] = 0xFF000000 | shine;
+        out[6 * SIZE + 5] = 0xFF000000 | shine;
+        return out;
+    }
+
+    /**
+     * [POT] A white sugar cube with a few grainy highlights and a soft
+     * bottom shadow, used as the Speed potion ingredient.
+     */
+    private static int[] sugarSprite() {
+        int[] out = new int[SIZE * SIZE];
+        int[] grays = {0xFFF4F6F8, 0xFFE8ECF0, 0xFFDCE2E8, 0xFFC8D0D8};
+        for (int y = 3; y < 13; y++) {
+            for (int x = 3; x < 13; x++) {
+                out[y * SIZE + x] = 0xFF000000 | grays[(x + y) % 4];
+            }
+        }
+        // Grainy specks
+        out[5 * SIZE + 5] = 0xFF000000 | 0xFFFFFFFF;
+        out[6 * SIZE + 9] = 0xFF000000 | 0xFFFFFFFF;
+        out[9 * SIZE + 7] = 0xFF000000 | 0xFFFFFFFF;
+        out[7 * SIZE + 4] = 0xFF000000 | 0xDFE6EC;
+        out[10 * SIZE + 10] = 0xFF000000 | 0xC0CCD4;
+        // Bottom-right shadow
+        for (int y = 11; y < 13; y++) {
+            for (int x = 11; x < 13; x++) {
+                out[y * SIZE + x] = 0xFF000000 | 0x98A2AA;
+            }
+        }
+        return out;
+    }
+
+    /**
+     * [POT] A glass bottle with a coloured liquid: round flask shape, a
+     * cork stopper and a lighter glass shine. The liquid colour is passed
+     * in as 0xFFrrggbb.
+     */
+    private static int[] potionSprite(int liquid) {
+        int[] out = new int[SIZE * SIZE];
+        int glass = 0xFFD8E8F0;
+        int glassLight = 0xFFF8FFFF;
+        int cork = 0xFFB88860;
+        int r = (liquid >> 16) & 255, g = (liquid >> 8) & 255, b = liquid & 255;
+        int liquidDark = 0xFF000000 | ((int) (r * 0.75f) << 16)
+            | ((int) (g * 0.75f) << 8) | (int) (b * 0.75f);
+        int liquidLight = 0xFF000000 | (Math.min(255, r + 40) << 16)
+            | (Math.min(255, g + 40) << 8) | Math.min(255, b + 40);
+
+        // Flask body: narrow neck at top, bulbous bottom
+        for (int y = 5; y <= 13; y++) {
+            int half = (y < 7) ? 1 : (y < 11 ? 3 : 2);
+            for (int x = 8 - half; x <= 7 + half; x++) {
+                boolean inLiquid = y >= 9;
+                int c = (x == 8 - half || x == 7 + half || y == 13) ? (inLiquid ? liquidDark : glass)
+                    : (y <= 6 ? glassLight : (inLiquid ? liquidLight : glass));
+                out[y * SIZE + x] = (inLiquid ? 0xFF000000 : 0xF2000000) | c;
+            }
+        }
+        // Cork: two tiny cork-coloured pixels on the neck
+        out[5 * SIZE + 7] = 0xFF000000 | cork;
+        out[5 * SIZE + 8] = 0xFF000000 | cork;
+        // Glass shine on the left shoulder
+        out[7 * SIZE + 5] = 0xFF000000 | glassLight;
+        return out;
+    }
+
+    /**
+     * [POT] HUD status-effect icon: a simple pictogram in the effect colour.
+     * Shapes: heart (regeneration), chevrons (speed), two strokes (strength),
+     * a flame (fire resistance).
+     */
+    private static int[] effectIconSprite(int color, String shape) {
+        int[] out = new int[SIZE * SIZE];
+        int c = 0xFF000000 | color;
+        int cLight = 0xFF000000 | 0xFF | Math.max(0, Math.min(255, (color & 0xFF) + 60))
+            | (Math.max(0, Math.min(255, ((color >> 8) & 255) + 60)) << 8)
+            | (Math.max(0, Math.min(255, ((color >> 16) & 255) + 60)) << 16);
+        switch (shape) {
+            case "heart" -> {
+                for (int y = 5; y <= 12; y++) {
+                    for (int x = 4; x <= 11; x++) {
+                        int dx = x - 8;
+                        int dy = y - 8;
+                        boolean inHeart = dy >= 0 ? Math.abs(dx) <= (y < 10 ? 2 + dy : 1) : (Math.abs(dx) <= 2 && Math.abs(dx + dy) >= 2);
+                        if (inHeart) out[y * SIZE + x] = (Math.abs(dx) + dy == 1) ? cLight : c;
+                    }
+                }
+                out[5 * SIZE + 8] = cLight;
+            }
+            case "chevron" -> {
+                for (int i = 0; i < 3; i++) {
+                    int base = 5 + i * 2;
+                    for (int y = base; y <= base + 2; y++) {
+                        out[y * SIZE + 7 - i] = c;
+                        out[y * SIZE + 8 + i] = c;
+                    }
+                    out[(base + 1) * SIZE + 7 - i] = cLight;
+                    out[(base + 1) * SIZE + 8 + i] = cLight;
+                }
+            }
+            case "sword" -> {
+                for (int i = 0; i < 7; i++) {
+                    out[(8 + i) * SIZE + (8 - i)] = c;
+                    out[(8 + i) * SIZE + (7 - i)] = c;
+                    out[(6 + i) * SIZE + (8 - i)] = c;
+                }
+                out[14 * SIZE + 8] = c;
+                out[14 * SIZE + 9] = c;
+                out[13 * SIZE + 6] = c;
+                out[13 * SIZE + 9] = c;
+                out[7 * SIZE + 7] = cLight;
+            }
+            case "flame" -> {
+                for (int y = 5; y <= 12; y++) {
+                    int half = y < 7 ? y - 4 : (y < 10 ? 3 : 2);
+                    for (int x = 8 - half; x <= 7 + half; x++) {
+                        out[y * SIZE + x] = (y == 6 || y == 12) ? cLight : c;
+                    }
+                }
+                out[5 * SIZE + 8] = cLight;
+            }
+            default -> { }
+        }
         return out;
     }
 

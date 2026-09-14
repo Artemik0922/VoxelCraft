@@ -32,6 +32,9 @@ public class Item {
     // Block association (for block items)
     public final BlockType blockType;
 
+    // Potion effect (for potion items)
+    public final StatusEffect potionEffect;
+
     // Sprite index for rendering
     public final String spriteName;
 
@@ -49,6 +52,7 @@ public class Item {
         this.foodValue = b.foodValue;
         this.saturation = b.saturation;
         this.blockType = b.blockType;
+        this.potionEffect = b.potionEffect;
         this.spriteName = b.spriteName;
     }
 
@@ -56,6 +60,7 @@ public class Item {
     public boolean isArmor() { return armorSlot != null; }
     public boolean isFood() { return foodValue > 0; }
     public boolean isBlock() { return blockType != null; }
+    public boolean isPotion() { return potionEffect != null; }
 
     public int getMaxDurability() {
         return isTool() ? tier.maxDurability : 0;
@@ -83,6 +88,7 @@ public class Item {
         private int foodValue;
         private float saturation;
         private BlockType blockType;
+        private StatusEffect potionEffect;
         private String spriteName;
 
         Builder(int id, String name) {
@@ -101,6 +107,7 @@ public class Item {
         public Builder armorPoints(int p) { this.armorPoints = p; return this; }
         public Builder food(int value, float sat) { this.foodValue = value; this.saturation = sat; return this; }
         public Builder block(BlockType b) { this.blockType = b; return this; }
+        public Builder potion(StatusEffect e) { this.potionEffect = e; return this; }
         public Builder sprite(String s) { this.spriteName = s; return this; }
 
         public Item build() { return new Item(this); }

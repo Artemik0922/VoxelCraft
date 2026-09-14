@@ -272,6 +272,30 @@ public final class ItemRegistry {
     public static final Item MILK = Item.builder(204, "milk")
             .displayName("Milk").stackSize(1).food(4, 0.4f).sprite("milk").build();
 
+    // --- [GP-009] Slime ---
+    public static final Item SLIME_BALL = Item.builder(205, "slime_ball")
+            .displayName("Slime Ball").stackSize(64).sprite("slime_ball").build();
+
+    // --- [POT] Potions and brewing ---
+    public static final Item WATER_BOTTLE = Item.builder(206, "water_bottle")
+            .displayName("Water Bottle").stackSize(1).sprite("water_bottle").build();
+    public static final Item POTION_HEALING = Item.builder(207, "potion_healing")
+            .displayName("Potion of Regeneration").stackSize(1)
+            .potion(StatusEffect.REGENERATION).sprite("potion_healing").build();
+    public static final Item POTION_SPEED = Item.builder(208, "potion_speed")
+            .displayName("Potion of Speed").stackSize(1)
+            .potion(StatusEffect.SPEED).sprite("potion_speed").build();
+    public static final Item POTION_STRENGTH = Item.builder(209, "potion_strength")
+            .displayName("Potion of Strength").stackSize(1)
+            .potion(StatusEffect.STRENGTH).sprite("potion_strength").build();
+    public static final Item POTION_FIRE_RESISTANCE = Item.builder(210, "potion_fire_resistance")
+            .displayName("Potion of Fire Resistance").stackSize(1)
+            .potion(StatusEffect.FIRE_RESISTANCE).sprite("potion_fire_resistance").build();
+
+    // --- [POT] Brewing ingredients ---
+    public static final Item SUGAR = Item.builder(211, "sugar")
+            .displayName("Sugar").stackSize(64).sprite("sugar").build();
+
     /** All items indexed by ID for lookup. */
     private static final Item[] BY_ID = new Item[256];
     static {
@@ -292,7 +316,9 @@ public final class ItemRegistry {
             FURNACE_ITEM, CHEST_ITEM, ROTTEN_FLESH, BONE, SPIDER_EYE,
             FLINT_AND_STEEL, RESIN, WAX,
             BOOK, LAPIS_LAZULI, ENCHANTING_TABLE_ITEM,
-            SHEARS, BUCKET, MILK
+            SHEARS, BUCKET, MILK,
+            SLIME_BALL, WATER_BOTTLE, POTION_HEALING, POTION_SPEED,
+            POTION_STRENGTH, POTION_FIRE_RESISTANCE, SUGAR
         }) {
             if (item != null) {
                 BY_ID[item.id & 0xFF] = item;
@@ -303,6 +329,13 @@ public final class ItemRegistry {
     /** Get item by ID. */
     public static Item getById(int id) {
         return id >= 0 && id < BY_ID.length ? BY_ID[id] : null;
+    }
+
+    /** Every registered item, in registry order (creative inventory listing). */
+    public static Item[] all() {
+        java.util.List<Item> out = new java.util.ArrayList<>();
+        for (Item item : BY_ID) if (item != null) out.add(item);
+        return out.toArray(new Item[0]);
     }
 
     private ItemRegistry() {}

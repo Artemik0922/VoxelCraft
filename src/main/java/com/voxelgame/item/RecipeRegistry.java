@@ -298,6 +298,56 @@ public final class RecipeRegistry {
             null, item(ItemRegistry.IRON_INGOT), null,
             null, item(ItemRegistry.IRON_INGOT), null,
             null, item(ItemRegistry.IRON_INGOT), null),
+
+        // --- [GP-009] Slime block: four slime balls in a square ---
+        Recipe.shaped2x2(new ItemStack(BlockType.SLIME_BLOCK, 1),
+            item(ItemRegistry.SLIME_BALL), item(ItemRegistry.SLIME_BALL),
+            item(ItemRegistry.SLIME_BALL), item(ItemRegistry.SLIME_BALL)),
+
+        // --- [RKT] Rocket launch pad: iron ingots in a ring ---
+        Recipe.shaped(new ItemStack(BlockType.ROCKET_LAUNCH_PAD, 1),
+            item(ItemRegistry.IRON_INGOT), item(ItemRegistry.IRON_INGOT), item(ItemRegistry.IRON_INGOT),
+            item(ItemRegistry.IRON_INGOT), null, item(ItemRegistry.IRON_INGOT),
+            item(ItemRegistry.IRON_INGOT), item(ItemRegistry.IRON_INGOT), item(ItemRegistry.IRON_INGOT)),
+
+        // --- [RKT] Rocket engine: iron ingots in an X ---
+        Recipe.shaped(new ItemStack(BlockType.ROCKET_ENGINE, 1),
+            null, item(ItemRegistry.IRON_INGOT), null,
+            item(ItemRegistry.IRON_INGOT), null, item(ItemRegistry.IRON_INGOT),
+            null, item(ItemRegistry.IRON_INGOT), null),
+
+        // --- [RKT] Rocket fuel tank: coal core in an iron cross ---
+        Recipe.shaped(new ItemStack(BlockType.ROCKET_FUEL, 1),
+            null, item(ItemRegistry.COAL), null,
+            item(ItemRegistry.COAL), item(ItemRegistry.IRON_INGOT), item(ItemRegistry.COAL),
+            null, item(ItemRegistry.COAL), null),
+
+        // --- [RKT] Rocket body: three iron ingot plates ---
+        Recipe.shaped(new ItemStack(BlockType.ROCKET_BODY, 1),
+            null, item(ItemRegistry.IRON_INGOT), null,
+            null, item(ItemRegistry.IRON_INGOT), null,
+            null, item(ItemRegistry.IRON_INGOT), null),
+
+        // --- [RKT] Rocket window: glass porthole in an iron frame ---
+        Recipe.shaped2x2(new ItemStack(BlockType.ROCKET_WINDOW, 1),
+            item(ItemRegistry.IRON_INGOT), block(BlockType.GLASS),
+            block(BlockType.GLASS), item(ItemRegistry.IRON_INGOT)),
+
+        // --- [RKT] Rocket cone: iron ingots in a cap ---
+        Recipe.shaped(new ItemStack(BlockType.ROCKET_CONE, 1),
+            null, item(ItemRegistry.IRON_INGOT), null,
+            item(ItemRegistry.IRON_INGOT), item(ItemRegistry.IRON_INGOT), item(ItemRegistry.IRON_INGOT),
+            null, null, null),
+
+        // --- [POT] Brewing: water bottle + ingredient -> potion ---
+        Recipe.shapeless(new ItemStack(ItemRegistry.POTION_SPEED),
+            item(ItemRegistry.WATER_BOTTLE), item(ItemRegistry.SUGAR)),
+        Recipe.shapeless(new ItemStack(ItemRegistry.POTION_HEALING),
+            item(ItemRegistry.WATER_BOTTLE), item(ItemRegistry.APPLE_ITEM)),
+        Recipe.shapeless(new ItemStack(ItemRegistry.POTION_STRENGTH),
+            item(ItemRegistry.WATER_BOTTLE), item(ItemRegistry.IRON_INGOT)),
+        Recipe.shapeless(new ItemStack(ItemRegistry.POTION_FIRE_RESISTANCE),
+            item(ItemRegistry.WATER_BOTTLE), item(ItemRegistry.RESIN)),
         });
 
     private static Recipe[] concat(Recipe[] a, Recipe[] b) {

@@ -51,39 +51,19 @@ public class TextField extends Widget {
 
         int fadeAlpha = (alpha >>> 24) & 0xFF;
 
-        // Inset panel (dark interior with bevelled edge)
-        ui.fillRect(x, y, width, height,
-            MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.PANEL_BG));
-        // Outer border
-        int borderCol = focused
-            ? MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.ACCENT)
-            : MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.PANEL_BORDER);
-        ui.fillRect(x, y, width, 1, borderCol);
-        ui.fillRect(x, y + height - 1, width, 1, borderCol);
-        ui.fillRect(x, y, 1, height, borderCol);
-        ui.fillRect(x + width - 1, y, 1, height, borderCol);
-        // Inner shadow (top/left darker to look inset)
-        ui.fillRect(x + 1, y + 1, width - 2, 1,
-            MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.PANEL_EDGE_D));
-        ui.fillRect(x + 1, y + 1, 1, height - 2,
-            MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.PANEL_EDGE_D));
-        // Inner highlight (bottom/right lighter)
-        ui.fillRect(x + 1, y + height - 2, width - 2, 1,
-            MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.PANEL_EDGE_L));
-        ui.fillRect(x + width - 2, y + 1, 1, height - 2,
-            MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.PANEL_EDGE_L));
+        // Rounded glass inset field
+        int field = focused ? 0xFF0A0F18 : 0xFF0C111C;
+        ui.drawNineSlice(tex.glassField, x, y, width, height, 6,
+            GuiAssets.GLASS_WIDGET, MenuTheme.col(fadeAlpha << 24, 255, field));
 
-        // Amber corner accents when focused
+        // Focus accents: amber top line + soft echoed underline
         if (focused) {
             int ac = MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.ACCENT);
-            ui.fillRect(x + 1, y + 1, 2, 1, ac);
-            ui.fillRect(x + 1, y + 1, 1, 2, ac);
-            ui.fillRect(x + width - 3, y + 1, 2, 1, ac);
-            ui.fillRect(x + width - 2, y + 1, 1, 2, ac);
-            ui.fillRect(x + 1, y + height - 2, 2, 1, ac);
-            ui.fillRect(x + 1, y + height - 3, 1, 2, ac);
-            ui.fillRect(x + width - 3, y + height - 2, 2, 1, ac);
-            ui.fillRect(x + width - 2, y + height - 3, 1, 2, ac);
+            ui.fillRect(x + 6, y + 1, Math.max(0, width - 12), 1, ac);
+            ui.fillRect(x + 6, y + height - 2, Math.max(0, width - 12), 1,
+                MenuTheme.col(fadeAlpha << 24, 150, MenuTheme.ACCENT));
+            ui.fillRect(x + 2, y + 6, 1, Math.max(0, height - 12), ac);
+            ui.fillRect(x + width - 3, y + 6, 1, Math.max(0, height - 12), ac);
         }
 
         String shown = text.toString();

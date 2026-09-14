@@ -23,7 +23,24 @@ public class Renderer {
 
     private final Map<Long, RenderChunk> renderChunks = new HashMap<>();
     private final TextureAtlas textureAtlas;
-    private final BlockCube heldItemCube = new BlockCube();
+    private BlockCube heldItemCube = new BlockCube();
+
+    /** Unit-cube faces in BlockCube order: 0 +X, 1 -X, 2 +Y, 3 -Y, 4 +Z, 5 -Z. */
+    private static final float[][][] ITEM_CUBE_FACES = {
+        {{ 0.5f,-0.5f, 0.5f},{ 0.5f,-0.5f,-0.5f},{ 0.5f, 0.5f,-0.5f},{ 0.5f, 0.5f, 0.5f}},
+        {{-0.5f,-0.5f,-0.5f},{-0.5f,-0.5f, 0.5f},{-0.5f, 0.5f, 0.5f},{-0.5f, 0.5f,-0.5f}},
+        {{-0.5f, 0.5f, 0.5f},{ 0.5f, 0.5f, 0.5f},{ 0.5f, 0.5f,-0.5f},{-0.5f, 0.5f,-0.5f}},
+        {{-0.5f,-0.5f,-0.5f},{ 0.5f,-0.5f,-0.5f},{ 0.5f,-0.5f, 0.5f},{-0.5f,-0.5f, 0.5f}},
+        {{-0.5f,-0.5f, 0.5f},{ 0.5f,-0.5f, 0.5f},{ 0.5f, 0.5f, 0.5f},{-0.5f, 0.5f, 0.5f}},
+        {{ 0.5f,-0.5f,-0.5f},{-0.5f,-0.5f,-0.5f},{-0.5f, 0.5f,-0.5f},{ 0.5f, 0.5f,-0.5f}},
+    };
+    private static final float[] ITEM_CUBE_SHADES = {0.80f, 0.80f, 1.00f, 0.55f, 0.68f, 0.68f};
+    private static final float[][] ITEM_CUBE_NORMALS = {
+        {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1},
+    };
+
+    /** Last frame's batched item-entity mesh, rebuilt whenever items exist. */
+    private Mesh itemBatchMesh = null;
 
     // Reused each frame to avoid per-frame allocation
     private final List<RenderChunk> transparentQueue = new ArrayList<>();
@@ -56,30 +73,91 @@ public class Renderer {
         shader.setUniform1f("lightLevel", lightLevel);
         shader.setUniform3f("sunColor", new Vector3f(1.0f, 1.0f, 1.0f));
         shader.setUniform1f("fadeAlpha", 1.0f);
+        shader.setUniformMat4("model", IDENTITY_MATRIX);
 
         glActiveTexture(GL_TEXTURE0);
         atlas.bindArray();
 
-        org.joml.Matrix4f model = new org.joml.Matrix4f();
+        float camX = camera.getPosition().x;
+        float camZ = camera.getPosition().z;
+        float cullSq = CULL_DISTANCE * CULL_DISTANCE;
+
+        // Batch every visible item cube into one mesh (one draw call instead
+        // of one per entity). Baking the true per-face atlas layer also fixes
+        // the old path, which always sampled atlas layer 0. The mesh is
+        // rebuilt every frame because items bob and spin.
+        List<Float> positions = new ArrayList<>(items.size() * 72);
+        List<Float> texCoords = new ArrayList<>(items.size() * 48);
+        List<Float> normals = new ArrayList<>(items.size() * 72);
+        List<Float> colors = new ArrayList<>(items.size() * 72);
+        List<Float> layers = new ArrayList<>(items.size() * 24);
+        List<Float> ao = new ArrayList<>(items.size() * 24);
+        List<Float> wave = new ArrayList<>(items.size() * 24);
+        List<Float> emissive = new ArrayList<>(items.size() * 24);
+        List<Integer> indices = new ArrayList<>(items.size() * 36);
+
         for (var item : items) {
             Vector3f pos = item.getPosition();
-            model.identity();
+            float dx = pos.x - camX;
+            float dz = pos.z - camZ;
+            if (dx * dx + dz * dz > cullSq) continue;
+
+            BlockType renderBlock = item.getStack().isItem()
+                ? getItemRenderBlock(item.getStack().getItem())
+                : item.getStack().getBlockType();
+
+            int[] faceLayers = new int[6];
+            for (int face = 0; face < 6; face++) {
+                faceLayers[face] = atlas.getSlot(renderBlock.id, face);
+            }
+
+            Matrix4f model = new Matrix4f();
             model.translate(pos.x, pos.y + item.getBobOffset(), pos.z);
             model.rotateY((float) java.lang.Math.toRadians(item.getRotation()));
             model.rotateX((float) java.lang.Math.toRadians(20));
             model.scale(0.3f);
 
-            shader.setUniformMat4("model", model);
-
-            // Handle both block items and non-block items
-            if (item.getStack().isItem()) {
-                // Use the item's associated block type for rendering
-                com.voxelgame.world.BlockType renderBlock = getItemRenderBlock(item.getStack().getItem());
-                heldItemCube.render(atlas, renderBlock, shader);
-            } else {
-                heldItemCube.render(atlas, item.getStack().getBlockType(), shader);
+            Matrix3f rot = new Matrix3f(model);
+            for (int face = 0; face < 6; face++) {
+                float[][] corners = ITEM_CUBE_FACES[face];
+                float shade = ITEM_CUBE_SHADES[face];
+                Vector3f n = rot.transform(new Vector3f(ITEM_CUBE_NORMALS[face]))
+                             .normalize();
+                int base = positions.size() / 3;
+                int[] order = {0, 1, 2, 0, 2, 3};
+                float[][] uvs = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+                for (int i = 0; i < 6; i++) {
+                    float[] c = corners[order[i]];
+                    Vector3f v = model.transformPosition(new Vector3f(c[0], c[1], c[2]));
+                    positions.add(v.x);
+                    positions.add(v.y);
+                    positions.add(v.z);
+                    texCoords.add(uvs[order[i]][0]);
+                    texCoords.add(uvs[order[i]][1]);
+                    normals.add(n.x);
+                    normals.add(n.y);
+                    normals.add(n.z);
+                    colors.add(shade);
+                    colors.add(shade);
+                    colors.add(shade);
+                    layers.add((float) faceLayers[face]);
+                    ao.add(1.0f);
+                    wave.add(0.0f);
+                    emissive.add(0.0f);
+                    indices.add(base + i);
+                }
             }
         }
+
+        if (indices.isEmpty()) {
+            atlas.unbindArray();
+            shader.unbind();
+            return;
+        }
+
+        if (itemBatchMesh != null) itemBatchMesh.cleanup();
+        itemBatchMesh = new Mesh(positions, texCoords, normals, colors, layers, ao, wave, emissive, indices);
+        itemBatchMesh.render();
 
         atlas.unbindArray();
         shader.unbind();
@@ -355,8 +433,15 @@ public class Renderer {
             RenderChunk rc = renderChunks.computeIfAbsent(entry.getKey(), k -> new RenderChunk());
             rc.rebuild(chunk, world, textureAtlas);
             chunk.setDirty(false);
+            remeshGeneration++;
         }
     }
+
+    /** How many chunk meshes have been rebuilt; drives shadow-map invalidation. */
+    private long remeshGeneration = 0;
+
+    /** Monotonic counter bumped on every chunk remesh. */
+    public long getRemeshGeneration() { return remeshGeneration; }
 
     /** Reused every frame; the render loop must not allocate. */
     private final FrustumCuller frustum = new FrustumCuller();
@@ -725,6 +810,8 @@ public class Renderer {
         renderChunks.clear();
         if (slidingDoorMesh != null) slidingDoorMesh.cleanup();
         slidingDoorMesh = null;
+        if (itemBatchMesh != null) itemBatchMesh.cleanup();
+        itemBatchMesh = null;
         textureAtlas.cleanup();
     }
 
@@ -751,14 +838,13 @@ public class Renderer {
             // Only the very first build fades in; an edit-triggered rebuild
             // would otherwise flash every time a block is placed nearby.
             boolean firstBuild = opaque == null && transparent == null && leaves == null;
-            cleanup();
 
             modelMatrix = new Matrix4f().translate(chunk.getWorldX(), 0, chunk.getWorldZ());
 
-            ChunkMeshBuilder.MeshData data = ChunkMeshBuilder.build(chunk, world, atlas);
-            opaque = data.opaque;
-            transparent = data.transparent;
-            leaves = data.leaves;
+            ChunkMeshBuilder.ChunkGeom geom = ChunkMeshBuilder.build(chunk, world, atlas);
+            opaque = Mesh.rebind(opaque, geom.opaque);
+            transparent = Mesh.rebind(transparent, geom.transparent);
+            leaves = Mesh.rebind(leaves, geom.leaves);
 
             if (firstBuild) {
                 bornNs = System.nanoTime();

@@ -1,5 +1,6 @@
 package com.voxelgame.ui.screen;
 
+import com.voxelgame.core.Game;
 import com.voxelgame.item.Enchantment;
 import com.voxelgame.item.Inventory;
 import com.voxelgame.item.Item;
@@ -9,6 +10,8 @@ import com.voxelgame.item.ToolType;
 import com.voxelgame.rendering.TextureAtlas;
 import com.voxelgame.ui.FontRenderer;
 import com.voxelgame.ui.GuiAssets;
+import com.voxelgame.ui.MenuTheme;
+import com.voxelgame.ui.StackIcons;
 import com.voxelgame.ui.UIRenderer;
 import com.voxelgame.ui.widget.Button;
 import com.voxelgame.world.BlockType;
@@ -22,15 +25,9 @@ import static com.voxelgame.core.Language.tr;
  * lazuli. The three glowing buttons in the middle each offer one
  * enchantment for a price of 1, 2 or 3 levels.
  *
- * Layout (MC-style):
- *     ┌──────────────────────────────────┐
- *     │      Стол зачарования             │
- *     │  [Tool]  [Кнопка 1 (1 ур.)] [Лап.]│
- *     │           [Кнопка 2 (2 ур.)]      │
- *     │           [Кнопка 3 (3 ур.)]      │
- *     │  ─── Player inventory ───         │
- *     │  [ 9 hotbar slots ]               │
- *     └──────────────────────────────────┘
+ * The player inventory below uses the shared {@link SlotEngine} click
+ * semantics: whole-stack take/place/merge/swap, right-click half/one,
+ * shift-click quick move, 1-9 hotbar swap, Q drop.
  */
 public class EnchantingTableScreen extends Screen {
 
@@ -41,10 +38,11 @@ public class EnchantingTableScreen extends Screen {
         int xpLevel();
         int xpProgress();
         boolean spendXp(int levels);
+        /** Drop a stack into the world at the player's feet. */
+        void dropStack(ItemStack stack);
     }
 
     private static final int SLOT = GuiAssets.SLOT_SIZE;
-    private static final int ICON = GuiAssets.ICON_SIZE;
     private static final int COLS = 9;
 
     private static final int PANEL_PAD = 7;
@@ -74,6 +72,8 @@ public class EnchantingTableScreen extends Screen {
     private final int[] offerLevels = new int[3];
     private boolean dirty = true; // re-roll when the tool changes
 
+    private float lastMx, lastMy;
+
     public EnchantingTableScreen(Callbacks callbacks, TextureAtlas atlas) {
         this.callbacks = callbacks;
         this.atlas = atlas;
@@ -81,6 +81,9 @@ public class EnchantingTableScreen extends Screen {
 
     @Override
     public boolean rendersWorld() { return false; }
+
+    @Override
+    public boolean usesBlurredBackdrop() { return true; }
 
     @Override
     protected void layout() {
@@ -116,32 +119,40 @@ public class EnchantingTableScreen extends Screen {
     }
 
     private void fireClosed() {
-        if (onClosedCallback != null) onClosedCallback.run();
+        if (onClosedCallback != null) {
+            Runnable cb = onClosedCallback;
+            onClosedCallback = null;
+            cb.run();
+        }
     }
 
     private Runnable onClosedCallback;
     public void onClose(Runnable cb) { this.onClosedCallback = cb; }
 
-    /** Enchantable tool currently sitting in the slot, or null. */
+    /** Also fires when the screen is popped with Escape. */
+    @Override
+    public void onClosed() { fireClosed(); }
+
+    // The tool and lapis "slots" live at the tail of the player inventory.
+
+    private static final int TOOL_INV_SLOT = Inventory.MAIN_INVENTORY_SIZE - 1;
+    private static final int LAPIS_INV_SLOT = Inventory.MAIN_INVENTORY_SIZE - 2;
+
     private ItemStack toolInSlot() {
-        return callbacks.inventory().getInventoryItem(
-            Inventory.MAIN_INVENTORY_SIZE - 1);
+        return callbacks.inventory().getInventoryItem(TOOL_INV_SLOT);
     }
 
     private void setToolInSlot(ItemStack stack) {
-        callbacks.inventory().setInventoryItem(
-            Inventory.MAIN_INVENTORY_SIZE - 1, stack);
+        callbacks.inventory().setInventoryItem(TOOL_INV_SLOT, stack);
         dirty = true;
     }
 
     private ItemStack lapisInSlot() {
-        return callbacks.inventory().getInventoryItem(
-            Inventory.MAIN_INVENTORY_SIZE - 2);
+        return callbacks.inventory().getInventoryItem(LAPIS_INV_SLOT);
     }
 
     private void setLapisInSlot(ItemStack stack) {
-        callbacks.inventory().setInventoryItem(
-            Inventory.MAIN_INVENTORY_SIZE - 2, stack);
+        callbacks.inventory().setInventoryItem(LAPIS_INV_SLOT, stack);
     }
 
     /** Re-roll the three offers when the tool in the slot changes. */
@@ -174,41 +185,99 @@ public class EnchantingTableScreen extends Screen {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Slot views
+    // ------------------------------------------------------------------
+
+    private SlotEngine.Slot toolSlot() {
+        return new SlotEngine.Slot() {
+            @Override public ItemStack get() { return toolInSlot(); }
+            @Override public void set(ItemStack s) { setToolInSlot(s); }
+        };
+    }
+
+    private SlotEngine.Slot lapisSlot() {
+        return new SlotEngine.Slot() {
+            @Override public ItemStack get() { return lapisInSlot(); }
+            @Override public void set(ItemStack s) { setLapisInSlot(s); }
+
+            @Override public boolean mayPlace(ItemStack stack) {
+                return stack.isItem() && stack.getItem() == ItemRegistry.LAPIS_LAZULI;
+            }
+        };
+    }
+
+    private SlotEngine.Slot storageSlot(int i) {
+        Inventory inv = callbacks.inventory();
+        return new SlotEngine.Slot() {
+            @Override public ItemStack get() { return inv.getInventoryItem(i); }
+            @Override public void set(ItemStack s) { inv.setInventoryItem(i, s); }
+        };
+    }
+
+    private SlotEngine.Slot hotbarSlot(int i) {
+        Inventory inv = callbacks.inventory();
+        return new SlotEngine.Slot() {
+            @Override public ItemStack get() { return inv.getHotbarItem(i); }
+            @Override public void set(ItemStack s) { inv.setHotbarItem(i, s); }
+        };
+    }
+
+    private SlotEngine.Slot[] playerSlots() {
+        SlotEngine.Slot[] slots = new SlotEngine.Slot[
+            Inventory.MAIN_INVENTORY_SIZE + Inventory.HOTBAR_SIZE];
+        for (int i = 0; i < Inventory.MAIN_INVENTORY_SIZE; i++) slots[i] = storageSlot(i);
+        for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
+            slots[Inventory.MAIN_INVENTORY_SIZE + i] = hotbarSlot(i);
+        }
+        return slots;
+    }
+
+    // ------------------------------------------------------------------
+    // Rendering
+    // ------------------------------------------------------------------
+
     @Override
     protected void renderBackground(UIRenderer ui, FontRenderer font, GuiAssets gui) {
-        ui.fillRect(0, 0, width, height, 0xB0101010);
-        ui.drawNineSlice(gui.panel, panelX, panelY, panelW, panelH,
-            GuiAssets.BORDER, GuiAssets.WIDGET, 0xFFFFFFFF);
+        MenuTheme.drawWorldOverlay(ui, width, height);
+        ui.drawNineSlice(gui.glassPanel, panelX, panelY, panelW, panelH,
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
     }
 
     @Override
     protected void renderForeground(UIRenderer ui, FontRenderer font, GuiAssets gui,
                                     float mx, float my) {
+        lastMx = mx;
+        lastMy = my;
+
         font.draw(ui, tr("container.enchanting"), panelX + PANEL_PAD,
-            panelY + PANEL_PAD, GuiAssets.TEXT_TITLE);
+            panelY + PANEL_PAD, 0xFFE8EEFF);
 
         ItemStack tool = toolInSlot();
         ItemStack lapis = lapisInSlot();
         ItemStack mouse = callbacks.mouseItem();
+        ItemStack hovered = null;
 
         // Tool slot
-        ui.drawSprite(gui.slot, toolSlotX, toolSlotY, SLOT, SLOT);
-        if (!tool.isEmpty()) drawItem(ui, tool, toolSlotX + 1, toolSlotY + 1);
-        if (tool.isEmpty()) {
+        drawGlassSlot(ui, gui, toolSlotX, toolSlotY, mx, my);
+        if (!tool.isEmpty()) {
+            StackIcons.drawStack(ui, font, atlas, tool, toolSlotX + 1, toolSlotY + 1);
+            if (inside(mx, my, toolSlotX, toolSlotY, SLOT, SLOT)) hovered = tool;
+        } else {
             font.drawWithShadow(ui, "?", toolSlotX + SLOT / 2 - 3, toolSlotY + SLOT / 2 - 4,
-                0xFF888888);
+                0xFFB8A0D6);
         }
 
         // Lapis slot
-        ui.drawSprite(gui.slot, lapisSlotX, lapisSlotY, SLOT, SLOT);
+        drawGlassSlot(ui, gui, lapisSlotX, lapisSlotY, mx, my);
         if (!lapis.isEmpty()) {
-            drawItem(ui, lapis, lapisSlotX + 1, lapisSlotY + 1);
-            drawCount(ui, font, lapis.getCount(), lapisSlotX, lapisSlotY);
+            StackIcons.drawStack(ui, font, atlas, lapis, lapisSlotX + 1, lapisSlotY + 1);
+            if (inside(mx, my, lapisSlotX, lapisSlotY, SLOT, SLOT)) hovered = lapis;
         }
 
         // Level indicator
         font.drawWithShadow(ui, tr("enchant.level") + ": " + callbacks.xpLevel(),
-            panelX + PANEL_PAD, areaY + AREA_H + 2, 0xFF9D5CB0);
+            panelX + PANEL_PAD, areaY + AREA_H + 2, 0xFFC78BE8);
 
         // Offers
         refreshOffers();
@@ -220,10 +289,14 @@ public class EnchantingTableScreen extends Screen {
             int cost = i + 1;
             boolean enabled = enchanted && offers[i] != null
                 && lapisCount >= cost && callbacks.xpLevel() >= cost;
-            int bg = enabled ? 0xFF6A3FA0 : 0xFF3A2A55;
-            ui.fillRect(ox, oy, OPTION_W, OPTION_H, bg);
-            ui.fillRect(ox, oy, OPTION_W, 1, 0xFF9D5CB0);
-            ui.fillRect(ox, oy + OPTION_H - 1, OPTION_W, 1, 0xFF9D5CB0);
+            boolean hover = inside(mx, my, ox, oy, OPTION_W, OPTION_H);
+            int tint = enabled ? 0xFF5A3190 : (hover ? 0xFF3A2A55 : 0xFF271C3E);
+            ui.drawNineSlice(gui.glassPanel, ox, oy, OPTION_W, OPTION_H,
+                GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, tint);
+            if (enabled) {
+                ui.useSolidColor();
+                ui.fillRect(ox + 4, oy + OPTION_H - 2, OPTION_W - 8, 1, 0xFF9D5CB0);
+            }
 
             String name;
             if (offers[i] != null) {
@@ -231,86 +304,52 @@ public class EnchantingTableScreen extends Screen {
             } else {
                 name = "???";
             }
-            font.drawWithShadow(ui, name, ox + 3, oy + 1, 0xFFD6A0FF);
+            font.drawWithShadow(ui, name, ox + 3, oy + 1, 0xFFE2C0FF);
             font.drawWithShadow(ui, cost + " " + tr("enchant.levelShort"), ox + 3,
-                oy + OPTION_H - 9, enabled ? 0xFF9D5CB0 : 0xFF6A5580);
+                oy + OPTION_H - 9, enabled ? 0xFFC78BE8 : 0xFF6A5580);
         }
 
-        // --- Player inventory ---
+        // --- Player inventory (tool/lapis cells are shown up top) ---
         for (int i = 0; i < Inventory.MAIN_INVENTORY_SIZE; i++) {
-            if (i == Inventory.MAIN_INVENTORY_SIZE - 1
-                    || i == Inventory.MAIN_INVENTORY_SIZE - 2) continue;
+            if (i == TOOL_INV_SLOT || i == LAPIS_INV_SLOT) continue;
             int row = i / COLS;
             int col = i % COLS;
             int sx = storageX + col * SLOT;
             int sy = storageY + row * SLOT;
-            ui.drawSprite(gui.slot, sx, sy, SLOT, SLOT);
+            drawGlassSlot(ui, gui, sx, sy, mx, my);
             ItemStack stack = callbacks.inventory().getInventoryItem(i);
             if (!stack.isEmpty()) {
-                drawItem(ui, stack, sx + 1, sy + 1);
-                drawCount(ui, font, stack.getCount(), sx, sy);
+                StackIcons.drawStack(ui, font, atlas, stack, sx + 1, sy + 1);
+                if (inside(mx, my, sx, sy, SLOT, SLOT)) hovered = stack;
             }
         }
 
         // Hotbar strip
         for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
             int sx = hotbarX + i * SLOT;
-            ui.drawSprite(gui.slot, sx, hotbarY, SLOT, SLOT);
+            drawGlassSlot(ui, gui, sx, hotbarY, mx, my);
             ItemStack stack = callbacks.inventory().getHotbarItem(i);
             if (!stack.isEmpty()) {
-                drawItem(ui, stack, sx + 1, hotbarY + 1);
-                drawCount(ui, font, stack.getCount(), sx, hotbarY);
+                StackIcons.drawStack(ui, font, atlas, stack, sx + 1, hotbarY + 1);
+                if (inside(mx, my, sx, hotbarY, SLOT, SLOT)) hovered = stack;
             }
         }
 
-        // Mouse item follows cursor
+        // Mouse item follows the cursor
         if (!mouse.isEmpty()) {
-            drawItem(ui, mouse, (int) mx - ICON / 2, (int) my - ICON / 2);
-            if (mouse.getCount() > 1) {
-                drawCount(ui, font, mouse.getCount(),
-                    (int) mx - ICON / 2, (int) my - ICON / 2);
-            }
+            StackIcons.drawStack(ui, font, atlas, mouse,
+                (int) mx - GuiAssets.ICON_SIZE / 2, (int) my - GuiAssets.ICON_SIZE / 2);
+        }
+
+        if (hovered != null && mouse.isEmpty()) {
+            StackIcons.drawTooltip(ui, font, atlas, hovered, mx, my, width, height);
         }
     }
 
-    private void drawItem(UIRenderer ui, ItemStack stack, int x, int y) {
-        if (stack.isEmpty()) return;
-        if (stack.isBlock()) {
-            drawIcon(ui, stack.getBlockType(), x, y);
-            return;
-        }
-        Item item = stack.getItem();
-        if (item != null) {
-            if (item.blockType != null) {
-                drawIcon(ui, item.blockType, x, y);
-                return;
-            }
-            int slot = atlas.getLayerOf(item.spriteName);
-            if (slot >= 0) {
-                TextureAtlas.TextureCoords uv = new TextureAtlas.TextureCoords(slot);
-                ui.drawTexture(atlas.getTexture().getId(), x, y, ICON, ICON,
-                    uv.u1, uv.v2, uv.u2, uv.v1, 0xFFFFFFFF);
-                return;
-            }
-        }
-        ui.useSolidColor();
-        ui.fillRect(x + 2, y + 2, ICON - 4, ICON - 4, 0xFFC0C0C0);
-    }
-
-    private void drawIcon(UIRenderer ui, BlockType block, int x, int y) {
-        TextureAtlas.TextureCoords uv = atlas.getCoords(block.id, 2);
-        ui.drawTexture(atlas.getTexture().getId(), x, y, ICON, ICON,
-            uv.u1, uv.v2, uv.u2, uv.v1, 0xFFFFFFFF);
-    }
-
-    private void drawCount(UIRenderer ui, FontRenderer font, int count, int sx, int sy) {
-        if (count < 2) return;
-        String text = String.valueOf(count);
-        int tw = font.width(text);
-        font.drawWithShadow(ui, text,
-            sx + SLOT - tw - 1,
-            sy + SLOT - FontRenderer.GLYPH_H - 1,
-            0xFFFFFFFF);
+    private void drawGlassSlot(UIRenderer ui, GuiAssets gui, int sx, int sy, float mx, float my) {
+        boolean hover = inside(mx, my, sx, sy, SLOT, SLOT);
+        ui.drawNineSlice(hover ? gui.glassSlotHover : gui.glassSlot,
+            sx, sy, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
     }
 
     private static String roman(int n) {
@@ -324,38 +363,35 @@ public class EnchantingTableScreen extends Screen {
         };
     }
 
-    private boolean slotSwap(ItemStack slot, java.util.function.Consumer<ItemStack> setter,
-                             boolean mustBeEmpty) {
-        ItemStack mouse = callbacks.mouseItem();
-        if (mustBeEmpty && !mouse.isEmpty()) return false;
-        if (slot.isEmpty() && mouse.isEmpty()) return false;
-        setter.accept(mouse);
-        callbacks.onMouseItemChanged(slot);
-        return true;
-    }
+    // ------------------------------------------------------------------
+    // Mouse
+    // ------------------------------------------------------------------
 
     @Override
     public boolean mouseClicked(float mx, float my, int button) {
         if (button != 0 && button != 1) return false;
         ItemStack mouse = callbacks.mouseItem();
+        boolean shift = Game.isShiftDown();
 
         // Tool slot: swap anything
         if (inside(mx, my, toolSlotX, toolSlotY, SLOT, SLOT)) {
-            if (mouse.isEmpty() && toolInSlot().isEmpty()) return true;
-            ItemStack was = toolInSlot();
-            setToolInSlot(mouse);
-            callbacks.onMouseItemChanged(was);
+            SlotEngine.Slot slot = toolSlot();
+            if (shift) {
+                SlotEngine.quickMove(slot, playerSlots());
+            } else {
+                callbacks.onMouseItemChanged(SlotEngine.click(slot, mouse, button == 0));
+            }
             return true;
         }
 
         // Lapis slot: only lapis may enter
         if (inside(mx, my, lapisSlotX, lapisSlotY, SLOT, SLOT)) {
-            ItemStack was = lapisInSlot();
-            boolean lapisMouse = !mouse.isEmpty()
-                && mouse.getItem() == ItemRegistry.LAPIS_LAZULI;
-            if (was.isEmpty() && !lapisMouse) return true;
-            setLapisInSlot(mouse);
-            callbacks.onMouseItemChanged(was);
+            SlotEngine.Slot slot = lapisSlot();
+            if (shift) {
+                SlotEngine.quickMove(slot, playerSlots());
+            } else {
+                callbacks.onMouseItemChanged(SlotEngine.click(slot, mouse, button == 0));
+            }
             return true;
         }
 
@@ -382,7 +418,109 @@ public class EnchantingTableScreen extends Screen {
                 }
             }
         }
+
+        // Hotbar strip
+        if (inside(mx, my, hotbarX, hotbarY, Inventory.HOTBAR_SIZE * SLOT, SLOT)) {
+            int slot = (int) ((mx - hotbarX) / SLOT);
+            if (slot >= 0 && slot < Inventory.HOTBAR_SIZE) {
+                SlotEngine.Slot s = hotbarSlot(slot);
+                if (shift) {
+                    SlotEngine.Slot[] storage = new SlotEngine.Slot[Inventory.MAIN_INVENTORY_SIZE];
+                    for (int i = 0; i < storage.length; i++) storage[i] = storageSlot(i);
+                    SlotEngine.quickMove(s, storage);
+                } else {
+                    callbacks.onMouseItemChanged(SlotEngine.click(s, mouse, button == 0));
+                }
+            }
+            return true;
+        }
+
+        // Storage area (tool/lapis cells live up top, skip them here)
+        if (inside(mx, my, storageX, storageY,
+                COLS * SLOT, Inventory.MAIN_INVENTORY_SIZE / COLS * SLOT)) {
+            int col = (int) ((mx - storageX) / SLOT);
+            int row = (int) ((my - storageY) / SLOT);
+            int slot = row * COLS + col;
+            if (slot >= 0 && slot < Inventory.MAIN_INVENTORY_SIZE
+                    && slot != TOOL_INV_SLOT && slot != LAPIS_INV_SLOT) {
+                SlotEngine.Slot s = storageSlot(slot);
+                if (shift) {
+                    SlotEngine.Slot[] hotbar = new SlotEngine.Slot[Inventory.HOTBAR_SIZE];
+                    for (int i = 0; i < hotbar.length; i++) hotbar[i] = hotbarSlot(i);
+                    SlotEngine.quickMove(s, hotbar);
+                } else {
+                    callbacks.onMouseItemChanged(SlotEngine.click(s, mouse, button == 0));
+                }
+            }
+            return true;
+        }
+
+        // Click outside the panel drops the cursor stack into the world
+        if (!mouse.isEmpty() && !insidePanel(mx, my) && !overDoneButton(mx, my)) {
+            callbacks.dropStack(mouse.copy());
+            callbacks.onMouseItemChanged(SlotEngine.empty());
+            return true;
+        }
+
         return super.mouseClicked(mx, my, button);
+    }
+
+    private boolean overDoneButton(float mx, float my) {
+        return my >= height - 32 && my < height - 8
+            && mx >= (width - 200) / 2 && mx < (width - 200) / 2 + 200;
+    }
+
+    private boolean insidePanel(float mx, float my) {
+        return mx >= panelX && mx < panelX + panelW && my >= panelY && my < panelY + panelH;
+    }
+
+    // ------------------------------------------------------------------
+    // Keyboard: Q drop, 1-9 hotbar swap
+    // ------------------------------------------------------------------
+
+    @Override
+    public boolean keyPressed(int key, int mods) {
+        if (key >= org.lwjgl.glfw.GLFW.GLFW_KEY_1 && key <= org.lwjgl.glfw.GLFW.GLFW_KEY_9) {
+            int index = key - org.lwjgl.glfw.GLFW.GLFW_KEY_1;
+            SlotEngine.Slot hovered = hoveredSlot();
+            if (hovered != null) {
+                SlotEngine.hotbarSwap(hovered, hotbarSlot(index));
+                return true;
+            }
+            return false;
+        }
+
+        if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_Q) {
+            SlotEngine.Slot hovered = hoveredSlot();
+            if (hovered != null) {
+                boolean entire = (mods & org.lwjgl.glfw.GLFW.GLFW_MOD_CONTROL) != 0;
+                ItemStack dropped = SlotEngine.pullForDrop(hovered, entire);
+                if (!dropped.isEmpty()) callbacks.dropStack(dropped);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private SlotEngine.Slot hoveredSlot() {
+        float mx = lastMx, my = lastMy;
+        if (inside(mx, my, toolSlotX, toolSlotY, SLOT, SLOT)) return toolSlot();
+        if (inside(mx, my, lapisSlotX, lapisSlotY, SLOT, SLOT)) return lapisSlot();
+        if (inside(mx, my, storageX, storageY,
+                COLS * SLOT, Inventory.MAIN_INVENTORY_SIZE / COLS * SLOT)) {
+            int col = (int) ((mx - storageX) / SLOT);
+            int row = (int) ((my - storageY) / SLOT);
+            int slot = row * COLS + col;
+            if (slot >= 0 && slot < Inventory.MAIN_INVENTORY_SIZE
+                    && slot != TOOL_INV_SLOT && slot != LAPIS_INV_SLOT) {
+                return storageSlot(slot);
+            }
+        }
+        if (inside(mx, my, hotbarX, hotbarY, Inventory.HOTBAR_SIZE * SLOT, SLOT)) {
+            int slot = (int) ((mx - hotbarX) / SLOT);
+            if (slot >= 0 && slot < Inventory.HOTBAR_SIZE) return hotbarSlot(slot);
+        }
+        return null;
     }
 
     private static boolean inside(float mx, float my, int x, int y, int w, int h) {

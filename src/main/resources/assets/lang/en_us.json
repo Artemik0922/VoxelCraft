@@ -7,7 +7,6 @@
   "menu.game": "Game Menu",
   "menu.language": "Language",
   "menu.disabled": "Not available yet",
-
   "options.title": "Options",
   "options.video": "Video Settings...",
   "options.language": "Language...",
@@ -46,6 +45,8 @@
   "options.difficulty.hard": "Hard",
   "options.ao": "Smooth Lighting",
   "options.shadows": "Shadows",
+  "options.bloom": "Bloom",
+  "options.fxaa": "FXAA",
   "options.menuTheme": "Menu Theme",
   "options.menuTheme.sunset": "Sunset",
   "options.menuTheme.amoled": "AMOLED",
@@ -63,7 +64,6 @@
   "options.preset.medium": "Medium",
   "options.preset.fancy": "Fancy",
   "options.preset.ultra": "Ultra",
-
   "options.video.title": "Video Settings",
   "options.controls.title": "Controls",
   "options.sound.title": "Sound Settings",
@@ -72,7 +72,6 @@
   "options.difficulty.title": "Difficulty",
   "options.language.title": "Language",
   "options.language.warning": "Translations may not be accurate",
-
   "controls.reset": "Reset",
   "controls.resetAll": "Reset All",
   "controls.pressKey": "Press a key...",
@@ -88,7 +87,6 @@
   "key.inventory": "Inventory",
   "key.drop": "Drop",
   "key.none": "Not bound",
-
   "selectWorld.title": "Select World",
   "selectWorld.select": "Play Selected World",
   "selectWorld.create": "Create New World",
@@ -99,7 +97,6 @@
   "selectWorld.deleteButton": "Delete",
   "selectWorld.empty": "No saved worlds",
   "selectWorld.hint": "Create a new world to start playing",
-
   "createWorld.title": "Create New World",
   "createWorld.name": "World Name",
   "createWorld.defaultName": "New World",
@@ -108,14 +105,12 @@
   "createWorld.more": "More World Options...",
   "createWorld.structures": "Generate Structures",
   "createWorld.create": "Create New World",
-
   "gameMode.survival": "Survival",
   "gameMode.creative": "Creative",
   "gameMode.hardcore": "Hardcore",
   "gameMode.survival.info": "Search for resources, craft, and fight",
   "gameMode.creative.info": "Unlimited resources and free flight",
   "gameMode.hardcore.info": "Survival, locked difficulty, one life",
-
   "deathScreen.title": "You Died!",
   "deathScreen.respawn": "Respawn",
   "deathScreen.titleScreen": "Title Screen",
@@ -129,7 +124,14 @@
   "death.mob": "You were killed by a mob",
   "death.void": "You fell out of the world",
   "container.survival": "Inventory",
+  "container.armor": "Armor",
   "container.creative": "Creative Inventory",
+  "creative.search": "Search...",
+  "ui.durability": "Durability: ",
+  "ui.armor.slot.0": "Helmet",
+  "ui.armor.slot.1": "Chestplate",
+  "ui.armor.slot.2": "Leggings",
+  "ui.armor.slot.3": "Boots",
   "item.apple": "Apple",
   "item.iron_sword": "Iron Sword",
   "block.autumn_leaves": "Autumn Leaves",
@@ -274,7 +276,6 @@
   "tutorial.jumpSprint": "Space to jump, Ctrl to sprint",
   "tutorial.minePlace": "LMB to mine, RMB to place blocks",
   "tutorial.inventory": "E for inventory, F to pick a block",
-
   "container.furnace": "Furnace",
   "container.chest": "Chest",
   "container.crafting": "Crafting",
@@ -292,7 +293,6 @@
   "block.enchanting_table": "Enchanting Table",
   "recipeBook.toggle": "Recipes",
   "recipeBook.title": "Recipe Book",
-
   "item.stick": "Stick",
   "item.coal": "Coal",
   "item.iron_ingot": "Iron Ingot",
@@ -323,7 +323,6 @@
   "item.rotten_flesh": "Rotten Flesh",
   "item.bone": "Bone",
   "item.spider_eye": "Spider Eye",
-
   "block.oak_raw_planks": "Raw Oak Planks",
   "block.oak_raw_slab": "Raw Oak Slab",
   "block.oak_dried_planks": "Dried Oak Planks",
@@ -390,7 +389,6 @@
   "block.jungle_lacquered_slab": "Lacquered Jungle Slab",
   "item.resin": "Resin",
   "item.wax": "Wax",
-
   "item.wooden_pickaxe": "Wooden Pickaxe",
   "item.wooden_axe": "Wooden Axe",
   "item.wooden_shovel": "Wooden Shovel",
@@ -404,7 +402,6 @@
   "item.iron_pickaxe": "Iron Pickaxe",
   "item.iron_axe": "Iron Axe",
   "item.iron_shovel": "Iron Shovel",
-  "item.iron_sword": "Iron Sword",
   "item.iron_hoe": "Iron Hoe",
   "item.diamond_pickaxe": "Diamond Pickaxe",
   "item.diamond_axe": "Diamond Axe",
@@ -416,7 +413,6 @@
   "item.golden_shovel": "Golden Shovel",
   "item.golden_sword": "Golden Sword",
   "item.golden_hoe": "Golden Hoe",
-
   "item.leather_helmet": "Leather Cap",
   "item.leather_chestplate": "Leather Tunic",
   "item.leather_leggings": "Leather Pants",
@@ -429,7 +425,6 @@
   "item.diamond_chestplate": "Diamond Chestplate",
   "item.diamond_leggings": "Diamond Leggings",
   "item.diamond_boots": "Diamond Boots",
-
   "block.cobblestone": "Cobblestone",
   "block.mossy_cobblestone": "Mossy Cobblestone",
   "block.stone_bricks": "Stone Bricks",
@@ -438,34 +433,37 @@
   "block.ice": "Ice",
   "block.snow": "Snow",
   "block.gravel": "Gravel",
-  "block.coal_block": "Coal Block",
   "block.glowstone": "Glowstone",
   "block.netherrack": "Netherrack",
-  "block.deepslate": "Deepslate",
-  "block.basalt": "Basalt",
   "block.moss_block": "Moss Block",
   "block.dripstone": "Dripstone",
-
   "menu.saveAndQuit": "Save and Quit to Title",
   "menu.quitQuestion": "Quit to title?",
   "menu.quitWarning": "Your progress will be saved.",
   "menu.achievements": "Achievements",
   "menu.statistics": "Statistics",
-
   "gui.cancel": "Cancel",
   "gui.back": "Back",
   "gui.yes": "Yes",
   "gui.no": "No",
   "gui.done": "Done",
   "gui.saving": "Saving world...",
-
   "splash.1": "Procedurally generated!",
   "splash.2": "No Mojang assets!",
   "splash.3": "Watch out for caves!",
   "splash.4": "Dig deeper!",
   "splash.5": "Blocks, blocks, blocks",
   "splash.6": "Hand-drawn font!",
-
   "world.playedOn": "Last played: %s",
-  "world.created": "Created: %s"
+  "world.created": "Created: %s",
+  "hud.map.zoom": "Zoom: %s",
+  "hud.map.zoom.0": "Close",
+  "hud.map.zoom.1": "Medium",
+  "hud.map.zoom.2": "Far",
+  "hud.map.north": "N",
+  "hud.map.m": "m",
+  "hud.map.km": " km",
+  "hud.map.south": "S",
+  "hud.map.west": "W",
+  "hud.map.east": "E"
 }

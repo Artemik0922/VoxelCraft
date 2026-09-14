@@ -66,11 +66,28 @@ public class Chunk {
         if (x < 0 || x >= SIZE || y < 0 || y >= HEIGHT || z < 0 || z >= SIZE) {
             return 0;
         }
-        return blocks[index(x, y, z)] & 0xFFFF;
+        int id = blocks[index(x, y, z)] & 0xFFFF;
+        // Safety net: ids above the table size would index out of bounds in
+        // the light/mesh lookup tables. Treat them as air instead of crashing.
+        if (id >= 512) {
+            if (badBlockWarn.get() < 5) {
+                System.err.println("BAD_BLOCK_ID=" + id + " at chunk " + chunkX + "," + chunkZ
+                    + " local=(" + x + "," + y + "," + z + ") world=("
+                    + (chunkX * SIZE + x) + "," + y + "," + (chunkZ * SIZE + z) + ")");
+                badBlockWarn.incrementAndGet();
+            }
+            return 0;
+        }
+        return id;
     }
+
+    /** Global one-shot diagnostic for garbage block ids (capped). */
+    private static final java.util.concurrent.atomic.AtomicInteger badBlockWarn =
+        new java.util.concurrent.atomic.AtomicInteger();
     
     public void setBlock(int x, int y, int z, int id) {
         if (x < 0 || x >= SIZE || y < 0 || y >= HEIGHT || z < 0 || z >= SIZE) return;
+        if (id < 0 || id >= 512) return;
         blocks[index(x, y, z)] = (short) id;
         dirty = true;
         lightDirty = true;
@@ -96,7 +113,17 @@ public class Chunk {
     
     /** Restore blocks from a save (format 6: short ids). */
     public void loadBlocks(short[] data) {
-        System.arraycopy(data, 0, blocks, 0, Math.min(data.length, blocks.length));
+        for (int i = 0; i < Math.min(data.length, blocks.length); i++) {
+            int v = data[i] & 0xFFFF;
+            if (v >= 512) {
+                System.err.println("LOAD_BLOCKS_BAD_ID=" + v + " at chunk " + chunkX + "," + chunkZ
+                    + " idx=" + i);
+                badBlockWarn.incrementAndGet();
+                blocks[i] = 0;
+            } else {
+                blocks[i] = data[i];
+            }
+        }
         java.util.Arrays.fill(heightMap, (short) -1);
         dirty = true;
         lightDirty = true;

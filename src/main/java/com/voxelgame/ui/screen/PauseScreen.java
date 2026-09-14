@@ -64,6 +64,7 @@ public class PauseScreen extends Screen {
 
     @Override
     public void update(double deltaTime) {
+        super.update(deltaTime);
         time += deltaTime;
         for (int i = 0; i < animProgress.length && i < widgets.size(); i++) {
             if (widgets.get(i) instanceof Button btn) {

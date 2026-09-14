@@ -26,19 +26,30 @@ public class Inventory {
         for (int i = 0; i < MAIN_INVENTORY_SIZE; i++) mainInventory[i] = new ItemStack(BlockType.AIR, 0);
         for (int i = 0; i < ARMOR_SIZE; i++) armor[i] = new ItemStack(BlockType.AIR, 0);
 
-        giveStartingItems();
+        giveStarterKit();
     }
 
-    private void giveStartingItems() {
-        hotbar[0] = new ItemStack(BlockType.GRASS_BLOCK, 64);
-        hotbar[1] = new ItemStack(BlockType.DIRT, 64);
-        hotbar[2] = new ItemStack(BlockType.STONE, 64);
-        hotbar[3] = new ItemStack(BlockType.COBBLESTONE, 64);
-        hotbar[4] = new ItemStack(BlockType.OAK_PLANKS, 64);
-        hotbar[5] = new ItemStack(BlockType.GLASS, 64);
-        hotbar[6] = new ItemStack(BlockType.OAK_LOG, 64);
-        hotbar[7] = new ItemStack(BlockType.OAK_LEAVES, 64);
-        hotbar[8] = new ItemStack(BlockType.SAND, 64);
+    /**
+     * Survival starter kit: basic tools, light and food so the first night
+     * is survivable, plus some materials to build with.
+     */
+    public void giveStarterKit() {
+        setHotbarItem(0, ItemRegistry.WOODEN_PICKAXE, 1);
+        setHotbarItem(1, ItemRegistry.WOODEN_AXE, 1);
+        setHotbarItem(2, ItemRegistry.WOODEN_SWORD, 1);
+        setHotbarItem(3, BlockType.ITEM_TORCH, 16);
+        setHotbarItem(4, ItemRegistry.BREAD, 6);
+        setHotbarItem(5, BlockType.COBBLESTONE, 32);
+        setHotbarItem(6, BlockType.OAK_PLANKS, 16);
+        setHotbarItem(7, BlockType.DIRT, 16);
+    }
+
+    /** True when hotbar, storage and armor hold nothing at all. */
+    public boolean isCompletelyEmpty() {
+        for (ItemStack s : hotbar) if (!s.isEmpty()) return false;
+        for (ItemStack s : mainInventory) if (!s.isEmpty()) return false;
+        for (ItemStack s : armor) if (!s.isEmpty()) return false;
+        return true;
     }
 
     public ItemStack getSelectedItem() {
@@ -78,6 +89,13 @@ public class Inventory {
     public void setHotbarItem(int slot, Item item, int count) {
         if (slot < 0 || slot >= HOTBAR_SIZE) return;
         hotbar[slot] = new ItemStack(item, count);
+    }
+
+    /** Replace a hotbar slot with an arbitrary stack (keeps tools intact). */
+    public void setHotbarItem(int slot, ItemStack stack) {
+        if (slot < 0 || slot >= HOTBAR_SIZE) return;
+        hotbar[slot] = stack == null || stack.isEmpty()
+            ? new ItemStack(BlockType.AIR, 0) : stack;
     }
 
     public ItemStack getHotbarItem(int slot) {
@@ -167,6 +185,49 @@ public class Inventory {
             if (mainInventory[i].isEmpty()) { mainInventory[i] = new ItemStack(item, count); return true; }
         }
         return false;
+    }
+
+    /**
+     * Insert a whole stack anywhere it fits: merge into compatible stacks
+     * first, then empty slots, hotbar before main inventory. Tools and
+     * enchanted items keep their identity.
+     *
+     * @return the leftover that did not fit (an empty stack when all fit)
+     */
+    public ItemStack addStack(ItemStack stack) {
+        ItemStack rest = stack == null || stack.isEmpty()
+            ? new ItemStack(BlockType.AIR, 0) : stack.copy();
+
+        for (int i = 0; i < HOTBAR_SIZE && !rest.isEmpty(); i++) {
+            rest = mergeInto(hotbar, i, rest);
+        }
+        for (int i = 0; i < MAIN_INVENTORY_SIZE && !rest.isEmpty(); i++) {
+            rest = mergeInto(mainInventory, i, rest);
+        }
+        for (int i = 0; i < HOTBAR_SIZE && !rest.isEmpty(); i++) {
+            if (hotbar[i].isEmpty()) {
+                hotbar[i] = rest;
+                rest = new ItemStack(BlockType.AIR, 0);
+            }
+        }
+        for (int i = 0; i < MAIN_INVENTORY_SIZE && !rest.isEmpty(); i++) {
+            if (mainInventory[i].isEmpty()) {
+                mainInventory[i] = rest;
+                rest = new ItemStack(BlockType.AIR, 0);
+            }
+        }
+        return rest;
+    }
+
+    private ItemStack mergeInto(ItemStack[] arr, int idx, ItemStack source) {
+        ItemStack target = arr[idx];
+        if (target.isEmpty() || !target.canMerge(source)) return source;
+        int space = target.getMaxStackSize() - target.getCount();
+        if (space <= 0) return source;
+        int move = Math.min(space, source.getCount());
+        arr[idx] = target.copyWithCount(target.getCount() + move);
+        return move >= source.getCount()
+            ? new ItemStack(BlockType.AIR, 0) : source.copyWithCount(source.getCount() - move);
     }
 
     public boolean removeItem(BlockType type, int count) {
