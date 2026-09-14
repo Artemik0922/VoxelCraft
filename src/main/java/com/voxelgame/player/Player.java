@@ -1,5 +1,6 @@
 package com.voxelgame.player;
 
+import com.voxelgame.item.BlockHarvest;
 import com.voxelgame.item.Inventory;
 import com.voxelgame.item.Item;
 import com.voxelgame.item.ItemStack;
@@ -1101,6 +1102,35 @@ public class Player {
             return held.getItem().tier.miningSpeed;
         }
         return 1.0f; // Fist
+    }
+
+    /**
+     * [GP-054] Effective mining speed multiplier for a block, respecting tool
+     * kind and tier. Free blocks (dirt, logs, plants) accept any tool at its
+     * listed speed. Requiring a tool mines at full speed only with the right
+     * kind AND tier; otherwise the block crumbles at a crawl, exactly like
+     * vanilla's "wrong tool" slow dig.
+     */
+    public float getBlockMiningMultiplier(BlockType block) {
+        ItemStack held = inventory.getSelectedItem();
+        boolean hasTool = held.isItem() && held.getItem() != null && held.getItem().isTool();
+
+        BlockHarvest.Requirement req = BlockHarvest.get(block);
+        if (req == null || req.tool == ToolType.NONE) {
+            return hasTool ? held.getItem().tier.miningSpeed : 1.0f;
+        }
+
+        ToolTier tier = getHeldToolTier();
+        ToolType tool = getHeldToolType();
+        boolean okTool = tool == req.tool;
+        boolean okTier = req.minTier == null
+            || (tier != null && tier.harvestLevel >= req.minTier.harvestLevel);
+        if (okTool && okTier) {
+            return hasTool ? held.getItem().tier.miningSpeed : 1.0f;
+        }
+
+        // Wrong tool kind or too-low tier: ~3x slower than bare hands
+        return 0.3f;
     }
 
     /** Get tool tier of held item (null if not a tool) */

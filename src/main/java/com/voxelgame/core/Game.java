@@ -2814,17 +2814,19 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             digSoundAccum = 0;
         }
         
+        // [GP-054] Determine block type first so tool speed applies
+        BlockType mined = BlockType.fromId(
+            world.getBlock(breakingBlock.x, breakingBlock.y, breakingBlock.z));
         float hardness = getBlockHardness(breakingBlock.x, breakingBlock.y, breakingBlock.z);
+        float toolSpeed = player.getBlockMiningMultiplier(mined);
         // [ENCH] Efficiency: each level speeds mining by 50%
         int efficiency = player.getHeldEfficiency();
-        blockBreakProgress += deltaTime / hardness * (1.0f + 0.5f * efficiency);
+        blockBreakProgress += deltaTime / hardness * toolSpeed * (1.0f + 0.5f * efficiency);
         
         // Keep swinging for as long as the block is being worked on
         if (!heldItem.isSwinging()) heldItem.startSwing();
         
         // Chips fly off while the block is being worked on
-        BlockType mined = BlockType.fromId(
-            world.getBlock(breakingBlock.x, breakingBlock.y, breakingBlock.z));
         if (mined != BlockType.AIR) {
             particles.emitDigging(breakingBlock.x, breakingBlock.y, breakingBlock.z,
                 mined, renderer.getTextureAtlas());
@@ -3381,7 +3383,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
 
         // [GP-013] Cracks grow on the block while it is being mined
         if (breakingBlock != null && blockBreakProgress > 0 && blockBreakProgress < 1) {
-            int stage = java.lang.Math.min(4, (int) (blockBreakProgress * 10));
+            int stage = java.lang.Math.min(4, (int) (blockBreakProgress * 5));
             crackOverlay.render(breakingBlock.x, breakingBlock.y, breakingBlock.z,
                 stage, camera, renderer.getTextureAtlas());
         }
