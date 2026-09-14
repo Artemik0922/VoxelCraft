@@ -627,6 +627,20 @@ public class Renderer {
         // Water and leaves should be visible from both sides
         glDisable(GL_CULL_FACE);
 
+        // [GR-017] Depth pre-pass: write depth only (no color) so the real
+        // transparent draw uses GL_EQUAL and never overdraws itself within
+        // the same layer, eliminating the worst sorting artifacts.
+        glColorMask(false, false, false, false);
+        glDepthFunc(GL_LESS);
+        for (RenderChunk rc : transparentQueue) {
+            shader.setUniformMat4("model", rc.modelMatrix);
+            shader.setUniform1f("fadeAlpha", 1.0f);
+            rc.transparent.render();
+        }
+
+        // Now draw colour with depth locked to the pre-pass values
+        glColorMask(true, true, true, true);
+        glDepthFunc(GL_EQUAL);
         for (RenderChunk rc : transparentQueue) {
             shader.setUniformMat4("model", rc.modelMatrix);
             shader.setUniform1f("fadeAlpha", rc.updateFadeAlpha());
@@ -634,6 +648,7 @@ public class Renderer {
             drawnTriangles += rc.transparent.getIndexCount() / 3;
         }
 
+        glDepthFunc(GL_LESS);
         glDepthMask(true);
         glDisable(GL_BLEND);
         applyCulling();
