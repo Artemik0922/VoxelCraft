@@ -506,6 +506,7 @@
   "trade.done": "Deal done!",
   "trade.out_of_stock": "Sold out",
   "trade.sold_out": "Sold out",
+  "trade.stock": "Stock",
   "trade.cannot_pay": "Not enough resources",
   "trade.no_space": "Inventory is full",
   "trade.reputation": "Reputation",

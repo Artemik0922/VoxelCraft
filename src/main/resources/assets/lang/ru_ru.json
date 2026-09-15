@@ -509,6 +509,7 @@
   "trade.done": "Сделка совершена!",
   "trade.out_of_stock": "Распродано",
   "trade.sold_out": "Распродано",
+  "trade.stock": "Запас",
   "trade.cannot_pay": "Не хватает ресурсов",
   "trade.no_space": "Инвентарь полон",
   "trade.reputation": "Репутация",

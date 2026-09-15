@@ -352,6 +352,12 @@ public class FontRenderer {
         g.put('@', new String[]{" ### ", "#   #", "# ###", "# # #", "# ###", "#    ", " ### "});
         g.put('&', new String[]{" ##  ", "#  # ", " ##  ", " ##  ", "#  ##", "#  # ", " ## #"});
         g.put('|', new String[]{"#", "#", "#", "#", "#", "#", "#"});
+
+        // Typography commonly used by trading / crafting text
+        g.put('×', new String[]{"     ", "#   #", " # # ", "  #  ", " # # ", "#   #", "     "});
+        g.put('→', new String[]{"   # ", "  ## ", " ### ", "#####", " ### ", "  ## ", "   # "});
+        g.put('−', new String[]{"     ", "     ", "     ", "#####", "     ", "     ", "     "});
+        g.put('·', new String[]{"     ", "     ", "     ", " ### ", "     ", "     ", "     "});
     }
 
     /**
