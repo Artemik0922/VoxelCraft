@@ -1,5 +1,7 @@
 package com.voxelgame.rendering.model;
 
+import com.voxelgame.item.Item;
+import com.voxelgame.item.ItemStack;
 import com.voxelgame.rendering.Camera;
 import com.voxelgame.rendering.Shader;
 import com.voxelgame.rendering.TextureAtlas;
@@ -141,9 +143,9 @@ public class HeldItemRenderer {
     // ------------------------------------------------------------------
 
     /**
-     * @param held block currently selected in the hotbar, or AIR for none
+     * @param held stack currently selected in the hotbar, or null/empty for none
      */
-    public void render(Camera camera, TextureAtlas atlas, BlockType held,
+    public void render(Camera camera, TextureAtlas atlas, ItemStack held,
                        float lightLevel, Vector3f sunColor) {
 
         // A fresh depth range for the view model, so it is never clipped by
@@ -172,16 +174,39 @@ public class HeldItemRenderer {
                 0);
         }
 
-        boolean hasBlock = held != null && held != BlockType.AIR;
+        // What to draw in the hand: a block cube, a flat item sprite, or
+        // nothing. Items with a named sprite tile win over their block
+        // fallback, mirroring the inventory icon logic in StackIcons.
+        BlockType renderBlock = null;
+        int spriteLayer = -1;
 
-        if (hasBlock) {
-            if (isFlatItem(held)) {
-                renderHeldSprite(atlas, held, lightLevel, sunColor);
-            } else {
-                renderHeldBlock(atlas, held, lightLevel, sunColor);
+        if (held != null && !held.isEmpty()) {
+            if (held.isBlock()) {
+                renderBlock = held.getBlockType();
+            } else if (held.getItem() != null) {
+                Item item = held.getItem();
+                if (item.spriteName != null) {
+                    spriteLayer = atlas.getLayerOf(item.spriteName);
+                }
+                if (spriteLayer < 0 && item.blockType != null) {
+                    renderBlock = item.blockType;
+                }
             }
         }
-        renderArm(hasBlock, lightLevel, sunColor);
+
+        boolean hasBlock = renderBlock != null && renderBlock != BlockType.AIR;
+        boolean hasSprite = spriteLayer >= 0;
+
+        if (hasSprite) {
+            renderHeldSprite(atlas, spriteLayer, lightLevel, sunColor);
+        } else if (hasBlock) {
+            if (isFlatItem(renderBlock)) {
+                renderHeldSprite(atlas, renderBlock, lightLevel, sunColor);
+            } else {
+                renderHeldBlock(atlas, renderBlock, lightLevel, sunColor);
+            }
+        }
+        renderArm(hasBlock || hasSprite, lightLevel, sunColor);
 
         glDepthMask(true);
     }
@@ -262,6 +287,13 @@ public class HeldItemRenderer {
     /** Render a flat item sprite (swords, tools) in first person. */
     private void renderHeldSprite(TextureAtlas atlas, BlockType held,
                                    float lightLevel, Vector3f sunColor) {
+        renderHeldSprite(atlas, atlas.getSlot(held.id, 2),
+            lightLevel, sunColor);
+    }
+
+    /** Render a flat item sprite from a named atlas layer (tools, food, etc). */
+    private void renderHeldSprite(TextureAtlas atlas, int layer,
+                                   float lightLevel, Vector3f sunColor) {
         blockShader.bind();
         blockShader.setUniformMat4("projection", projection);
         blockShader.setUniformMat4("view", identityView);
@@ -288,7 +320,7 @@ public class HeldItemRenderer {
 
         blockShader.setUniformMat4("model", model);
 
-        sprite.render(atlas, held, blockShader);
+        sprite.render(atlas, layer, blockShader);
 
         blockShader.unbind();
         atlas.unbindArray();

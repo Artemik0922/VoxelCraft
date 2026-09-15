@@ -3374,7 +3374,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             // instead of staying readable at full brightness all night
             float light = 0.12f + 0.88f * dayNight.getDaylight();
             heldItem.render(camera, renderer.getTextureAtlas(),
-                player.getInventory().getSelectedItem().getBlockType(),
+                player.getInventory().getSelectedItem(),
                 light, dayNight.getSunColor());
         }
         

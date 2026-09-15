@@ -78,9 +78,15 @@ public class ItemSprite {
      * Draw the flat sprite using the atlas layer for this item type.
      */
     public void render(TextureAtlas atlas, BlockType type, Shader shader) {
-        int slot = atlas.getSlot(type.id, 2); // top face slot
+        render(atlas, atlas.getSlot(type.id, 2), shader); // top face slot
+    }
+
+    /**
+     * Draw the flat sprite from a specific atlas array layer.
+     */
+    public void render(TextureAtlas atlas, int layer, Shader shader) {
         int[] layers = new int[6];
-        java.util.Arrays.fill(layers, slot);
+        java.util.Arrays.fill(layers, layer);
         shader.setUniform1iv("faceLayers", layers);
 
         glDisable(GL_CULL_FACE); // double-sided so it's visible from both angles
