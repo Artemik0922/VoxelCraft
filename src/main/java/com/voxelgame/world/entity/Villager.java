@@ -192,6 +192,9 @@ public class Villager {
     /** РўР°Р№РјРµСЂ РїРѕРїРѕР»РЅРµРЅРёСЏ Р°СЃСЃРѕСЂС‚РёРјРµРЅС‚Р° (~1 РёРіСЂРѕРІР°СЏ РјРёРЅСѓС‚Р°). */
     private float restockCooldown = 0;
 
+    /** [ECO] РРіСЂРѕРє вЂ” Р“РµСЂРѕР№ РґРµСЂРµРІРЅРё: РІРѕРёРЅС‹ РїРµСЂРµСЃС‚Р°СЋС‚ РѕС…СЂР°РЅСЏС‚СЊ РІР°С€Р°С‚ Рё СЃРѕРїСЂРѕРІРѕР¶РґР°СЋС‚ РёРіСЂРѕРєР°. */
+    public static boolean heroPresent = false;
+
     public Villager(World world, float x, float y, float z, Profession profession) {
         this(world, x, y, z, profession, false);
     }
@@ -267,7 +270,7 @@ public class Villager {
                 socialBuddy = null;
                 isTalking = false;
             }
-            updateGuard(dt);
+            updateGuard(dt, playerPos);
         } else if (mobThreat && state != State.SLEEP && !isBaby) {
             // РњРѕРЅСЃС‚СЂС‹ СЂСЏРґРѕРј вЂ” Р±РµР¶РёРј РґРѕРјРѕР№ Рё РїСЂСЏС‡РµРјСЃСЏ
             state = State.FLEE;
@@ -827,7 +830,7 @@ public class Villager {
      * Р’РѕРёРЅ: РїР°С‚СЂСѓР»РёСЂСѓРµС‚ Сѓ СЂР°Р±РѕС‡РµРіРѕ РјРµСЃС‚Р° (С†РµРЅС‚СЂ РґРµСЂРµРІРЅРё), Р° РєРѕРіРґР° СЂСЏРґРѕРј
      * РјРѕРЅСЃС‚СЂ вЂ” Р±РµР¶РёС‚ Рє РЅРµРјСѓ Рё СЂСѓР±РёС‚ РјРµС‡РѕРј.
      */
-    private void updateGuard(float dt) {
+private void updateGuard(float dt, Vector3f playerPos) {
         if (attackCooldown > 0) attackCooldown -= dt;
         if (attackTimer > 0) attackTimer -= dt;
 
@@ -860,9 +863,9 @@ public class Villager {
             return;
         }
 
-        // РњРѕРЅСЃС‚СЂРѕРІ РЅРµС‚ вЂ” РїР°С‚СЂСѓР»РёСЂСѓРµРј Сѓ СЂР°Р±РѕС‡РµРіРѕ РјРµСЃС‚Р°
+        // РњРѕРЅСЃС‚СЂРѕРІ РЅРµС‚ вЂ” РїР°С‚СЂРѕР»РёСЂСѓРµРј: РІРѕР·Р»Рµ РёРіСЂРѕРєР°-Р“РµСЂРѕСЏ РёР»Рё РѕРєРѕР»Рѕ СЂР°Р±РѕС‡РµРіРѕ РјРµСЃС‚Р°.
         if (!hasTarget) {
-            pickGuardPost();
+            pickGuardPost(playerPos);
         }
         float tx = moveTarget.x - position.x;
         float tz = moveTarget.z - position.z;
@@ -872,7 +875,7 @@ public class Villager {
             velocity.z *= 0.8f;
             guardTimer -= dt;
             if (guardTimer <= 0) {
-                pickGuardPost(); // СЃР»РµРґСѓСЋС‰Р°СЏ С‚РѕС‡РєР° РїР°С‚СЂСѓР»СЏ
+                pickGuardPost(playerPos); // СЃР»РµРґСѓСЋС‰Р°СЏ С‚РѕС‡РєР° РїР°С‚СЂСѓР»СЏ
             }
         } else {
             desiredYaw = (float) Math.atan2(-tx, -tz);
@@ -880,10 +883,19 @@ public class Villager {
         }
     }
 
-    /** РЎР»РµРґСѓСЋС‰Р°СЏ С‚РѕС‡РєР° РїР°С‚СЂСѓР»СЏ РЅРµРґР°Р»РµРєРѕ РѕС‚ СЂР°Р±РѕС‡РµРіРѕ РјРµСЃС‚Р° (С†РµРЅС‚СЂР° РґРµСЂРµРІРЅРё). */
-    private void pickGuardPost() {
-        float baseX = hasWork ? workPos.x : (hasHome ? homePos.x : position.x);
-        float baseZ = hasWork ? workPos.z : (hasHome ? homePos.z : position.z);
+    /** СЂР°Р±РѕС‡РµРіРѕ РјРµСЃС‚Р° (С†РµРЅС‚СЂР° РґРµСЂРµРІРЅРё) РёР»Рё РёРіСЂРѕРєР°-Р“РµСЂРѕСЏ. */
+    private void pickGuardPost(Vector3f playerPos) {
+        boolean escort = profession == Profession.WARRIOR && heroPresent
+            && playerPos != null
+            && (float) Math.sqrt(
+                (playerPos.x - position.x) * (playerPos.x - position.x)
+                + (playerPos.z - position.z) * (playerPos.z - position.z)) < 64.0f;
+        float baseX = escort
+            ? playerPos.x
+            : (hasWork ? workPos.x : (hasHome ? homePos.x : position.x));
+float baseZ = escort
+            ? playerPos.z
+            : (hasWork ? workPos.z : (hasHome ? homePos.z : position.z));
         for (int i = 0; i < 8; i++) {
             float angle = (float) (Math.random() * Math.PI * 2);
             float dist = 2.0f + (float) Math.random() * GUARD_RADIUS;

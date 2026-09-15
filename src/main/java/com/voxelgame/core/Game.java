@@ -766,10 +766,13 @@ public class Game {
     /** [ECO] A deal went through: grow reputation, fire achievements, cash sound. */
     private void onTradeComplete(TradeOffer offer) {
         WorldMeta meta = currentSave.getMeta();
+        int before = meta.reputation;
         meta.reputation++;
         AchievementRegistry.trigger("first_trade");
-        if (meta.reputation >= Reputation.HERO_TIER) {
+        if (Reputation.isHero(meta.reputation) && !Reputation.isHero(before)) {
+            // First time the player reaches Hero tier: the village honours them.
             AchievementRegistry.trigger("village_hero");
+            awardHeroGift();
         }
         String given = Inventory.canonicalName(offer.give);
         if (given.startsWith("meteorite")) {
@@ -780,6 +783,16 @@ public class Game {
                 + " " + Language.tr(Reputation.tierKey(meta.reputation)), 0xFFAAFFAA);
         }
         AudioManager.play("sounds/steps/wood", 1.0f, 0.35f);
+    }
+
+    /** [ECO] Hero gift: a bribe of emeralds, a diamond and a healing potion. */
+    private void awardHeroGift() {
+        if (player == null || currentSave == null) return;
+        Vector3f p = player.getPosition();
+        dropItem(p, new ItemStack(ItemRegistry.EMERALD, 8));
+        dropItem(p, new ItemStack(ItemRegistry.DIAMOND, 1));
+        dropItem(p, new ItemStack(ItemRegistry.POTION_HEALING, 1));
+        chat.addMessage(Language.tr("trade.heroGift"), 0xFFAAFFAA);
     }
 
     private void openChest(int x, int y, int z) {
@@ -2233,6 +2246,11 @@ if (!paused) {
                 for (int i = 0; i < vaultStock.length; i++) vaultStock[i] = wo[i].maxUses;
             }
         }
+
+        // [ECO] At Hero reputation the village warriors escort the player
+        // instead of guarding their posts.
+        Villager.heroPresent = currentSave != null
+            && Reputation.isHero(currentSave.getMeta().reputation);
 
         SpawnCommand.currentWorld = world;
         SpawnCommand.currentPlayerPos = player.getPosition();
