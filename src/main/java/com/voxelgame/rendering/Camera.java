@@ -54,6 +54,15 @@ public class Camera {
         this.aspectRatio = (float) width / height;
         updateProjection();
     }
+
+    /** [OPT] Pull the far plane in to just past the fog so depth precision and
+     *  the shadow frustum tighten; the skybox sits on the far plane but far
+     *  still exceeds fogEnd, so the horizon stays seamless. */
+    public void setFar(float far) {
+        if (far <= near + 1.0f || java.lang.Math.abs(this.far - far) < 0.01f) return;
+        this.far = far;
+        updateProjection();
+    }
     
     public void setFov(float fov) {
         this.fov = fov;

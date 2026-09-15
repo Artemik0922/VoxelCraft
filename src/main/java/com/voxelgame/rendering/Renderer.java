@@ -19,7 +19,13 @@ import static org.lwjgl.opengl.GL13.*;
  *   2. transparent geometry (water/glass/leaves), back-to-front, depth write off
  */
 public class Renderer {
-    private static final float CULL_DISTANCE = 144.0f;
+    /** Chunks beyond the fog are invisible, so Game drives this from fogEnd
+     *  (renderDistance * 16) plus a one-chunk safety margin. */
+    private float cullDistance = 144.0f;
+
+    /** The shadow pass keeps a larger radius so fogged hills still cast
+     *  shadows onto the terrain near the player. */
+    private static final float SHADOW_CULL_DISTANCE = 144.0f;
 
     private final Map<Long, RenderChunk> renderChunks = new HashMap<>();
     private final TextureAtlas textureAtlas;
@@ -54,6 +60,11 @@ public class Renderer {
         textureAtlas = new TextureAtlas(resourcePackName);
     }
 
+    /** [OPT] Fade-out distance for chunk/entity culling, set from fogEnd. */
+    public void setCullDistance(float blocks) {
+        cullDistance = blocks;
+    }
+
     /** Draw spinning mini-blocks for loose item entities. */
     public void renderItemEntities(World world, Shader shader, Camera camera,
                                     com.voxelgame.rendering.TextureAtlas atlas,
@@ -80,7 +91,7 @@ public class Renderer {
 
         float camX = camera.getPosition().x;
         float camZ = camera.getPosition().z;
-        float cullSq = CULL_DISTANCE * CULL_DISTANCE;
+        float cullSq = cullDistance * cullDistance;
 
         // Batch every visible item cube into one mesh (one draw call instead
         // of one per entity). Baking the true per-face atlas layer also fixes
@@ -537,7 +548,7 @@ public class Renderer {
                 if (c == null || !isChunkVisible(c)) continue;
                 float ddx = c.getWorldX() + 8 - camX;
                 float ddz = c.getWorldZ() + 8 - camZ;
-                if (ddx * ddx + ddz * ddz >= CULL_DISTANCE * CULL_DISTANCE) continue;
+                if (ddx * ddx + ddz * ddz >= cullDistance * cullDistance) continue;
                 visibleChunks.add(rc);
             }
         }
@@ -686,7 +697,7 @@ public class Renderer {
         int bottomLayer = textureAtlas.getSlotByName("sliding_door_bottom");
         float camX = camera.getPosition().x;
         float camZ = camera.getPosition().z;
-        float cullSq = CULL_DISTANCE * CULL_DISTANCE;
+        float cullSq = cullDistance * cullDistance;
 
         for (SlidingDoor d : doors) {
             float dcx = d.x + 0.5f - camX;
@@ -789,7 +800,7 @@ public class Renderer {
 
             float dx = chunk.getWorldX() + 8 - camera.getPosition().x;
             float dz = chunk.getWorldZ() + 8 - camera.getPosition().z;
-            if (dx * dx + dz * dz >= CULL_DISTANCE * CULL_DISTANCE) continue;
+            if (dx * dx + dz * dz >= SHADOW_CULL_DISTANCE * SHADOW_CULL_DISTANCE) continue;
 
             // Shadow frustum culling: skip chunks outside the light's view
             if (!shadowMap.isAABBInShadowFrustum(

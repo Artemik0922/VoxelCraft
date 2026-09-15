@@ -3377,7 +3377,12 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         
         // Fog hugs the render distance edge instead of fading nearby terrain
         float renderDistBlocks = renderDistance * 16.0f;
-        
+
+        // [OPT] The fog fully obscures everything past renderDistBlocks, so the
+        // renderer can cull chunks and pull the far plane in just past that.
+        renderer.setCullDistance(renderDistBlocks + 16.0f);
+        camera.setFar(renderDistBlocks + 32.0f);
+
         // Render world
         shader.bind();
         shader.setUniformMat4("projection", camera.getProjectionMatrix());

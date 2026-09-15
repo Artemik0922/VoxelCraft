@@ -102,6 +102,17 @@ void main() {
     float alphaCutoff = 0.5 * max(1.0 - 0.22 * mip, 0.30);
     if (Layer != glassLayer && texColor.a < alphaCutoff) discard;
 
+    // [OPT] Distance fog doubles as a culling optimisation: fragments fully
+    // swallowed by the fog are invisible, so bail out to the sky colour now
+    // and skip the PCF shadow, specular, fresnel and water/lava work entirely.
+    // The mix() below still needs the factor for partially-fogged fragments.
+    float dist = length(cameraPos - FragPos);
+    float fogFactor = clamp((dist - fogStart) / max(fogEnd - fogStart, 1.0), 0.0, 1.0);
+    if (fogFactor >= 1.0) {
+        FragColor = vec4(skyColor, texColor.a * fadeAlpha);
+        return;
+    }
+
     vec3 normal = normalize(Normal);
 
     // Faces pointing away from the sun are self-shadowed anyway; skip the
@@ -205,8 +216,6 @@ void main() {
     }
 
     // Fade distant geometry into the skybox horizon
-    float dist = length(cameraPos - FragPos);
-    float fogFactor = clamp((dist - fogStart) / max(fogEnd - fogStart, 1.0), 0.0, 1.0);
     result = mix(result, skyColor, fogFactor);
 
     FragColor = vec4(result, texColor.a * fadeAlpha);
