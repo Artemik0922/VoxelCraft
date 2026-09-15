@@ -2629,11 +2629,17 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             horizontalSpeed = 0;
         }
         
-        float amount = java.lang.Math.min(horizontalSpeed / 5.0f, 1.0f) * 0.07f;
+        // Minecraft-style travel scale: the full wobble plays at walking
+        // speed (~4.3 blocks/s) and dims below it
+        float travel = java.lang.Math.min(horizontalSpeed / 4.32f, 1.0f);
         
-        // Vertical moves at twice the rate: one dip per footfall
-        float targetY = (float) -java.lang.Math.abs(java.lang.Math.sin(bobPhase)) * amount;
-        float targetX = (float) java.lang.Math.sin(bobPhase * 0.5) * amount * 0.6f;
+        // Stride cycle. The eye dips towards the ground on each footfall and
+        // sways side to side at half the cadence — the classic walk wobble.
+        float stride = (float) java.lang.Math.sin(bobPhase);
+        float sway = (float) java.lang.Math.sin(bobPhase * 0.5f);
+        
+        float targetY = (float) -java.lang.Math.abs(stride) * 0.10f * travel;
+        float targetX = sway * 0.115f * travel;
         
         // Smooth so the camera never snaps when movement starts or stops
         bobOffsetY += (targetY - bobOffsetY) * java.lang.Math.min(1.0f, (float) deltaTime * 12.0f);
