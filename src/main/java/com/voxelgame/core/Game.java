@@ -30,6 +30,7 @@ import com.voxelgame.chat.commands.WeatherCommand;
 import com.voxelgame.chat.commands.ConnectCommand;
 import com.voxelgame.chat.commands.VillageCommand;
 import com.voxelgame.chat.commands.AsteroidCommand;
+import com.voxelgame.chat.commands.TradeCommand;
 import com.voxelgame.net.*;
 import com.voxelgame.world.biome.BiomeDiscovery;
 import com.voxelgame.world.biome.BiomeDistributionTest;
@@ -52,6 +53,10 @@ import com.voxelgame.world.block.DoorBlock;
 import com.voxelgame.debug.DebugCommandHandler;
 import com.voxelgame.audio.AudioManager;
 import com.voxelgame.achievement.AchievementRegistry;
+import com.voxelgame.economy.Reputation;
+import com.voxelgame.economy.TradeManager;
+import com.voxelgame.economy.TradeOffer;
+import com.voxelgame.economy.TradeRegistry;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
 import org.lwjgl.system.MemoryUtil;
@@ -179,6 +184,10 @@ public class Game {
     private boolean firstMouse = true;
     private double lastSpacePress = -1.0;
     private ItemStack mouseItem = new ItemStack(BlockType.AIR, 0);
+
+    // === [ECO] Emerald vault / wandering-trader virtual stock ===
+    private int[] vaultStock;
+    private float vaultRestockTimer = 0;
 
     // Keyboard modifiers tracked globally so inventory screens can offer
     // shift-click quick move and Ctrl+Q whole-stack drops
@@ -431,6 +440,7 @@ public class Game {
         CommandRegistry.register(new ConnectCommand());
         CommandRegistry.register(new VillageCommand());
         CommandRegistry.register(new AsteroidCommand());
+        CommandRegistry.register(new TradeCommand());
         ConnectCommand.game = this;
 
         // Initialize achievement system
@@ -701,6 +711,75 @@ public class Game {
             closeScreens();
         });
         screens.open(screen);
+    }
+
+    /** [ECO] Open the trading screen: a villager's wares, or the emerald
+     *  vault / wandering-trader catalogue when {@code villager} is null. */
+    private void openTrading(Villager villager) {
+        if (currentSave == null || player == null || renderer == null) return;
+        TradeOffer[] offers = villager != null
+            ? villager.getOffers() : TradeRegistry.wanderingOffers();
+
+        TradingScreen screen = new TradingScreen(renderer.getTextureAtlas(),
+            villager != null
+                ? "trade.profession." + villager.getProfession().name().toLowerCase(java.util.Locale.ROOT)
+                : "trade.vault.title",
+            new TradingScreen.Callbacks() {
+                @Override public Inventory inventory() { return player.getInventory(); }
+                @Override public int reputation() { return currentSave.getMeta().reputation; }
+                @Override public int stockOf(int idx) {
+                    if (villager != null) return villager.stockOf(idx);
+                    ensureVaultStock();
+                    if (vaultStock == null || idx < 0 || idx >= vaultStock.length) return 0;
+                    return vaultStock[idx];
+                }
+                @Override public TradeManager.Result trade(int idx) {
+                    if (idx < 0 || idx >= offers.length) return TradeManager.Result.CANNOT_PAY;
+                    TradeOffer offer = offers[idx];
+                    ensureVaultStock();
+                    int stock = villager != null ? villager.stockOf(idx)
+                        : (vaultStock == null || idx >= vaultStock.length) ? 0 : vaultStock[idx];
+                    TradeManager.Result result = TradeManager.execute(
+                        player.getInventory(), offer, currentSave.getMeta().reputation, stock);
+                    if (result == TradeManager.Result.SUCCESS) {
+                        if (villager != null) villager.useOffer(idx);
+                        else if (vaultStock != null && idx < vaultStock.length) vaultStock[idx]--;
+                        onTradeComplete(offer);
+                    }
+                    return result;
+                }
+                @Override public void onClose() { closeScreens(); }
+            });
+        screen.setOffers(offers);
+        screens.open(screen);
+    }
+
+    /** [ECO] Lazily build the vault's stock counters. */
+    private void ensureVaultStock() {
+        TradeOffer[] offers = TradeRegistry.wanderingOffers();
+        if (vaultStock == null || vaultStock.length != offers.length) {
+            vaultStock = new int[offers.length];
+            for (int i = 0; i < offers.length; i++) vaultStock[i] = offers[i].maxUses;
+        }
+    }
+
+    /** [ECO] A deal went through: grow reputation, fire achievements, cash sound. */
+    private void onTradeComplete(TradeOffer offer) {
+        WorldMeta meta = currentSave.getMeta();
+        meta.reputation++;
+        AchievementRegistry.trigger("first_trade");
+        if (meta.reputation >= Reputation.HERO_TIER) {
+            AchievementRegistry.trigger("village_hero");
+        }
+        String given = Inventory.canonicalName(offer.give);
+        if (given.startsWith("meteorite")) {
+            AchievementRegistry.trigger("meteorite");
+        }
+        if (meta.reputation % 5 == 0) {
+            chat.addMessage(Language.tr("trade.repUp")
+                + " " + Language.tr(Reputation.tierKey(meta.reputation)), 0xFFAAFFAA);
+        }
+        AudioManager.play("sounds/steps/wood", 1.0f, 0.35f);
     }
 
     private void openChest(int x, int y, int z) {
@@ -2142,6 +2221,19 @@ if (!paused) {
 
         // Update chat message ages + command context
         chat.update((float) deltaTime);
+
+        // [ECO] The vault / wandering trader restocks its rarest wares
+        // after ~a minute of playing so the shop never runs dry for long
+        if (currentSave != null) {
+            vaultRestockTimer -= (float) deltaTime;
+            if (vaultRestockTimer <= 0) {
+                vaultRestockTimer = 60.0f;
+                TradeOffer[] wo = TradeRegistry.wanderingOffers();
+                ensureVaultStock();
+                for (int i = 0; i < vaultStock.length; i++) vaultStock[i] = wo[i].maxUses;
+            }
+        }
+
         SpawnCommand.currentWorld = world;
         SpawnCommand.currentPlayerPos = player.getPosition();
         SpawnCommand.currentPlayerFront = camera.getFront();
@@ -2156,6 +2248,12 @@ if (!paused) {
             camera.setPosition(new Vector3f(x, y + eyeHeight, z));
             player.setVerticalVelocity(0);
             player.setHorizontalVelocity(0, 0);
+        };
+        TradeCommand.opener = () -> {
+            Villager v = findTargetedVillager();
+            if (v != null && !v.isBaby()) openTrading(v);
+            else if (v == null) openTrading(null);
+            else chat.addMessage(Language.tr("trade.baby"), 0xFFAAAAFF);
         };
         GamemodeCommand.changer = new GamemodeCommand.GameModeChanger() {
             @Override public WorldMeta.GameMode currentMode() { return player.getGameMode(); }
@@ -3794,6 +3892,31 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         return best;
     }
     
+    /** [ECO] Nearest villager on the aim ray (right-click opens their stall). */
+    private Villager findTargetedVillager() {
+        if (player == null || world == null || camera == null) return null;
+        Vector3f eye = camera.getPosition();
+        Vector3f dir = camera.getFront();
+        Villager best = null;
+        float bestT = Float.MAX_VALUE;
+        for (Villager v : world.getVillagers()) {
+            Vector3f p = v.getPosition();
+            float mx = p.x, my = p.y + 0.9f, mz = p.z;
+            float dx = mx - eye.x, dy = my - eye.y, dz = mz - eye.z;
+            float t = dx * dir.x + dy * dir.y + dz * dir.z;
+            if (t < 0 || t > ATTACK_REACH) continue;
+            float cx = eye.x + dir.x * t - mx;
+            float cy = eye.y + dir.y * t - my;
+            float cz = eye.z + dir.z * t - mz;
+            float perpSq = cx * cx + cy * cy + cz * cz;
+            if (perpSq < 0.75f * 0.75f && t < bestT) {
+                bestT = t;
+                best = v;
+            }
+        }
+        return best;
+    }
+    
     private void mouseButtonCallback(long win, int button, int action, int mods) {
         // Screens get first refusal on the mouse
         if (screens.isOpen()) {
@@ -3815,6 +3938,16 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
                 // [GP-026] Left click is an attack first, mining second
                 attackMobs();
             } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+                // [ECO] Right-click a villager to trade with them
+                Villager traded = findTargetedVillager();
+                if (traded != null) {
+                    if (traded.isBaby()) {
+                        chat.addMessage(Language.tr("trade.baby"), 0xFFAAAAFF);
+                    } else {
+                        openTrading(traded);
+                    }
+                    return;
+                }
                 // Check if targeting a container block or TNT
                 if (targetedBlock != null) {
                     BlockType targeted = BlockType.fromId(
@@ -3867,6 +4000,12 @@ if (targeted == BlockType.CHEST) {
                     } else if (targeted == BlockType.ROCKET_LAUNCH_PAD) {
                         // [SPACE] Launch the rocket built above, or return home
                         handleLaunchPad(targetedBlock.x, targetedBlock.y, targetedBlock.z);
+                        return;
+                    } else if (targeted == BlockType.EMERALD_VAULT) {
+                        // [ECO] The vault doubles as a trading post for the
+                        // wandering trader's catalogue
+                        AudioManager.play("sounds/steps/stone", 1.0f, 0.4f);
+                        openTrading(null);
                         return;
                     }
                 }

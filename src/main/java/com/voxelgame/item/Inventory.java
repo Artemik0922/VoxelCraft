@@ -304,4 +304,41 @@ public class Inventory {
         for (ItemStack s : mainInventory) if (s.isItem() && s.getItem() == item) count += s.getCount();
         return count;
     }
+
+    // --- [ECO] Canonical-name matching for trades ---
+    /** Canonical name of an ItemStack: the item name (for registry items) or
+     *  the block name (for BlockType stacks like ITEM_EMERALD). */
+    public static String canonicalName(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return "";
+        if (stack.isItem() && stack.getItem() != null) return stack.getItem().name;
+        if (stack.isBlock() && stack.getBlockType() != null) return stack.getBlockType().name;
+        return "";
+    }
+
+    /** Total count of a stack identified by its canonical name. */
+    public int countByName(String name) {
+        if (name == null || name.isEmpty()) return 0;
+        int count = 0;
+        for (ItemStack s : hotbar) {
+            if (canonicalName(s).equals(name)) count += s.getCount();
+        }
+        for (ItemStack s : mainInventory) {
+            if (canonicalName(s).equals(name)) count += s.getCount();
+        }
+        return count;
+    }
+
+    /** Remove up to {@code count} of a stack identified by its canonical name.
+     *  Returns true when the full amount was removed. */
+    public boolean removeByName(String name, int count) {
+        if (name == null || name.isEmpty()) return false;
+        int remaining = count;
+        for (int i = 0; i < HOTBAR_SIZE && remaining > 0; i++) {
+            if (canonicalName(hotbar[i]).equals(name)) remaining = hotbar[i].remove(remaining);
+        }
+        for (int i = 0; i < MAIN_INVENTORY_SIZE && remaining > 0; i++) {
+            if (canonicalName(mainInventory[i]).equals(name)) remaining = mainInventory[i].remove(remaining);
+        }
+        return remaining <= 0;
+    }
 }

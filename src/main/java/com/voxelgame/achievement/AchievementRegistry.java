@@ -41,6 +41,11 @@ public class AchievementRegistry {
 
         // Building
         register(new Achievement("place_block", "achievement.place_block", "achievement.place_block.desc", BlockType.OAK_PLANKS.id));
+
+        // [ECO] Trading
+        register(new Achievement("first_trade", "achievement.first_trade", "achievement.first_trade.desc", BlockType.EMERALD_BLOCK.id));
+        register(new Achievement("village_hero", "achievement.village_hero", "achievement.village_hero.desc", BlockType.EMERALD_BLOCK.id, 0xFFAAFFAA));
+        register(new Achievement("meteorite", "achievement.meteorite", "achievement.meteorite.desc", BlockType.METEORITE_ORE.id));
     }
 
     public static void register(Achievement ach) {

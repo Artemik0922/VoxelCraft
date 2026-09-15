@@ -67,6 +67,9 @@ public class WorldMeta {
     /** Time of day, so a world resumes at the hour it was left. */
     public double dayTime = 0.25;
 
+    /** [ECO] Reputation with the village; grows +1 per trade. */
+    public int reputation = 0;
+
     public WorldMeta() {}
 
     public WorldMeta(String displayName, long seed, GameMode mode, boolean structures) {
@@ -105,6 +108,7 @@ public class WorldMeta {
         m.put("playerHunger", Integer.toString(playerHunger));
         m.put("selectedSlot", Integer.toString(selectedSlot));
         m.put("dayTime", Double.toString(dayTime));
+        m.put("reputation", Integer.toString(reputation));
         m.put("hasSpawn", Boolean.toString(hasSpawn));
         m.put("spawnX", Float.toString(spawnX));
         m.put("spawnY", Float.toString(spawnY));
@@ -154,6 +158,7 @@ public class WorldMeta {
             w.playerHunger = (int) parseFloat(m.get("playerHunger"), 20);
             w.selectedSlot = (int) parseFloat(m.get("selectedSlot"), 0);
             w.dayTime = parseFloat(m.get("dayTime"), 0.25f);
+            w.reputation = (int) parseFloat(m.get("reputation"), 0);
             w.hasSpawn = "true".equals(m.get("hasSpawn"));
             w.spawnX = parseFloat(m.get("spawnX"), 0);
             w.spawnY = parseFloat(m.get("spawnY"), 70);

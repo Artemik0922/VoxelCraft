@@ -1,6 +1,8 @@
 package com.voxelgame.world.entity;
 
 import com.voxelgame.audio.AudioManager;
+import com.voxelgame.economy.TradeOffer;
+import com.voxelgame.economy.TradeRegistry;
 import com.voxelgame.item.ItemStack;
 import com.voxelgame.player.Player;
 import com.voxelgame.world.BlockType;
@@ -184,6 +186,12 @@ public class Villager {
     /** Р’Р°СЂРёР°РЅС‚ СЃРєРёРЅР° (0 РёР»Рё 1) вЂ” РЅРѕРјРµСЂ СЃС‚СЂРѕРєРё РІ HD-Р°С‚Р»Р°СЃРµ 16384x2048. */
     private final int variant;
 
+    // === [ECO] РўРѕСЂРіРѕРІР»СЏ ===
+    /** РћСЃС‚Р°РІС€РёРµСЃСЏ РїРѕСЃС‚Р°РІРєРё РїРѕ РёРЅРґРµРєСЃР°Рј РїСЂРµРґР»РѕР¶РµРЅРёР№ РїСЂРѕС„РµСЃСЃРёРё (0 = РїРѕРІР°СЂ СЂР°СЃРїСЂРѕРґР°РЅ). */
+    private int[] tradeStock;
+    /** РўР°Р№РјРµСЂ РїРѕРїРѕР»РЅРµРЅРёСЏ Р°СЃСЃРѕСЂС‚РёРјРµРЅС‚Р° (~1 РёРіСЂРѕРІР°СЏ РјРёРЅСѓС‚Р°). */
+    private float restockCooldown = 0;
+
     public Villager(World world, float x, float y, float z, Profession profession) {
         this(world, x, y, z, profession, false);
     }
@@ -205,6 +213,8 @@ public class Villager {
             this.hp = 45.0f;
         }
         this.stateTimer = 2.0f + (float) Math.random() * 3.0f;
+        initTradeStock();
+        this.restockCooldown = 60.0f;
     }
 
     /**
@@ -231,6 +241,15 @@ public class Villager {
             if (talkTimer <= 0) isTalking = false;
         }
         if (fleeTimer > 0) fleeTimer -= dt;
+
+        // === [ECO] РџРѕРїРѕР»РЅРµРЅРёРµ Р°СЃСЃРѕСЂС‚РёРјРµРЅС‚Р° Р¶РёС‚РµР»СЏ ===
+        if (restockCooldown > 0) {
+            restockCooldown -= dt;
+            if (restockCooldown <= 0) {
+                restock();
+                restockCooldown = 60.0f;
+            }
+        }
 
         // === РЈРіСЂРѕР·Р°: РјРѕРЅСЃС‚СЂС‹ СЂСЏРґРѕРј ===
         Zoloy threat = findNearestMob(MOB_FLEE_RANGE);
@@ -1423,6 +1442,40 @@ public class Villager {
     public boolean isDead() { return dead; }
     public Profession getProfession() { return profession; }
     public boolean isBaby() { return isBaby; }
+
+    // === [ECO] РўРѕСЂРіРѕРІР»СЏ ===
+
+    /** РўРѕРІР°СЂС‹ РїСЂРѕС„РµСЃСЃРёРё (РїСѓСЃС‚Рѕ Сѓ NITWIT). */
+    public TradeOffer[] getOffers() {
+        return TradeRegistry.offersFor(profession);
+    }
+
+    /** РЎРєРѕР»СЊРєРѕ СЂР°Р· РµС‰С‘ РІ РЅР°Р»РёС‡РёРё РїСЂРµРґР»РѕР¶РµРЅРёРµ {@code idx} (0 = СЂР°СЃРїСЂРѕРґР°РЅРѕ). */
+    public int stockOf(int idx) {
+        if (tradeStock == null || idx < 0 || idx >= tradeStock.length) return 0;
+        return tradeStock[idx];
+    }
+
+    /** РЎРїРёСЃР°С‚СЊ РѕРґРЅСѓ РїРѕСЃС‚Р°РІРєСѓ; false вЂ” С‚РѕРІР°СЂ СѓР¶Рµ СЂР°СЃРїСЂРѕРґР°РЅ. */
+    public boolean useOffer(int idx) {
+        if (tradeStock == null || idx < 0 || idx >= tradeStock.length) return false;
+        if (tradeStock[idx] <= 0) return false;
+        tradeStock[idx]--;
+        return true;
+    }
+
+    /** РџРѕР»РЅРѕРµ РїРѕРїРѕР»РЅРµРЅРёРµ РІСЃРµРіРѕ Р°СЃСЃРѕСЂС‚РёРјРµРЅС‚Р° (РїРѕСЃР»Рµ СЃРЅР°/С‚Р°Р№РјРµСЂСѓ). */
+    public void restock() {
+        TradeOffer[] offers = getOffers();
+        if (tradeStock == null || tradeStock.length != offers.length) initTradeStock();
+        for (int i = 0; i < offers.length; i++) tradeStock[i] = offers[i].maxUses;
+    }
+
+    private void initTradeStock() {
+        TradeOffer[] offers = getOffers();
+        tradeStock = new int[offers.length];
+        for (int i = 0; i < offers.length; i++) tradeStock[i] = offers[i].maxUses;
+    }
     public State getState() { return state; }
     public boolean isTalking() { return isTalking; }
     public float getTalkTimer() { return talkTimer; }
