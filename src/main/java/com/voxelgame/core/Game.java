@@ -1161,7 +1161,10 @@ public class Game {
         if (world != null) {
             world.cleanup();
         }
-        
+
+        // Clear any queued asteroid shake / notices from the previous session
+        AsteroidEntity.resetStatics();
+
         currentSave = new WorldSave(meta);
         currentSave.saveMeta();
 
@@ -2220,8 +2223,25 @@ if (!paused) {
         world.updateAsteroids((float) deltaTime, player);
         updateAsteroidEvents();
 
-        // Earthquake: asteroid impacts kick the camera, decaying over time
-        shakeTrauma = java.lang.Math.min(1.0f, shakeTrauma + AsteroidEntity.consumeShakeImpulse());
+        // [ECO] Hero perk: the village veteran reads the sky, stands steady
+        // when a comet lands near them and warns about falling debris.
+        boolean hero = currentSave != null
+            && Reputation.isHero(currentSave.getMeta().reputation);
+        for (var n : AsteroidEntity.consumeImpactNotices()) {
+            if (!hero) continue;
+            Vector3f pp = player.getPosition();
+            float ddx = pp.x - n.x;
+            float ddz = pp.z - n.z;
+            if (ddx * ddx + ddz * ddz <= 100.0f * 100.0f) {
+                chat.addMessage(Language.tr("trade.meteorNear"), 0xFFFFAA66);
+            }
+        }
+
+        // Earthquake: asteroid impacts kick the camera, decaying over time.
+        // A Hero braces and the tremor feels weaker.
+        float impulse = AsteroidEntity.consumeShakeImpulse();
+        if (hero) impulse *= 0.45f;
+        shakeTrauma = java.lang.Math.min(1.0f, shakeTrauma + impulse);
 
         // [GP-073/GP-074] Fire burns, spreads and goes out
         world.updateFire((float) deltaTime, currentWeather);

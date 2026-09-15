@@ -52,6 +52,20 @@ public class AsteroidEntity {
     /** Camera shake strength queued by the most recent impact, consumed by Game. */
     private static float shakeImpulse = 0f;
 
+    /** [ECO] Impacts queued this tick so Game can warn Hero players. */
+    private static final List<ImpactNotice> pendingNotices = new ArrayList<>();
+
+    /** [ECO] An impact notice: where the asteroid landed and how big it was. */
+    public static class ImpactNotice {
+        public final float x, z;
+        public final int size;
+        ImpactNotice(float x, float z, int size) {
+            this.x = x;
+            this.z = z;
+            this.size = size;
+        }
+    }
+
     private static final float GRAVITY = 40.0f;          // blocks/s^2
     private static final float MAX_FALL_SPEED = 60.0f;   // blocks/s
     private static final float TRAIL_INTERVAL = 0.05f;   // s between puffs
@@ -168,6 +182,8 @@ public class AsteroidEntity {
         AudioManager.play("sounds/explosion", 0.95f, 0.6f);
         // Earthquake: the impact shakes the camera
         shakeImpulse = Math.max(shakeImpulse, 0.5f + size * 0.12f);
+        // [ECO] Record the impact so Game can warn Hero players nearby
+        pendingNotices.add(new ImpactNotice(cx + 0.5f, cz + 0.5f, size));
     }
 
     /** Queue a camera shake for Game to consume this frame. */
@@ -175,6 +191,19 @@ public class AsteroidEntity {
         float s = shakeImpulse;
         shakeImpulse = 0f;
         return s;
+    }
+
+    /** [ECO] Drain the impacts that landed this tick, for Game to act on. */
+    public static List<ImpactNotice> consumeImpactNotices() {
+        List<ImpactNotice> out = new ArrayList<>(pendingNotices);
+        pendingNotices.clear();
+        return out;
+    }
+
+    /** [ECO] Reset static queues between separate Game sessions (tests, save/load). */
+    public static void resetStatics() {
+        shakeImpulse = 0f;
+        pendingNotices.clear();
     }
 
     public Vector3f getPosition() { return position; }
