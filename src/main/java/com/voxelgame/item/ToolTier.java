@@ -8,7 +8,10 @@ public enum ToolTier {
     STONE(2, 131, 4.0f, 5.0f, 5),
     IRON(3, 250, 6.0f, 6.0f, 14),
     DIAMOND(4, 1561, 8.0f, 7.0f, 10),
-    GOLD(0, 32, 12.0f, 4.0f, 22);
+    GOLD(0, 32, 12.0f, 4.0f, 22),
+    /** Space metal forged into tools: diamond's harvest level, but tougher,
+     *  faster and sharper than anything on the base world. */
+    METEORITE(4, 2400, 9.0f, 8.0f, 15);
 
     /** Harvest level: 0=wood, 1=stone, 2=iron, 3=diamond */
     public final int harvestLevel;

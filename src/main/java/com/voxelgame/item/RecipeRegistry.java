@@ -348,6 +348,60 @@ public final class RecipeRegistry {
             item(ItemRegistry.WATER_BOTTLE), item(ItemRegistry.IRON_INGOT)),
         Recipe.shapeless(new ItemStack(ItemRegistry.POTION_FIRE_RESISTANCE),
             item(ItemRegistry.WATER_BOTTLE), item(ItemRegistry.RESIN)),
+
+        // --- [ECO] Emerald block: 9 emeralds both ways ---
+        Recipe.shaped(new ItemStack(BlockType.EMERALD_BLOCK, 1),
+            item(ItemRegistry.EMERALD), item(ItemRegistry.EMERALD), item(ItemRegistry.EMERALD),
+            item(ItemRegistry.EMERALD), item(ItemRegistry.EMERALD), item(ItemRegistry.EMERALD),
+            item(ItemRegistry.EMERALD), item(ItemRegistry.EMERALD), item(ItemRegistry.EMERALD)),
+        Recipe.shapeless(new ItemStack(ItemRegistry.EMERALD, 9),
+            new ItemStack(BlockType.EMERALD_BLOCK, 1)),
+
+        // --- [ECO] Meteorite tools ---
+        Recipe.shaped(new ItemStack(ItemRegistry.METEORITE_PICKAXE),
+            item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT),
+            null, item(ItemRegistry.STICK), null,
+            null, item(ItemRegistry.STICK), null),
+        Recipe.shaped(new ItemStack(ItemRegistry.METEORITE_AXE),
+            item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT), null,
+            item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.STICK), null,
+            null, item(ItemRegistry.STICK), null),
+        Recipe.shaped(new ItemStack(ItemRegistry.METEORITE_SHOVEL),
+            null, item(ItemRegistry.METEORITE_INGOT), null,
+            null, item(ItemRegistry.STICK), null,
+            null, item(ItemRegistry.STICK), null),
+        Recipe.shaped(new ItemStack(ItemRegistry.METEORITE_SWORD),
+            null, item(ItemRegistry.METEORITE_INGOT), null,
+            null, item(ItemRegistry.METEORITE_INGOT), null,
+            null, item(ItemRegistry.STICK), null),
+        Recipe.shaped(new ItemStack(ItemRegistry.METEORITE_HOE),
+            item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT), null,
+            null, item(ItemRegistry.STICK), null,
+            null, item(ItemRegistry.STICK), null),
+
+        // --- [ECO] Meteorite armour ---
+        Recipe.shaped(new ItemStack(ItemRegistry.METEORITE_HELMET),
+            item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT),
+            item(ItemRegistry.METEORITE_INGOT), null, item(ItemRegistry.METEORITE_INGOT),
+            null, null, null),
+        Recipe.shaped(new ItemStack(ItemRegistry.METEORITE_CHESTPLATE),
+            item(ItemRegistry.METEORITE_INGOT), null, item(ItemRegistry.METEORITE_INGOT),
+            item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT),
+            item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT)),
+        Recipe.shaped(new ItemStack(ItemRegistry.METEORITE_LEGGINGS),
+            item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT), item(ItemRegistry.METEORITE_INGOT),
+            item(ItemRegistry.METEORITE_INGOT), null, item(ItemRegistry.METEORITE_INGOT),
+            item(ItemRegistry.METEORITE_INGOT), null, item(ItemRegistry.METEORITE_INGOT)),
+        Recipe.shaped(new ItemStack(ItemRegistry.METEORITE_BOOTS),
+            null, null, null,
+            item(ItemRegistry.METEORITE_INGOT), null, item(ItemRegistry.METEORITE_INGOT),
+            item(ItemRegistry.METEORITE_INGOT), null, item(ItemRegistry.METEORITE_INGOT)),
+
+        // --- [ECO] Emerald vault: a permanent trading post ---
+        Recipe.shaped(new ItemStack(BlockType.EMERALD_VAULT, 1),
+            item(ItemRegistry.EMERALD), block(BlockType.GOLD_BLOCK), item(ItemRegistry.EMERALD),
+            block(BlockType.OBSIDIAN), item(ItemRegistry.EMERALD), block(BlockType.OBSIDIAN),
+            block(BlockType.OBSIDIAN), block(BlockType.OBSIDIAN), block(BlockType.OBSIDIAN)),
         });
 
     private static Recipe[] concat(Recipe[] a, Recipe[] b) {
@@ -388,6 +442,8 @@ public final class RecipeRegistry {
         new SmeltingRecipe(BlockType.SPRUCE_RAW_PLANKS.id, BlockType.SPRUCE_DRIED_PLANKS.id, 1),
         new SmeltingRecipe(BlockType.BIRCH_RAW_PLANKS.id, BlockType.BIRCH_DRIED_PLANKS.id, 1),
         new SmeltingRecipe(BlockType.JUNGLE_RAW_PLANKS.id, BlockType.JUNGLE_DRIED_PLANKS.id, 1),
+        // [ECO] Meteorite ore blasts down into ingots in the furnace
+        new SmeltingRecipe(BlockType.METEORITE_ORE.id, ItemRegistry.METEORITE_INGOT.id, 1),
     };
 
     /** Get smelting result for an item. */

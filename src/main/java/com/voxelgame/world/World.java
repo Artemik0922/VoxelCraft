@@ -2019,6 +2019,23 @@ public class World {
             }
         }
 
+        // [ECO] The impact buries meteorite ore in the crater floor: the
+        // bigger the rock, the richer the deposit. The centre cell stays
+        // free for the fire below.
+        int oreCount = 1 + radius / 2;
+        int placed = 0;
+        for (int bx = cx - radius / 2; bx <= cx + radius / 2 && placed < oreCount; bx++) {
+            for (int bz = cz - radius / 2; bz <= cz + radius / 2 && placed < oreCount; bz++) {
+                if (bx == cx && bz == cz) continue;
+                int fy = cy;
+                while (fy > 0 && getBlock(bx, fy, bz) == BlockType.AIR.id) fy--;
+                if (getBlock(bx, fy, bz) == BlockType.AIR.id) continue;
+                if (java.lang.Math.random() > 0.5f) continue;
+                setBlock(bx, fy, bz, BlockType.METEORITE_ORE.id);
+                placed++;
+            }
+        }
+
         // Fire on the crater floor: the centre cell hangs over empty space,
         // so scan down to the first solid block and ignite just above it
         int fy = cy;

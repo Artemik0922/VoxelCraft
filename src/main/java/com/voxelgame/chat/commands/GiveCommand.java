@@ -62,6 +62,12 @@ public class GiveCommand implements Command {
             ItemRegistry.IRON_LEGGINGS, ItemRegistry.IRON_BOOTS,
             ItemRegistry.DIAMOND_HELMET, ItemRegistry.DIAMOND_CHESTPLATE,
             ItemRegistry.DIAMOND_LEGGINGS, ItemRegistry.DIAMOND_BOOTS,
+            ItemRegistry.EMERALD, ItemRegistry.METEORITE_INGOT,
+            ItemRegistry.METEORITE_PICKAXE, ItemRegistry.METEORITE_AXE,
+            ItemRegistry.METEORITE_SHOVEL, ItemRegistry.METEORITE_SWORD,
+            ItemRegistry.METEORITE_HOE,
+            ItemRegistry.METEORITE_HELMET, ItemRegistry.METEORITE_CHESTPLATE,
+            ItemRegistry.METEORITE_LEGGINGS, ItemRegistry.METEORITE_BOOTS,
         }) {
             if (item != null) {
                 ITEM_NAMES.put(item.name.toLowerCase(), item);

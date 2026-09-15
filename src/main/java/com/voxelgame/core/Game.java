@@ -2965,6 +2965,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             // breaks but drops nothing, exactly like vanilla
             BlockHarvest.Requirement req = BlockHarvest.get(type);
             BlockType dropType = null;
+            Item itemDrop = null;
             int dropCount = 1;
             if (req == null) {
                 dropType = type;
@@ -2981,16 +2982,23 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
                     } else {
                         dropType = req.drop != null ? req.drop : type;
                         dropCount = player.fortuneCount(dropType);
+                        // [ECO] A registry-item drop (emerald, meteorite ingot)
+                        itemDrop = req.dropItem;
+                        if (itemDrop != null) dropType = null;
                     }
                 }
             }
 
-            if (dropType != null) {
+            if (dropType != null || itemDrop != null) {
                 Vector3f dropPos = new Vector3f(
                     breakingBlock.x + 0.5f,
                     breakingBlock.y + 0.5f,
                     breakingBlock.z + 0.5f);
-                dropItem(dropPos, new ItemStack(dropType, dropCount));
+                if (itemDrop != null) {
+                    dropItem(dropPos, new ItemStack(itemDrop, dropCount));
+                } else {
+                    dropItem(dropPos, new ItemStack(dropType, dropCount));
+                }
             }
 
             // [ENCH] Ores sparkle with experience

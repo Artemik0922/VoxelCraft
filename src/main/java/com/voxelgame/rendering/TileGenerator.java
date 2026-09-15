@@ -256,9 +256,12 @@ public final class TileGenerator {
             case "redstone_ore"  -> ore(0xE02020, 0xFF4040, variant);
             case "lapis_ore"     -> ore(0x3050E0, 0x5070FF, variant);
             case "copper_ore"    -> ore(0xB87333, 0xD89353, variant);
+            // [ECO] Meteorite ore: dark cobalt metal veined through pale stone
+            case "meteorite_ore" -> ore(0x5A5F8A, 0x8A90C0, variant);
 
             // Blocks
             case "emerald_block" -> metalBlock(0x30E050, 0x50FF70, 0x20A030);
+            case "emerald_vault" -> metalBlock(0x30E050, 0x58FF80, 0x1F8A30);
             case "white_wool"    -> noisy(new int[]{0xF0F0F0, 0xE8E8E8, 0xF8F8F8, 0xE0E0E0}, variant, 1);
             case "furnace"       -> noisy(new int[]{0x696969, 0x797979, 0x595959, 0x898989}, variant, 2);
             case "furnace_side"  -> noisy(new int[]{0x595959, 0x696969, 0x494949, 0x797979}, variant, 2);
@@ -312,6 +315,12 @@ public final class TileGenerator {
             case "golden_shovel" -> toolSprite(0xFFD4A820, 0xFFF0C840, 0xFFFCE060, 0xFF5A3A18, 0xFF7A5228, "shovel");
             case "golden_sword" -> toolSprite(0xFFD4A820, 0xFFF0C840, 0xFFFCE060, 0xFF5A3A18, 0xFF7A5228, "sword_generic");
             case "golden_hoe" -> toolSprite(0xFFD4A820, 0xFFF0C840, 0xFFFCE060, 0xFF5A3A18, 0xFF7A5228, "hoe");
+            // [ECO] Meteorite tools: forged cobalt, brighter than iron
+            case "meteorite_pickaxe" -> toolSprite(0xFF2A2E44, 0xFF5A5F8A, 0xFF8A90C0, 0xFF5A3A18, 0xFF7A5228, "pickaxe");
+            case "meteorite_axe" -> toolSprite(0xFF2A2E44, 0xFF5A5F8A, 0xFF8A90C0, 0xFF5A3A18, 0xFF7A5228, "axe");
+            case "meteorite_shovel" -> toolSprite(0xFF2A2E44, 0xFF5A5F8A, 0xFF8A90C0, 0xFF5A3A18, 0xFF7A5228, "shovel");
+            case "meteorite_sword" -> toolSprite(0xFF2A2E44, 0xFF5A5F8A, 0xFF8A90C0, 0xFF5A3A18, 0xFF7A5228, "sword_generic");
+            case "meteorite_hoe" -> toolSprite(0xFF2A2E44, 0xFF5A5F8A, 0xFF8A90C0, 0xFF5A3A18, 0xFF7A5228, "hoe");
 
             // --- Materials ---
             case "stick" -> stickSprite();
@@ -319,6 +328,9 @@ public final class TileGenerator {
             case "iron_ingot" -> ingotSprite(0xFF808088, 0xFFB0B0B8, 0xFFD8D8E0);
             case "gold_ingot" -> ingotSprite(0xFFD4A820, 0xFFF0C840, 0xFFFCE060);
             case "diamond" -> gemSprite(0xFF2AA8A0, 0xFF4CC8C0, 0xFF8EF0F8);
+            // [ECO] Emeralds and meteorite ingots
+            case "emerald" -> gemSprite(0xFF30E050, 0xFF50FF70, 0xFFA8FFC8);
+            case "meteorite_ingot" -> ingotSprite(0xFF3A3E5A, 0xFF5A5F8A, 0xFF8A90C0);
             case "leather" -> leatherSprite();
             case "string" -> stringSprite();
             case "feather" -> featherSprite();
@@ -369,6 +381,11 @@ public final class TileGenerator {
             case "diamond_chestplate" -> armorSprite(0xFF2AA8A0, 0xFF4CC8C0, 0xFF8EF0F8, "chestplate");
             case "diamond_leggings" -> armorSprite(0xFF2AA8A0, 0xFF4CC8C0, 0xFF8EF0F8, "leggings");
             case "diamond_boots" -> armorSprite(0xFF2AA8A0, 0xFF4CC8C0, 0xFF8EF0F8, "boots");
+            // [ECO] Meteorite armour
+            case "meteorite_helmet" -> armorSprite(0xFF2A2E44, 0xFF5A5F8A, 0xFF8A90C0, "helmet");
+            case "meteorite_chestplate" -> armorSprite(0xFF2A2E44, 0xFF5A5F8A, 0xFF8A90C0, "chestplate");
+            case "meteorite_leggings" -> armorSprite(0xFF2A2E44, 0xFF5A5F8A, 0xFF8A90C0, "leggings");
+            case "meteorite_boots" -> armorSprite(0xFF2A2E44, 0xFF5A5F8A, 0xFF8A90C0, "boots");
 
             // --- Food ---
             case "bread" -> breadSprite();

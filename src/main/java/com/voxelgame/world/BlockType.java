@@ -389,7 +389,35 @@ public enum BlockType {
     /** Porthole: window segment with a blue viewport. */
     ROCKET_WINDOW(270, "rocket_window", true, 0x2A3850),
     /** Cone: nose cap that tops off a rocket. */
-    ROCKET_CONE(271, "rocket_cone", true, 0xE04040);
+    ROCKET_CONE(271, "rocket_cone", true, 0xE04040),
+
+    // --- Economy & space metals [ECO] ---
+    /** Meteorite ore: rich cobalt-grey space metal found under asteroid
+     *  craters. Smelts into meteorite ingots, the material for the best
+     *  tools and armour in the game. */
+    METEORITE_ORE(272, "meteorite_ore", true, 0x5A5F8A),
+    /** Emerald vault: a glowing emerald-green market block. Right-click
+     *  opens the wandering trader's catalogue wherever you are. */
+    EMERALD_VAULT(273, "emerald_vault", true, 0x30E050),
+    /** Emerald: the universal currency used in villager trade. Drops from
+     *  emerald ore and is paid out for surplus goods. */
+    ITEM_EMERALD(274, "emerald", false, 0xFF30E050),
+    /** Meteorite ingot: smelted from meteorite ore; the base material for
+     *  the meteorite tool and armour set. */
+    ITEM_METEORITE(275, "meteorite_ingot", false, 0xFF5A5F8A),
+
+    // Meteorite tools
+    ITEM_METEORITE_PICKAXE(276, "meteorite_pickaxe", false, 0xFF5A5F8A),
+    ITEM_METEORITE_AXE(277, "meteorite_axe", false, 0xFF5A5F8A),
+    ITEM_METEORITE_SHOVEL(278, "meteorite_shovel", false, 0xFF5A5F8A),
+    ITEM_METEORITE_SWORD(279, "meteorite_sword", false, 0xFF5A5F8A),
+    ITEM_METEORITE_HOE(280, "meteorite_hoe", false, 0xFF5A5F8A),
+
+    // Meteorite armour
+    ITEM_METEORITE_HELMET(281, "meteorite_helmet", false, 0xFF5A5F8A),
+    ITEM_METEORITE_CHESTPLATE(282, "meteorite_chestplate", false, 0xFF5A5F8A),
+    ITEM_METEORITE_LEGGINGS(283, "meteorite_leggings", false, 0xFF5A5F8A),
+    ITEM_METEORITE_BOOTS(284, "meteorite_boots", false, 0xFF5A5F8A);
 
     public final int id;
     public final String name;
@@ -450,6 +478,8 @@ public enum BlockType {
         EMISSIVE[LANTERN.id] = true;
         EMISSIVE[ICE_LANTERN.id] = true;
         EMISSIVE[CAMPFIRE.id] = true;
+        // [ECO] The emerald vault glows like a market lantern
+        EMISSIVE[EMERALD_VAULT.id] = true;
     }
 
     /** O(1) flammability lookup for fire spread [GP-074]. */

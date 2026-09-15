@@ -296,6 +296,52 @@ public final class ItemRegistry {
     public static final Item SUGAR = Item.builder(211, "sugar")
             .displayName("Sugar").stackSize(64).sprite("sugar").build();
 
+    // --- [ECO] Economy & space metals ---
+    public static final Item EMERALD = Item.builder(212, "emerald")
+            .displayName("Emerald").sprite("emerald").build();
+    public static final Item METEORITE_INGOT = Item.builder(213, "meteorite_ingot")
+            .displayName("Meteorite Ingot").sprite("meteorite_ingot").build();
+
+    // Meteorite tools
+    public static final Item METEORITE_PICKAXE = Item.builder(214, "meteorite_pickaxe")
+            .displayName("Meteorite Pickaxe").stackSize(1)
+            .tier(ToolTier.METEORITE).toolType(ToolType.PICKAXE).attackSpeed(1.2f)
+            .sprite("meteorite_pickaxe").build();
+    public static final Item METEORITE_AXE = Item.builder(215, "meteorite_axe")
+            .displayName("Meteorite Axe").stackSize(1)
+            .tier(ToolTier.METEORITE).toolType(ToolType.AXE).attackSpeed(1.1f)
+            .sprite("meteorite_axe").build();
+    public static final Item METEORITE_SHOVEL = Item.builder(216, "meteorite_shovel")
+            .displayName("Meteorite Shovel").stackSize(1)
+            .tier(ToolTier.METEORITE).toolType(ToolType.SHOVEL).attackSpeed(1.0f)
+            .sprite("meteorite_shovel").build();
+    public static final Item METEORITE_SWORD = Item.builder(217, "meteorite_sword")
+            .displayName("Meteorite Sword").stackSize(1)
+            .tier(ToolTier.METEORITE).toolType(ToolType.SWORD).attackDamage(8).attackSpeed(1.6f)
+            .sprite("meteorite_sword").build();
+    public static final Item METEORITE_HOE = Item.builder(218, "meteorite_hoe")
+            .displayName("Meteorite Hoe").stackSize(1)
+            .tier(ToolTier.METEORITE).toolType(ToolType.HOE).attackSpeed(1.0f)
+            .sprite("meteorite_hoe").build();
+
+    // Meteorite armour
+    public static final Item METEORITE_HELMET = Item.builder(219, "meteorite_helmet")
+            .displayName("Meteorite Helmet").stackSize(1)
+            .armorSlot(ArmorSlot.HELMET).armorPoints(4)
+            .sprite("meteorite_helmet").build();
+    public static final Item METEORITE_CHESTPLATE = Item.builder(220, "meteorite_chestplate")
+            .displayName("Meteorite Chestplate").stackSize(1)
+            .armorSlot(ArmorSlot.CHESTPLATE).armorPoints(9)
+            .sprite("meteorite_chestplate").build();
+    public static final Item METEORITE_LEGGINGS = Item.builder(221, "meteorite_leggings")
+            .displayName("Meteorite Leggings").stackSize(1)
+            .armorSlot(ArmorSlot.LEGGINGS).armorPoints(7)
+            .sprite("meteorite_leggings").build();
+    public static final Item METEORITE_BOOTS = Item.builder(222, "meteorite_boots")
+            .displayName("Meteorite Boots").stackSize(1)
+            .armorSlot(ArmorSlot.BOOTS).armorPoints(4)
+            .sprite("meteorite_boots").build();
+
     /** All items indexed by ID for lookup. */
     private static final Item[] BY_ID = new Item[256];
     static {
@@ -318,7 +364,10 @@ public final class ItemRegistry {
             BOOK, LAPIS_LAZULI, ENCHANTING_TABLE_ITEM,
             SHEARS, BUCKET, MILK,
             SLIME_BALL, WATER_BOTTLE, POTION_HEALING, POTION_SPEED,
-            POTION_STRENGTH, POTION_FIRE_RESISTANCE, SUGAR
+            POTION_STRENGTH, POTION_FIRE_RESISTANCE, SUGAR,
+            EMERALD, METEORITE_INGOT,
+            METEORITE_PICKAXE, METEORITE_AXE, METEORITE_SHOVEL, METEORITE_SWORD, METEORITE_HOE,
+            METEORITE_HELMET, METEORITE_CHESTPLATE, METEORITE_LEGGINGS, METEORITE_BOOTS
         }) {
             if (item != null) {
                 BY_ID[item.id & 0xFF] = item;
