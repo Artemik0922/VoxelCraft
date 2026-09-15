@@ -12,6 +12,7 @@ import com.voxelgame.ui.GuiAssets;
 import com.voxelgame.ui.MenuTheme;
 import com.voxelgame.ui.StackIcons;
 import com.voxelgame.ui.UIRenderer;
+import com.voxelgame.ui.widget.Button;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -43,7 +44,7 @@ public class TradingScreen extends Screen {
 
     private static final int SLOT = GuiAssets.SLOT_SIZE;
     private static final int ROW_H = 44;
-    private static final int ROW_PAD = 10;
+    private static final int PANEL_PAD = 7;
     private static final int SCROLLBAR_W = 6;
 
     private final Callbacks callbacks;
@@ -57,6 +58,7 @@ public class TradingScreen extends Screen {
     private int visibleRows = 0;
     private int scrollRow = 0;
     private boolean draggingThumb = false;
+    private Button tradeButton;
 
     private int panelX, panelY, panelW, panelH;
     private int listX, listY, listW, listH;
@@ -87,21 +89,34 @@ public class TradingScreen extends Screen {
         panelW = 360;
         int headerH = 30;
         listH = visibleRows * ROW_H;
-        panelH = headerH + listH + 16 + 22 + 8;
+        panelH = headerH + listH + 16 + 20 + 8;
         panelX = (width - panelW) / 2;
         panelY = (height - panelH) / 2;
 
-        listX = panelX + ROW_PAD;
+        listX = panelX + PANEL_PAD;
         listY = panelY + headerH;
-        listW = panelW - ROW_PAD * 2 - SCROLLBAR_W - 4;
-        scrollbarX = panelX + panelW - ROW_PAD - SCROLLBAR_W;
+        listW = panelW - PANEL_PAD * 2 - SCROLLBAR_W - 4;
+        scrollbarX = panelX + panelW - PANEL_PAD - SCROLLBAR_W;
 
-        buttonH = 22;
+        // Inventory-style themed button at the bottom of the panel
+        buttonH = 20;
         buttonW = 120;
         buttonX = panelX + (panelW - buttonW) / 2;
-        buttonY = panelY + panelH - 10 - buttonH;
+        buttonY = panelY + panelH - 8 - buttonH;
+        if (offers != null && offers.length > 0) {
+            tradeButton = add(new Button(buttonX, buttonY, buttonW, buttonH,
+                tr("trade.make"), src -> doTrade(selected)));
+        }
 
         clampScroll();
+    }
+
+    @Override
+    public void update(double deltaTime) {
+        super.update(deltaTime);
+        if (tradeButton != null) {
+            tradeButton.enabled = canTradeNow();
+        }
     }
 
     private int maxScrollRow() {
@@ -127,12 +142,12 @@ public class TradingScreen extends Screen {
         MenuTheme.drawWorldOverlay(ui, width, height);
         ui.drawNineSlice(gui.glassPanel, panelX, panelY, panelW, panelH,
             GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
-        font.draw(ui, tr(titleKey), panelX + ROW_PAD, panelY + 7, 0xFFE8EEFF);
+        font.draw(ui, tr(titleKey), panelX + PANEL_PAD, panelY + 8, 0xFFE8EEFF);
         font.drawRight(ui, tr("trade.emeralds") + ": " + emeraldCount(),
-            panelX + panelW - ROW_PAD, panelY + 7, 0xFFE8B23A);
+            panelX + panelW - PANEL_PAD, panelY + 8, 0xFFE8B23A);
 
         if (offers == null || offers.length == 0) {
-            font.draw(ui, tr("trade.empty"), panelX + ROW_PAD, listY + 12, 0xFF8EA2C2);
+            font.draw(ui, tr("trade.empty"), panelX + PANEL_PAD, listY + 12, 0xFF8EA2C2);
             return;
         }
 
@@ -140,7 +155,7 @@ public class TradingScreen extends Screen {
         int discount = Reputation.discountPercent(rep);
         String sub = tr("trade.reputation") + ": " + tr(Reputation.tierKey(rep));
         if (discount > 0) sub += " · −" + discount + "%";
-        font.draw(ui, sub, panelX + ROW_PAD, panelY + 18, 0xFF8EA2C2);
+        font.draw(ui, sub, panelX + PANEL_PAD, panelY + 18, MenuTheme.TEXT_SECONDARY);
 
         for (int r = 0; r < visibleRows; r++) {
             int row = scrollRow + r;
@@ -162,7 +177,10 @@ public class TradingScreen extends Screen {
         if (lastResult != null && System.currentTimeMillis() > lastResultUntil) {
             lastResult = null;
         }
-        drawButton(ui, font, gui, mx, my);
+        if (lastResult != null) {
+            int color = lastResult == TradeManager.Result.SUCCESS ? 0xFF7AD07A : 0xFFD08950;
+            font.draw(ui, message(lastResult), buttonX, buttonY - 13, color);
+        }
 
         // Row tooltip (uses the live cursor position)
         int hovered = rowAt(mx, my);
@@ -200,13 +218,13 @@ public class TradingScreen extends Screen {
         int dx = listX;
 
         // Cost icons (the counted payment; emeralds get the discount)
-        ui.drawNineSlice(gui.glassSlot, dx, y, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+        drawSlot(ui, gui, dx, y);
         StackIcons.drawIcon(ui, atlas, o.costA, dx + 1, y + 1, SLOT - 2);
         drawCount(ui, font, pay, dx, y, payEmeralds, !affordable);
         dx += SLOT + 3;
 
         if (o.costB != null && !o.costB.isEmpty()) {
-            ui.drawNineSlice(gui.glassSlot, dx, y, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+            drawSlot(ui, gui, dx, y);
             StackIcons.drawIcon(ui, atlas, o.costB, dx + 1, y + 1, SLOT - 2);
             boolean shortB = callbacks.inventory().countByName(
                 Inventory.canonicalName(o.costB)) < o.costB.getCount();
@@ -217,15 +235,15 @@ public class TradingScreen extends Screen {
         font.draw(ui, "→", dx, y + 5, 0xFF8EA2C2);
         dx += 14;
 
-        ui.drawNineSlice(gui.glassSlot, dx, y, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
-        StackIcons.drawIcon(ui, atlas, o.give, dx + 1, y + 1, SLOT - 2);
+        drawSlot(ui, gui, dx, y);
+        StackIcons.drawStack(ui, font, atlas, o.give, dx + 1, y + 1);
         dx += SLOT + 6;
 
         // Give name, clipped so it never collides with the stock badge
         String badge = soldOut ? tr("trade.sold_out") : "×" + stock;
         int textRight = scrollbarX - 4;
         int nameMax = Math.max(20, textRight - font.width(badge) - 8 - dx);
-        String name = font.trimToWidth(stackLabel(o.give), nameMax);
+        String name = font.trimToWidth(StackIcons.displayName(o.give), nameMax);
 
         int nameColor = soldOut ? 0xFF4A5055 : (affordable ? 0xFFE8EEFF : 0xFF8EA2C2);
         font.draw(ui, name, dx, ry + 10, nameColor);
@@ -261,26 +279,11 @@ public class TradingScreen extends Screen {
             over ? (0xFF000000 | MenuTheme.ACCENT) : 0xFF8EA2C2);
     }
 
-    private void drawButton(UIRenderer ui, FontRenderer font, GuiAssets gui,
-                            float mx, float my) {
-        boolean canTrade = selected >= 0 && selected < offers.length
-            && callbacks.stockOf(selected) > 0
-            && canAfford(offers[selected], emeraldCost(offers[selected], callbacks.reputation()));
-        boolean over = mx >= buttonX && mx < buttonX + buttonW
-            && my >= buttonY && my < buttonY + buttonH;
-
-        int tint = !canTrade ? 0xFF141A28 : (over ? (0xFF000000 | MenuTheme.ACCENT) : 0xFF2A3A5E);
-        ui.drawNineSlice(gui.glassPanel, buttonX, buttonY, buttonW, buttonH,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, tint);
-
-        String label = tr("trade.make");
-        font.draw(ui, label, buttonX + (buttonW - font.width(label)) / 2, buttonY + 6,
-            canTrade ? 0xFFE8EEFF : 0xFF6B7488);
-
-        if (lastResult != null) {
-            int color = lastResult == TradeManager.Result.SUCCESS ? 0xFF7AD07A : 0xFFD08950;
-            font.draw(ui, message(lastResult), buttonX, buttonY - 13, color);
-        }
+    /** Inventory-style slot: hover flips to the lit variant. */
+    private void drawSlot(UIRenderer ui, GuiAssets gui, int x, int y) {
+        boolean over = hoverX >= x && hoverX < x + SLOT && hoverY >= y && hoverY < y + SLOT;
+        ui.drawNineSlice(over ? gui.glassSlotHover : gui.glassSlot,
+            x, y, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
     }
 
     private void drawRowTooltip(UIRenderer ui, FontRenderer font, int row,
@@ -344,11 +347,8 @@ public class TradingScreen extends Screen {
             return true;
         }
 
-        if (mx >= buttonX && mx < buttonX + buttonW
-            && my >= buttonY && my < buttonY + buttonH) {
-            doTrade(selected);
-            return true;
-        }
+        // The themed Button widget owns the trade button in the panel
+        super.mouseClicked(mx, my, button);
         return true;
     }
 
@@ -449,6 +449,12 @@ public class TradingScreen extends Screen {
         if (o.costB != null && !o.costB.isEmpty()
             && inv.countByName(Inventory.canonicalName(o.costB)) < o.costB.getCount()) return false;
         return true;
+    }
+
+    private boolean canTradeNow() {
+        return selected >= 0 && selected < offers.length
+            && callbacks.stockOf(selected) > 0
+            && canAfford(offers[selected], emeraldCost(offers[selected], callbacks.reputation()));
     }
 
     private String stackLabel(ItemStack s) {
