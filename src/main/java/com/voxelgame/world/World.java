@@ -379,6 +379,30 @@ public class World {
         return pendingRequests > 0;
     }
     
+    /** Number of chunks currently held in memory (loaded or generated). */
+    public int getLoadedChunkCount() {
+        return chunks.size();
+    }
+
+    /** Number of chunks inside the render-distance circle around the player. */
+    public int getTargetChunkCount() {
+        int r = renderDistance;
+        int count = 0;
+        for (int x = -r; x <= r; x++) {
+            for (int z = -r; z <= r; z++) {
+                if (x * x + z * z <= r * r) count++;
+            }
+        }
+        return count;
+    }
+
+    /** 0..1 how much of the render-distance circle is filled in. */
+    public float getChunkLoadProgress() {
+        int target = getTargetChunkCount();
+        if (target <= 0) return 1.0f;
+        return java.lang.Math.min(1.0f, chunks.size() / (float) target);
+    }
+    
     private int renderDistance = 8;
     
     public World() {

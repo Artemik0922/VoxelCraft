@@ -228,6 +228,9 @@ public class Game {
     // [SPACE] Rocket ride and dimension switching
     private boolean spaceMode = false;
     private boolean rocketRiding = false;
+
+    /** While true the loading screen is up: stream chunks but freeze the game. */
+    private boolean loadingWorld = false;
     private float rocketProgress = 0f;
     private int rocketPadX, rocketPadY, rocketPadZ;
     private final org.joml.Vector3f rocketReturnPos = new org.joml.Vector3f();
@@ -1140,14 +1143,14 @@ public class Game {
         System.out.println("Creating world '" + meta.displayName
             + "' seed=" + meta.seed + " mode=" + meta.gameMode);
         
-        activateWorld(meta, true);
+        activateWorld(meta, true, true);
         configureDimension(meta);
     }
     
     /** Resume an existing save. */
     private void loadWorld(WorldMeta meta) {
         System.out.println("Loading world '" + meta.displayName + "'");
-        activateWorld(meta, false);
+        activateWorld(meta, false, true);
         configureDimension(meta);
     }
     
@@ -1155,9 +1158,10 @@ public class Game {
      * Swap in a world and hand control to the player.
      *
      * The previous world is flushed first, so leaving one save and entering
-     * another never loses edits.
+     * another never loses edits. When {@code showLoading} is set the player is
+     * held on a loading screen until the render-distance circle is generated.
      */
-    private void activateWorld(WorldMeta meta, boolean fresh) {
+    private void activateWorld(WorldMeta meta, boolean fresh, boolean showLoading) {
         if (world != null) {
             world.cleanup();
         }
@@ -1241,7 +1245,19 @@ if (fresh) {
 
         lastAutosave = glfwGetTime();
         lastBiomeId = null; // Reset so first biome triggers toast
-        closeScreens();
+
+        if (showLoading) {
+            // Hold on a loading screen while the first chunk circle is built.
+            // The screen does not pause the game; the main loop streams chunks
+            // while this flag is set and skips input + world logic.
+            loadingWorld = true;
+            screens.open(new LoadingScreen(meta.displayName, world, () -> {
+                loadingWorld = false;
+                closeScreens();
+            }));
+        } else {
+            closeScreens();
+        }
 
         // [UI-010] First launch: show the controls tutorial once
         if (!settings.tutorialSeen) {
@@ -1512,7 +1528,7 @@ if (fresh) {
                 spaceMeta.playerHunger = homeMeta.playerHunger;
             }
         }
-        activateWorld(spaceMeta, fresh);
+        activateWorld(spaceMeta, fresh, false);
         configureDimension(spaceMeta);
         if (fresh) {
             // Build a landing pad with platform at the space spawn so the player
@@ -1575,7 +1591,7 @@ if (fresh) {
         homeMeta.playerHunger = spaceMeta.playerHunger;
         homeMeta.inventoryData = spaceMeta.inventoryData;
         homeMeta.selectedSlot = player.getInventory().getSelectedSlot();
-        activateWorld(homeMeta, false);
+        activateWorld(homeMeta, false, false);
         configureDimension(homeMeta);
         toastManager.enqueue(new com.voxelgame.ui.toast.AchievementToast(
             "Добро пожаловать домой!", homeMeta.displayName, BlockType.LANTERN.id, 0xFF80DDFF));
@@ -2051,20 +2067,27 @@ if (fresh) {
             }
             
 if (!paused) {
-                processInput();
-                // Clamp to prevent physics explosions after a lag spike
-                deltaTime = java.lang.Math.min(deltaTime, 0.1);
-                tickAccumulator += deltaTime;
-                // Run world logic at a fixed 60 Hz regardless of actual framerate
-                long worldStart = System.nanoTime();
-                while (tickAccumulator >= TICK_RATE) {
-                    tickAccumulator -= TICK_RATE;
-                    double realDelta = deltaTime;
-                    deltaTime = TICK_RATE;
-                    updateWorld();
-                    deltaTime = realDelta;
+                if (loadingWorld) {
+                    // Loading screen is up: stream chunks around spawn but keep
+                    // the rest of the world frozen (no input, no mobs/physics)
+                    world.update(camera.getPosition());
+                    tickAccumulator = 0;
+                } else {
+                    processInput();
+                    // Clamp to prevent physics explosions after a lag spike
+                    deltaTime = java.lang.Math.min(deltaTime, 0.1);
+                    tickAccumulator += deltaTime;
+                    // Run world logic at a fixed 60 Hz regardless of actual framerate
+                    long worldStart = System.nanoTime();
+                    while (tickAccumulator >= TICK_RATE) {
+                        tickAccumulator -= TICK_RATE;
+                        double realDelta = deltaTime;
+                        deltaTime = TICK_RATE;
+                        updateWorld();
+                        deltaTime = realDelta;
+                    }
+                    FrameTimer.add(FrameTimer.WORLD, System.nanoTime() - worldStart);
                 }
-                FrameTimer.add(FrameTimer.WORLD, System.nanoTime() - worldStart);
             } else {
                 player.setHorizontalVelocity(0, 0);
                 tickAccumulator = 0;
@@ -3448,8 +3471,8 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         // a fresnel sky reflection; ice and glass share the same highlight
         shader.setUniform1i("glassLayer", renderer.getTextureAtlas().getGlassLayer());
         shader.setUniform1i("iceLayer", renderer.getTextureAtlas().getIceLayer());
-        // [SHINE] Subtle specular sheen on every surface (0 = off, ~0.3 = subtle)
-        shader.setUniform1f("specStrength", 0.30f);
+        // [SHINE] Specular sheen disabled for a matte, flat-texture look (0 = off)
+        shader.setUniform1f("specStrength", 0.0f);
 
         // [GR-015] Lava layer for shader-side animation
         shader.setUniform1i("lavaLayer", renderer.getTextureAtlas().getLavaLayer());
@@ -4688,7 +4711,7 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                     ? WorldMeta.GameMode.SURVIVAL
                     : WorldMeta.GameMode.CREATIVE;
                 WorldMeta meta = new WorldMeta(name, seed, mode, true);
-                activateWorld(meta, true);
+                activateWorld(meta, true, false);
                 configureDimension(meta);
                 out.accept("created world '" + name + "' seed=" + seed + " mode=" + mode
                     + " spawn=" + player.getPosition());
@@ -4710,7 +4733,7 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                     spaceMeta.homeWorld = cur.folderName;
                     spaceMeta.dayTime = 0.35;
                 }
-                activateWorld(spaceMeta, fresh);
+                activateWorld(spaceMeta, fresh, false);
                 configureDimension(spaceMeta);
                 if (fresh) {
                     int sx = (int) spaceMeta.spawnX;
@@ -4739,7 +4762,7 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                     }
                 }
                 if (meta == null) throw new IllegalArgumentException("world not found: " + arg(t, 1));
-                activateWorld(meta, false);
+                activateWorld(meta, false, false);
                 configureDimension(meta);
                 out.accept("loaded world '" + meta.displayName + "'");
             }
