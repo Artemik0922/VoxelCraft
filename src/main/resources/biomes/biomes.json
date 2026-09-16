@@ -25,8 +25,7 @@
       "features": {
         "trees": { "type": "oak", "density": 0.055 },
         "flowers": { "type": "mixed", "density": 0.01 },
-        "grass": { "type": "tall_grass", "density": 0.05 },
-        "fallen_log": { "density": 0.004 }
+        "grass": { "type": "tall_grass", "density": 0.05 }
       },
       "fog_color": 0xC0D8FF
     },
@@ -40,8 +39,7 @@
       "features": {
         "trees": { "type": "birch", "density": 0.045 },
         "flowers": { "type": "mixed", "density": 0.015 },
-        "grass": { "type": "tall_grass", "density": 0.06 },
-        "fallen_log": { "density": 0.004 }
+        "grass": { "type": "tall_grass", "density": 0.06 }
       },
       "fog_color": 0xC0D8FF
     },
@@ -55,8 +53,7 @@
       "features": {
         "trees": { "type": "spruce", "density": 0.05 },
         "flowers": { "type": "none", "density": 0 },
-        "grass": { "type": "none", "density": 0 },
-        "fallen_log": { "density": 0.006 }
+        "grass": { "type": "none", "density": 0 }
       },
       "fog_color": 0xC0D8FF
     },
@@ -70,8 +67,7 @@
       "features": {
         "trees": { "type": "cactus", "density": 0.004 },
         "flowers": { "type": "none", "density": 0 },
-        "grass": { "type": "none", "density": 0 },
-        "dead_bush": { "density": 0.012 }
+        "grass": { "type": "none", "density": 0 }
       },
       "fog_color": 0xE8D8A0
     },
@@ -100,8 +96,7 @@
       "features": {
         "trees": { "type": "acacia", "density": 0.008 },
         "flowers": { "type": "none", "density": 0 },
-        "grass": { "type": "tall_grass", "density": 0.1 },
-        "dead_bush": { "density": 0.004 }
+        "grass": { "type": "tall_grass", "density": 0.1 }
       },
       "fog_color": 0xE8D8A0
     },
@@ -186,9 +181,7 @@
       "features": {
         "trees": { "type": "none", "density": 0 },
         "flowers": { "type": "none", "density": 0 },
-        "grass": { "type": "none", "density": 0 },
-        "dead_bush": { "density": 0.02 },
-        "boulder": { "density": 0.05 }
+        "grass": { "type": "none", "density": 0 }
       },
       "fog_color": 0xE8D8A0
     },
@@ -243,14 +236,12 @@
       "tints": { "grass": 0x8070A0, "foliage": 0x605080, "water": 0x4FA4F5 },
       "surface": "basalt",
       "filler": "basalt",
-"features": {
+      "features": {
         "trees": { "type": "none", "density": 0 },
         "flowers": { "type": "none", "density": 0 },
         "grass": { "type": "none", "density": 0 },
-        "ice_patch": { "density": 0.12 }
+        "crystal": { "density": 0.02 }
       },
-      "fog_color": 0xE0E8F0
-    },
       "fog_color": 0xD0C0F0
     },
     {
@@ -366,8 +357,7 @@
       "features": {
         "trees": { "type": "none", "density": 0 },
         "flowers": { "type": "none", "density": 0 },
-        "grass": { "type": "none", "density": 0 },
-        "ice_patch": { "density": 0.06 }
+        "grass": { "type": "none", "density": 0 }
       },
       "fog_color": 0xE0E8F0
     },
@@ -507,8 +497,7 @@
       "features": {
         "trees": { "type": "oak", "density": 0.025 },
         "flowers": { "type": "none", "density": 0 },
-        "grass": { "type": "tall_grass", "density": 0.04 },
-        "fallen_log": { "density": 0.006 }
+        "grass": { "type": "tall_grass", "density": 0.04 }
       },
       "fog_color": 0x506050
     },
@@ -564,9 +553,7 @@
       "features": {
         "trees": { "type": "oak", "density": 0.004 },
         "flowers": { "type": "none", "density": 0 },
-        "grass": { "type": "none", "density": 0 },
-        "dead_bush": { "density": 0.01 },
-        "boulder": { "density": 0.04 }
+        "grass": { "type": "none", "density": 0 }
       },
       "fog_color": 0xE8D8A0
     },

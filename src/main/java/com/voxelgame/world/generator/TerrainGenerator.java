@@ -233,10 +233,9 @@ public class TerrainGenerator {
         }
 
         decorate(chunk, originX, originZ, heights, biomes, side);
-        generateWater(chunk, originX, originZ, heights, side);
+        generateWater(chunk, originX, originZ);
         placeUnderwaterCover(chunk, originX, originZ, heights, biomes, side);
         placeLilyPads(chunk, originX, originZ, biomes, side);
-        placeIcePatches(chunk, originX, originZ, heights, biomes, side);
         placeSnowLayers(chunk, originX, originZ, heights, side);
     }
 
@@ -277,16 +276,13 @@ public class TerrainGenerator {
     /**
      * Generate water for oceans, rivers, and lakes.
      * Water fills air blocks below sea level РІР‚вЂќ no water columns above surface.
-     * Heights come from the cached margin array so the height/biome noise
-     * stack is not recomputed a second time per column.
      */
-    private void generateWater(Chunk chunk, int originX, int originZ,
-                               int[] heights, int side) {
-        final int M = DECORATION_MARGIN;
+    private void generateWater(Chunk chunk, int originX, int originZ) {
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
-                int i = (x + M) * side + (z + M);
-                int height = heights[i];
+                int wx = originX + x;
+                int wz = originZ + z;
+                int height = getHeight(wx, wz);
 
                 // Fill all air blocks below sea level with water
                 if (height < SEA_LEVEL) {
@@ -314,42 +310,6 @@ public class TerrainGenerator {
                 if (chunk.getBlock(x, SEA_LEVEL + 1, z) != BlockType.AIR.id) continue;
                 if (hashNoise(originX + x, 3, originZ + z, 23) > 0.96) {
                     chunk.setBlock(x, SEA_LEVEL + 1, z, BlockType.LILY_PAD.id);
-                }
-            }
-        }
-    }
-
-    /** Place ice patches: floes on frozen oceans, packed ice on cold shores. */
-    private void placeIcePatches(Chunk chunk, int originX, int originZ,
-                                 int[] heights, BiomeSelector.MCBiome[] biomes, int side) {
-        final int M = DECORATION_MARGIN;
-        for (int x = 0; x < Chunk.SIZE; x++) {
-            for (int z = 0; z < Chunk.SIZE; z++) {
-                var biome = biomes[(x + M) * side + (z + M)];
-                float density = icePatchDensity(biome);
-                if (density <= 0) continue;
-                int wx = originX + x, wz = originZ + z;
-                if (chunk.getBlock(x, SEA_LEVEL, z) == BlockType.WATER.id
-                    && chunk.getBlock(x, SEA_LEVEL + 1, z) == BlockType.AIR.id) {
-                    // Frozen ocean: scattered ice floes on the water surface.
-                    if (hashNoise(wx, 5, wz, 61) < density) {
-                        chunk.setBlock(x, SEA_LEVEL, z, BlockType.ICE.id);
-                        int h = heights[(x + M) * side + (z + M)];
-                        if (hashNoise(wx, 8, wz, 62) > 0.7 && SEA_LEVEL - 1 > h
-                            && chunk.getBlock(x, SEA_LEVEL - 1, z) == BlockType.WATER.id) {
-                            chunk.setBlock(x, SEA_LEVEL - 1, z, BlockType.PACKED_ICE.id);
-                        }
-                    }
-                } else {
-                    // Snowy beach / glacier: scattered packed-ice chunks.
-                    int h = heights[(x + M) * side + (z + M)];
-                    if (h < 0 || h >= Chunk.HEIGHT) continue;
-                    int top = chunk.getBlock(x, h, z);
-                    if (top == BlockType.AIR.id || top == BlockType.WATER.id) continue;
-                    if (chunk.getBlock(x, h + 1, z) != BlockType.AIR.id) continue;
-                    if (hashNoise(wx, 5, wz, 61) < density) {
-                        chunk.setBlock(x, h + 1, z, BlockType.PACKED_ICE.id);
-                    }
                 }
             }
         }
@@ -833,25 +793,10 @@ public class TerrainGenerator {
                     placeGroundCoverData(chunk, dx, dz, wx, height + 1, wz, biome);
                 }
 
-                // Fallen logs on forest floors (data-driven density)
-                if (fallenLogDensity(biome) > 0 && dx >= 0 && dx < Chunk.SIZE
-                    && dz >= 0 && dz < Chunk.SIZE
-                    && hashNoise(wx, 7, wz, 71) < fallenLogDensity(biome)) {
-                    placeFallenLog(chunk, dx, dz, wx, height + 1, wz, biome);
-                }
-
                 // Mountain boulders: scattered rocks on steep slopes
                 if (isMountainBiome(biome) && height > 80 && dx >= 0 && dx < Chunk.SIZE
                     && dz >= 0 && dz < Chunk.SIZE) {
-                    placeBoulder(chunk, dx, dz, wx, height + 1, wz, 0.15f);
-                }
-
-                // Data-driven boulders in hot/rocky biomes (badlands, desert)
-                float bd = boulderDensity(biome);
-                if (!isMountainBiome(biome) && bd > 0 && dx >= 0 && dx < Chunk.SIZE
-                    && dz >= 0 && dz < Chunk.SIZE
-                    && hashNoise(wx, 100, wz, 50) < bd) {
-                    placeBoulder(chunk, dx, dz, wx, height + 1, wz, bd);
+                    placeBoulder(chunk, dx, dz, wx, height + 1, wz);
                 }
 
                 // [WG] Ice spikes in the ice spikes biome
@@ -910,52 +855,6 @@ public class TerrainGenerator {
             case PETRIFIED_FOREST -> 0.02;
             case SHATTERED_SAVANNA -> 0.005;
             default -> 0.0;
-        };
-    }
-
-    /** Density of scattered dead bushes (data-driven, else fallback by biome). */
-    private float deadBushDensity(BiomeSelector.MCBiome biome) {
-        BiomeData data = biomeData(biome);
-        if (data != null && data.deadBushDensity > 0) return data.deadBushDensity;
-        return switch (biome) {
-            case DESERT, BADLANDS, WOODED_BADLANDS -> 0.012f;
-            case SAVANNA, SHATTERED_SAVANNA -> 0.004f;
-            default -> 0.0f;
-        };
-    }
-
-    /** Density of floating ice patches / surface ice (data-driven, else fallback). */
-    private float icePatchDensity(BiomeSelector.MCBiome biome) {
-        BiomeData data = biomeData(biome);
-        if (data != null && data.icePatchDensity > 0) return data.icePatchDensity;
-        return switch (biome) {
-            case FROZEN_OCEAN -> 0.12f;
-            case SNOWY_BEACH, GLACIER -> 0.06f;
-            default -> 0.0f;
-        };
-    }
-
-    /** Density of fallen logs on the forest floor (data-driven, else fallback). */
-    private float fallenLogDensity(BiomeSelector.MCBiome biome) {
-        BiomeData data = biomeData(biome);
-        if (data != null && data.fallenLogDensity > 0) return data.fallenLogDensity;
-        return switch (biome) {
-            case FOREST, BIRCH_FOREST, AUTUMN_FOREST -> 0.004f;
-            case DARK_FOREST -> 0.006f;
-            case TAIGA, OLD_GROWTH_PINE_TAIGA, OLD_GROWTH_SPRUCE_TAIGA -> 0.006f;
-            case JUNGLE, BAMBOO_JUNGLE -> 0.004f;
-            default -> 0.0f;
-        };
-    }
-
-    /** Density of rocky boulders on the surface (data-driven, else fallback). */
-    private float boulderDensity(BiomeSelector.MCBiome biome) {
-        BiomeData data = biomeData(biome);
-        if (data != null && data.boulderDensity > 0) return data.boulderDensity;
-        return switch (biome) {
-            case BADLANDS, WOODED_BADLANDS -> 0.05f;
-            case DESERT -> 0.03f;
-            default -> 0.0f;
         };
     }
 
@@ -1265,12 +1164,11 @@ public class TerrainGenerator {
         int ground = chunk.getBlock(lx, y - 1, lz);
         double r = hashNoise(wx, 3, wz, 23);
 
-        // Dead bushes in hot/arid biomes (data-driven density)
-        float dbD = deadBushDensity(biome);
-        if (dbD > 0 && (ground == BlockType.SAND.id || ground == BlockType.TERRACOTTA.id
-                        || ground == BlockType.RED_SAND.id || ground == BlockType.COARSE_DIRT.id)
-                && r > 1.0 - dbD) {
-            chunk.setBlock(lx, y, lz, BlockType.DEAD_BUSH.id);
+        // Desert: dead bushes only
+        if (biome == BiomeSelector.MCBiome.DESERT) {
+            if (ground == BlockType.SAND.id && r > 0.995) {
+                chunk.setBlock(lx, y, lz, BlockType.DEAD_BUSH.id);
+            }
             return;
         }
 
@@ -1385,9 +1283,9 @@ public class TerrainGenerator {
      * Place a boulder (cluster of stone/gravel) on mountain slopes.
      * Uses deterministic hash so boulders are reproducible per position.
      */
-    private void placeBoulder(Chunk chunk, int lx, int lz, int wx, int wy, int wz, float density) {
+    private void placeBoulder(Chunk chunk, int lx, int lz, int wx, int wy, int wz) {
         double hash = hashNoise(wx, 100, wz, 50);
-        if (hash >= density) return; // sparse by caller's density
+        if (hash > 0.15) return; // ~15% of eligible columns get a boulder
 
         int radius = 1 + (int)(hashNoise(wx, 200, wz, 30) * 2);
         int height = 1 + (int)(hashNoise(wx, 300, wz, 40) * 2);
@@ -1419,40 +1317,5 @@ public class TerrainGenerator {
                 }
             }
         }
-    }
-
-    /**
-     * Place a horizontal fallen log on a forest floor. The log lies along the
-     * east or south axis (kept inside the chunk) and stops at terrain rises.
-     */
-    private void placeFallenLog(Chunk chunk, int lx, int lz, int wx, int wy, int wz,
-                                BiomeSelector.MCBiome biome) {
-        if (chunk.getBlock(lx, wy, lz) != BlockType.AIR.id) return;
-        int ground = chunk.getBlock(lx, wy - 1, lz);
-        if (ground == BlockType.AIR.id || ground == BlockType.WATER.id) return;
-
-        int logId = fallenLogBlock(biome);
-        chunk.setBlock(lx, wy, lz, (byte) logId);
-
-        boolean east = hashNoise(wx, 7, wz, 72) > 0.5;
-        int len = 2 + (int) (hashNoise(wx, 9, wz, 73) * 2); // 2..3 extra blocks
-        for (int k = 1; k <= len; k++) {
-            int px = east ? lx + k : lx;
-            int pz = east ? lz : lz + k;
-            if (px >= Chunk.SIZE || pz >= Chunk.SIZE) break;
-            if (chunk.getBlock(px, wy, pz) != BlockType.AIR.id) break;
-            int below = chunk.getBlock(px, wy - 1, pz);
-            if (below == BlockType.AIR.id || below == BlockType.WATER.id) break;
-            chunk.setBlock(px, wy, pz, (byte) logId);
-        }
-    }
-
-    /** Log block used for fallen logs, matched to the biome's tree type. */
-    private int fallenLogBlock(BiomeSelector.MCBiome biome) {
-        return switch (treeType(biome)) {
-            case "birch" -> BlockType.BIRCH_LOG.id;
-            case "spruce", "acacia" -> BlockType.SPRUCE_LOG.id;
-            default -> BlockType.OAK_LOG.id;
-        };
     }
 }

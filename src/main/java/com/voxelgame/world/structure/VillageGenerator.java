@@ -235,15 +235,15 @@ public class VillageGenerator {
                 terrainGen.generate(c);
                 terrainGen.generateStructures(c);
                 chunks.put(key, c);
-                if (worldRef != null) worldRef.markDirtyChunk(c);
-                else { c.setDirty(true); c.setLightDirty(true); }
+                c.setDirty(true);
+                c.setLightDirty(true);
                 // РЎРѕСЃРµРґРё С‚РѕР¶Рµ РґРѕР»Р¶РЅС‹ РїРµСЂРµСЃС‡РёС‚Р°С‚СЊ СЃРІРµС‚ РЅР° РіСЂР°РЅРёС†Рµ
                 for (int nx = cx - 1; nx <= cx + 1; nx++) {
                     for (int nz = cz - 1; nz <= cz + 1; nz++) {
                         Chunk n = chunks.get(Chunk.key(nx, nz));
                         if (n != null) {
-                            if (worldRef != null) worldRef.markDirtyChunk(n);
-                            else { n.setDirty(true); n.setLightDirty(true); }
+                            n.setDirty(true);
+                            n.setLightDirty(true);
                         }
                     }
                 }

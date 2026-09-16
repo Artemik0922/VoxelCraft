@@ -23,14 +23,6 @@ public final class BiomeData {
     public final float grassDensity;
     public final String particleType;
     public final float particleDensity;
-    /** Density of scattered dead bushes (0 = none). */
-    public final float deadBushDensity;
-    /** Density of ice patches / floating ice chunks (0 = none). */
-    public final float icePatchDensity;
-    /** Density of fallen logs lying on the ground (0 = none). */
-    public final float fallenLogDensity;
-    /** Density of rocky boulders (0 = none). */
-    public final float boulderDensity;
     public final int fogColor;
 
     public BiomeData(String id, String nameKey,
@@ -43,8 +35,6 @@ public final class BiomeData {
                      String flowerType, float flowerDensity,
                      String grassType, float grassDensity,
                      String particleType, float particleDensity,
-                     float deadBushDensity, float icePatchDensity,
-                     float fallenLogDensity, float boulderDensity,
                      int fogColor) {
         this.id = id;
         this.nameKey = nameKey;
@@ -67,10 +57,6 @@ public final class BiomeData {
         this.grassDensity = grassDensity;
         this.particleType = particleType;
         this.particleDensity = particleDensity;
-        this.deadBushDensity = deadBushDensity;
-        this.icePatchDensity = icePatchDensity;
-        this.fallenLogDensity = fallenLogDensity;
-        this.boulderDensity = boulderDensity;
         this.fogColor = fogColor;
     }
 
