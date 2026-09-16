@@ -71,11 +71,13 @@ public class LightEngine {
     private static final class Work {
         final Chunk[] grid = new Chunk[9];
         int baseX, baseZ;
+        World world;
 
         int[] queue = new int[1 << 16];
         int head, tail;
 
         void reset(World world, Chunk centre) {
+            this.world = world;
             baseX = centre.getChunkX() - 1;
             baseZ = centre.getChunkZ() - 1;
             for (int dz = 0; dz < 3; dz++) {
@@ -270,7 +272,7 @@ public class LightEngine {
                     target.setBlockLight(tx, ny, tz, value);
                 }
 
-                if (target != here) target.setDirty(true);
+                if (target != here) w.world.markRemeshChunk(target);
                 w.push(nx, ny, nz);
             }
         }
@@ -368,7 +370,7 @@ public class LightEngine {
                 if (existing >= next) continue;
 
                 nc.setBlockLight(nx & 15, ny, nz & 15, next);
-                nc.setDirty(true);
+                world.markRemeshChunk(nc);
                 w.push(nx, ny, nz);
             }
         }
@@ -404,7 +406,7 @@ public class LightEngine {
                 for (int dz = -1; dz <= 1; dz++) {
                     if (dx == 0 && dz == 0) continue;
                     Chunk n = world.getChunk(cx + dx, cz + dz);
-                    if (n != null && n.isLightDirty()) n.setDirty(true);
+                    if (n != null && n.isLightDirty()) world.markRemeshChunk(n);
                 }
             }
         }

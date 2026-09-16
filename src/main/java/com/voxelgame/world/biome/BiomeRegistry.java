@@ -197,6 +197,10 @@ public final class BiomeRegistry {
             float grassDensity = getNestedFloat(features, "grass", "density");
             String particleType = getNestedString(features, "particles", "type");
             float particleDensity = getNestedFloat(features, "particles", "density");
+            float deadBushDensity = getNestedFloat(features, "dead_bush", "density");
+            float icePatchDensity = getNestedFloat(features, "ice_patch", "density");
+            float fallenLogDensity = getNestedFloat(features, "fallen_log", "density");
+            float boulderDensity = getNestedFloat(features, "boulder", "density");
             int fogColor = getHexInt(obj, "fog_color");
 
             return new BiomeData(id, nameKey,
@@ -205,6 +209,7 @@ public final class BiomeRegistry {
                 surfaceBlock, fillerBlock,
                 treeType, treeDensity, flowerType, flowerDensity,
                 grassType, grassDensity, particleType, particleDensity,
+                deadBushDensity, icePatchDensity, fallenLogDensity, boulderDensity,
                 fogColor);
         } catch (Exception e) {
             System.err.println("Failed to parse biome: " + e.getMessage());

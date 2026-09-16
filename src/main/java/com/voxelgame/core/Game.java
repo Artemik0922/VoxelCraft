@@ -956,7 +956,7 @@ public class Game {
                 ChunkMeshBuilder.setAmbientOcclusionEnabled(settings.ambientOcclusion);
         ChunkMeshBuilder.setFancyGraphics(settings.fancyGraphics);
                 // Leaf geometry is baked, so every chunk has to be rebuilt
-                for (var c : world.getChunks().values()) c.setDirty(true);
+                for (var c : world.getChunks().values()) world.markRemeshChunk(c);
             }
             @Override public void onGuiScaleChanged(int scale) {
                 settings.guiScale = scale;
@@ -4363,7 +4363,7 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                 ChunkMeshBuilder.setAmbientOcclusionEnabled(ao);
                 // Mark all chunks dirty so they rebuild with the new AO state
                 if (world != null) {
-                    for (var c : world.getChunks().values()) c.setDirty(true);
+                    for (var c : world.getChunks().values()) world.markRemeshChunk(c);
                 }
                 System.out.println("AO: " + (ao ? "on" : "off"));
                 return;
