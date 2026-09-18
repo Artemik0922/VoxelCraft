@@ -467,7 +467,7 @@ public class World {
                 if (villageGenerator.shouldGenerateVillage(chunk.getChunkX(), chunk.getChunkZ())) {
                     villageGenerator.generateVillage(chunk, chunks, this);
                 }
-                chunk.setDirty(true);
+                markRemeshChunk(chunk);
             }
 
             // [SD] Restore sliding-door state saved with this chunk
@@ -506,6 +506,7 @@ public class World {
                 Chunk stored = save.loadChunk(cx, cz);
                 if (stored != null) {
                     chunks.put(Chunk.key(cx, cz), stored);
+                    markRemeshChunk(stored);
                     markNeighboursDirty(cx, cz);
                     syncDoorsForChunk(stored);
                     // [CF] Containers restored from disk rejoin the manager
@@ -562,8 +563,7 @@ public class World {
                 if (dx == 0 && dz == 0) continue;
                 Chunk n = chunks.get(Chunk.key(cx + dx, cz + dz));
                 if (n != null) {
-                    n.setDirty(true);
-                    n.setLightDirty(true);
+                    markDirtyChunk(n);
                 }
             }
         }
@@ -585,6 +585,7 @@ public class World {
                         Chunk chunk = new Chunk(chunkX, chunkZ);
                         generator.generate(chunk);
                         chunks.put(key, chunk);
+                        markRemeshChunk(chunk);
                     }
                 }
             }
@@ -701,7 +702,7 @@ public class World {
         int lz = z & 15;
         chunk.setWaterLevel(lx, y, lz, level);
         chunk.markModified();
-        chunk.setDirty(true);
+        markRemeshChunk(chunk);
 
         // Flowing water surfaces cross chunk borders: neighbours re-mesh too
         if (lx == 0) markDirty(cx - 1, cz);
@@ -716,7 +717,7 @@ public class World {
         if (chunk == null) return;
         chunk.setCropStage(x & 15, y, z & 15, stage);
         chunk.markModified();
-        chunk.setDirty(true);
+        markRemeshChunk(chunk);
     }
 
     /** Crop growth tick cadence: a pass every few seconds near the player. */
@@ -744,7 +745,7 @@ public class World {
                 Chunk chunk = getChunk(cx, cz);
                 if (chunk == null) continue;
                 if (growChunkCrops(chunk)) {
-                    chunk.setDirty(true);
+                    markRemeshChunk(chunk);
                     chunk.markModified();
                 }
             }
@@ -852,19 +853,19 @@ public class World {
     // does zero chunk-map iteration per frame.
     // ------------------------------------------------------------------
 
-    private final ArrayDeque<Chunk> dirtyChunks = new ArrayDeque<>();
+    private final LinkedHashSet<Chunk> dirtyChunks = new LinkedHashSet<>();
 
     /** Flags both dirty + lightDirty and queues the chunk for relight+remesh. */
     public void markDirtyChunk(Chunk chunk) {
         chunk.setDirty(true);
         chunk.setLightDirty(true);
-        dirtyChunks.addLast(chunk);
+        dirtyChunks.add(chunk);
     }
 
     /** Flags the chunk dirty (remesh only; light already correct). */
     public void markRemeshChunk(Chunk chunk) {
         chunk.setDirty(true);
-        dirtyChunks.addLast(chunk);
+        dirtyChunks.add(chunk);
     }
 
     /**
@@ -874,8 +875,8 @@ public class World {
     public List<Chunk> drainDirtyChunks() {
         if (dirtyChunks.isEmpty()) return null;
         List<Chunk> out = new ArrayList<>(dirtyChunks.size());
-        Chunk c;
-        while ((c = dirtyChunks.pollFirst()) != null) out.add(c);
+        out.addAll(dirtyChunks);
+        dirtyChunks.clear();
         return out;
     }
     
@@ -1136,8 +1137,7 @@ public class World {
             c.setBlock(d.x & 15, d.y + 1, d.z & 15, (byte) 0);
             c.setDoorMeta(d.x & 15, d.y, d.z & 15, (byte) 0);
             c.markModified();
-            c.setDirty(true);
-            c.setLightDirty(true);
+            markDirtyChunk(c);
         }
         LightEngine.updateBlock(this, d.x, d.y, d.z, (byte) 0);
         LightEngine.updateBlock(this, d.x, d.y + 1, d.z, (byte) 0);
@@ -1151,7 +1151,7 @@ public class World {
         if (c == null) return;
         c.setDoorMeta(d.x & 15, d.y, d.z & 15, d.toMeta());
         c.markModified();
-        c.setDirty(true);
+        markRemeshChunk(c);
     }
 
     /**
@@ -1182,7 +1182,7 @@ public class World {
             // door blocks found in older saves once, on first load
             chunk.setBlock(wx & 15, wy, wz & 15, BlockType.OAK_DOOR.id);
             chunk.setBlock(wx & 15, wy + 1, wz & 15, BlockType.OAK_DOOR.id);
-            chunk.setDirty(true);
+            markRemeshChunk(chunk);
         }
     }
 

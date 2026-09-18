@@ -417,23 +417,25 @@ public class Renderer {
     private static final long REBUILD_BUDGET_NS = 6_000_000L;
 
     private void updateDirtyChunks(World world) {
-        long deadline = System.nanoTime() + REBUILD_BUDGET_NS;
-
         lightBacklog = 0;
         meshBacklog = 0;
 
+        // Drain the queue: a settled world iterates zero chunks per frame.
+        List<Chunk> dirty = world.drainDirtyChunks();
+        if (dirty == null) return;
+
+        long deadline = System.nanoTime() + REBUILD_BUDGET_NS;
+
         // Light first: the mesher reads light values, so a chunk relit this
         // frame must not be meshed with stale data
-        for (Map.Entry<Long, Chunk> entry : world.getChunks().entrySet()) {
-            Chunk chunk = entry.getValue();
+        for (Chunk chunk : dirty) {
             if (!chunk.isLightDirty()) continue;
 
             if (System.nanoTime() > deadline) { lightBacklog++; continue; }
             LightEngine.computeChunkLight(chunk, world);
         }
 
-        for (Map.Entry<Long, Chunk> entry : world.getChunks().entrySet()) {
-            Chunk chunk = entry.getValue();
+        for (Chunk chunk : dirty) {
             if (!chunk.isDirty()) continue;
 
             // Never mesh a chunk whose light is still pending
@@ -441,7 +443,8 @@ public class Renderer {
 
             if (System.nanoTime() > deadline) { meshBacklog++; continue; }
 
-            RenderChunk rc = renderChunks.computeIfAbsent(entry.getKey(), k -> new RenderChunk());
+            RenderChunk rc = renderChunks.computeIfAbsent(
+                Chunk.key(chunk.getChunkX(), chunk.getChunkZ()), k -> new RenderChunk());
             rc.rebuild(chunk, world, textureAtlas);
             chunk.setDirty(false);
             remeshGeneration++;
@@ -502,7 +505,7 @@ public class Renderer {
 
         ChunkMeshBuilder.setAmbientOcclusionEnabled(enabled);
         for (Chunk chunk : world.getChunks().values()) {
-            chunk.setDirty(true);
+            world.markRemeshChunk(chunk);
         }
     }
 

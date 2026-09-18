@@ -25,6 +25,7 @@ public final class BiomeRegistry {
             parse(text);
             loaded = true;
             System.out.println("Loaded " + BIOMES.size() + " biomes");
+            checkSelectorMappings();
         } catch (Exception e) {
             System.err.println("Could not load biomes: " + e.getMessage());
         }
@@ -35,14 +36,23 @@ public final class BiomeRegistry {
         // Find each biome object in the "biomes" array
         int arrayStart = text.indexOf('[');
         int arrayEnd = text.lastIndexOf(']');
-        if (arrayStart < 0 || arrayEnd < 0) return;
+        if (arrayStart < 0 || arrayEnd < 0) {
+            System.err.println("biomes.json: no biome array found");
+            return;
+        }
 
         String arrayContent = text.substring(arrayStart + 1, arrayEnd);
         List<String> objects = splitObjects(arrayContent);
 
+        int failed = 0;
         for (String obj : objects) {
             BiomeData biome = parseBiome(obj);
             if (biome != null) BIOMES.add(biome);
+            else failed++;
+        }
+        if (failed > 0) {
+            System.err.println("biomes.json: " + failed + " of " + objects.size()
+                + " biome blocks failed to parse (see errors above)");
         }
     }
 
@@ -60,10 +70,30 @@ public final class BiomeRegistry {
                 if (depth == 0 && start >= 0) {
                     result.add(content.substring(start + 1, i));
                     start = -1;
+                } else if (depth < 0) {
+                    // A '}' with no opening '{': some biome block above is
+                    // malformed (duplicate key, stray brace) — everything
+                    // after it mis-splits, so point at the line
+                    System.err.println("biomes.json: unbalanced braces near line "
+                        + lineOf(content, i) + " - a biome block above is malformed");
+                    depth = 0;
+                    start = -1;
                 }
             }
         }
+        if (depth > 0) {
+            System.err.println("biomes.json: unclosed brace near line "
+                + lineOf(content, content.length() - 1));
+        }
         return result;
+    }
+
+    private static int lineOf(String text, int offset) {
+        int line = 1;
+        for (int i = 0; i < offset && i < text.length(); i++) {
+            if (text.charAt(i) == '\n') line++;
+        }
+        return line;
     }
 
     private static String getString(String text, String key) {
@@ -197,6 +227,10 @@ public final class BiomeRegistry {
             float grassDensity = getNestedFloat(features, "grass", "density");
             String particleType = getNestedString(features, "particles", "type");
             float particleDensity = getNestedFloat(features, "particles", "density");
+            float deadBushDensity = getNestedFloat(features, "dead_bush", "density");
+            float icePatchDensity = getNestedFloat(features, "ice_patch", "density");
+            float fallenLogDensity = getNestedFloat(features, "fallen_log", "density");
+            float boulderDensity = getNestedFloat(features, "boulder", "density");
             int fogColor = getHexInt(obj, "fog_color");
 
             return new BiomeData(id, nameKey,
@@ -205,10 +239,31 @@ public final class BiomeRegistry {
                 surfaceBlock, fillerBlock,
                 treeType, treeDensity, flowerType, flowerDensity,
                 grassType, grassDensity, particleType, particleDensity,
+                deadBushDensity, icePatchDensity, fallenLogDensity, boulderDensity,
                 fogColor);
         } catch (Exception e) {
-            System.err.println("Failed to parse biome: " + e.getMessage());
+            String id;
+            try {
+                id = getString(obj, "id");
+            } catch (Exception inner) {
+                id = "<unparsed>";
+            }
+            System.err.println("Failed to parse biome '" + id + "': " + e);
             return null;
+        }
+    }
+
+    /** Every selector biome must resolve to a loaded biomes.json entry. */
+    private static void checkSelectorMappings() {
+        if (BIOMES.isEmpty()) {
+            System.err.println("biomes.json loaded zero biomes — worldgen falls back to defaults");
+            return;
+        }
+        for (Map.Entry<BiomeSelector.MCBiome, String> e : MC_JSON.entrySet()) {
+            if (get(e.getValue()) == null) {
+                System.err.println("biomes.json: selector biome " + e.getKey()
+                    + " maps to id '" + e.getValue() + "' which failed to load");
+            }
         }
     }
 
