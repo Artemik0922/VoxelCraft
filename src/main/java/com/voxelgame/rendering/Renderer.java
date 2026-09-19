@@ -449,6 +449,10 @@ public class Renderer {
             chunk.setDirty(false);
             remeshGeneration++;
         }
+
+        // Successful chunks cleared both flags; the ones that missed the
+        // budget keep them and go back into the queue for the next frame
+        world.requeueDirtyChunks(dirty);
     }
 
     /** How many chunk meshes have been rebuilt; drives shadow-map invalidation. */

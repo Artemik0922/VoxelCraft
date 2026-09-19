@@ -879,6 +879,19 @@ public class World {
         dirtyChunks.clear();
         return out;
     }
+
+    /**
+     * Puts chunks that still carry dirty/lightDirty flags back into the
+     * queue. The renderer drains the whole queue up front, so chunks that
+     * miss the per-frame rebuild budget would otherwise strand with their
+     * flags set and never be retried.
+     */
+    public void requeueDirtyChunks(List<Chunk> chunks) {
+        if (chunks == null) return;
+        for (Chunk c : chunks) {
+            if (c.isDirty() || c.isLightDirty()) dirtyChunks.add(c);
+        }
+    }
     
     /**
      * Combined light level (sky vs block, whichever is stronger) at world coords.

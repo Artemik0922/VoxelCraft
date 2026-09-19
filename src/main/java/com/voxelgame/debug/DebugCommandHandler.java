@@ -83,8 +83,8 @@ public final class DebugCommandHandler {
         try {
             long size = Files.exists(IN_FILE) ? Files.size(IN_FILE) : 0L;
             if (readOffset < 0) {
-                readOffset = 0;
-                return; // first sight: don't replay commands left over from an older run
+                readOffset = size; // first sight: don't replay commands left over from an older run
+                return;
             }
             if (size < readOffset) {
                 readOffset = size; // file was rewritten or truncated
@@ -94,14 +94,17 @@ public final class DebugCommandHandler {
             if (size <= readOffset) return;
 
             byte[] buf = new byte[(int) (size - readOffset)];
+            int got = 0;
             try (FileInputStream fis = new FileInputStream(IN_FILE.toFile())) {
-                int got = 0;
                 while (got < buf.length) {
                     int r = fis.read(buf, got, buf.length - got);
                     if (r < 0) break;
                     got += r;
                 }
             }
+            // A short read means the writer was still flushing; retry the
+            // whole range next tick instead of parsing zero-padded garbage
+            if (got < buf.length) return;
             readOffset = size;
 
             for (String line : new String(buf, StandardCharsets.UTF_8).split("\r?\n")) {
