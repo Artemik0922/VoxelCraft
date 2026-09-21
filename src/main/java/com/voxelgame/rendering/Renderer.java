@@ -417,25 +417,23 @@ public class Renderer {
     private static final long REBUILD_BUDGET_NS = 6_000_000L;
 
     private void updateDirtyChunks(World world) {
+        long deadline = System.nanoTime() + REBUILD_BUDGET_NS;
+
         lightBacklog = 0;
         meshBacklog = 0;
 
-        // Drain the queue: a settled world iterates zero chunks per frame.
-        List<Chunk> dirty = world.drainDirtyChunks();
-        if (dirty == null) return;
-
-        long deadline = System.nanoTime() + REBUILD_BUDGET_NS;
-
         // Light first: the mesher reads light values, so a chunk relit this
         // frame must not be meshed with stale data
-        for (Chunk chunk : dirty) {
+        for (Map.Entry<Long, Chunk> entry : world.getChunks().entrySet()) {
+            Chunk chunk = entry.getValue();
             if (!chunk.isLightDirty()) continue;
 
             if (System.nanoTime() > deadline) { lightBacklog++; continue; }
             LightEngine.computeChunkLight(chunk, world);
         }
 
-        for (Chunk chunk : dirty) {
+        for (Map.Entry<Long, Chunk> entry : world.getChunks().entrySet()) {
+            Chunk chunk = entry.getValue();
             if (!chunk.isDirty()) continue;
 
             // Never mesh a chunk whose light is still pending
@@ -443,16 +441,11 @@ public class Renderer {
 
             if (System.nanoTime() > deadline) { meshBacklog++; continue; }
 
-            RenderChunk rc = renderChunks.computeIfAbsent(
-                Chunk.key(chunk.getChunkX(), chunk.getChunkZ()), k -> new RenderChunk());
+            RenderChunk rc = renderChunks.computeIfAbsent(entry.getKey(), k -> new RenderChunk());
             rc.rebuild(chunk, world, textureAtlas);
             chunk.setDirty(false);
             remeshGeneration++;
         }
-
-        // Successful chunks cleared both flags; the ones that missed the
-        // budget keep them and go back into the queue for the next frame
-        world.requeueDirtyChunks(dirty);
     }
 
     /** How many chunk meshes have been rebuilt; drives shadow-map invalidation. */
@@ -509,7 +502,7 @@ public class Renderer {
 
         ChunkMeshBuilder.setAmbientOcclusionEnabled(enabled);
         for (Chunk chunk : world.getChunks().values()) {
-            world.markRemeshChunk(chunk);
+            chunk.setDirty(true);
         }
     }
 

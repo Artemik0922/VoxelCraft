@@ -233,7 +233,7 @@ public class TerrainGenerator {
         }
 
         decorate(chunk, originX, originZ, heights, biomes, side);
-        generateWater(chunk, originX, originZ, heights, side);
+        generateWater(chunk, originX, originZ);
         placeUnderwaterCover(chunk, originX, originZ, heights, biomes, side);
         placeLilyPads(chunk, originX, originZ, biomes, side);
         placeIcePatches(chunk, originX, originZ, heights, biomes, side);
@@ -280,13 +280,12 @@ public class TerrainGenerator {
      * Heights come from the cached margin array so the height/biome noise
      * stack is not recomputed a second time per column.
      */
-    private void generateWater(Chunk chunk, int originX, int originZ,
-                               int[] heights, int side) {
-        final int M = DECORATION_MARGIN;
+    private void generateWater(Chunk chunk, int originX, int originZ) {
         for (int x = 0; x < Chunk.SIZE; x++) {
             for (int z = 0; z < Chunk.SIZE; z++) {
-                int i = (x + M) * side + (z + M);
-                int height = heights[i];
+                int wx = originX + x;
+                int wz = originZ + z;
+                int height = getHeight(wx, wz);
 
                 // Fill all air blocks below sea level with water
                 if (height < SEA_LEVEL) {
