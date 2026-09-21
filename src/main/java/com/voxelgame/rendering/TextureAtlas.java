@@ -301,7 +301,7 @@ tile("spruce_planks", "spruce_planks.png", BlockType.SPRUCE_PLANKS);
         tile("nether_bricks", "nether_bricks.png", BlockType.NETHER_BRICKS);
 
         // --- Items (flat sprites) ---
-        tileGenerated("iron_sword", BlockType.IRON_SWORD);
+        tileSprite("iron_sword", "iron_sword.png", BlockType.IRON_SWORD);
         tileGenerated("stick", BlockType.ITEM_STICK);
         tileGenerated("coal", BlockType.ITEM_COAL);
         tileGenerated("iron_ingot", BlockType.ITEM_IRON_INGOT);
@@ -338,37 +338,37 @@ tile("spruce_planks", "spruce_planks.png", BlockType.SPRUCE_PLANKS);
         tileGenerated("sugar", BlockType.SLIME_BLOCK);
 
         // Tools
-        tileGenerated("wooden_pickaxe", BlockType.ITEM_WOODEN_PICKAXE);
-        tileGenerated("wooden_axe", BlockType.ITEM_WOODEN_AXE);
-        tileGenerated("wooden_shovel", BlockType.ITEM_WOODEN_SHOVEL);
-        tileGenerated("wooden_sword", BlockType.ITEM_WOODEN_SWORD);
-        tileGenerated("wooden_hoe", BlockType.ITEM_WOODEN_HOE);
-        tileGenerated("stone_pickaxe", BlockType.ITEM_STONE_PICKAXE);
-        tileGenerated("stone_axe", BlockType.ITEM_STONE_AXE);
-        tileGenerated("stone_shovel", BlockType.ITEM_STONE_SHOVEL);
-        tileGenerated("stone_sword", BlockType.ITEM_STONE_SWORD);
-        tileGenerated("stone_hoe", BlockType.ITEM_STONE_HOE);
-        tileGenerated("iron_pickaxe", BlockType.ITEM_IRON_PICKAXE);
-        tileGenerated("iron_axe", BlockType.ITEM_IRON_AXE);
-        tileGenerated("iron_shovel", BlockType.ITEM_IRON_SHOVEL);
-        tileGenerated("iron_sword_item", BlockType.ITEM_IRON_SWORD);
-        tileGenerated("iron_hoe", BlockType.ITEM_IRON_HOE);
-        tileGenerated("diamond_pickaxe", BlockType.ITEM_DIAMOND_PICKAXE);
-        tileGenerated("diamond_axe", BlockType.ITEM_DIAMOND_AXE);
-        tileGenerated("diamond_shovel", BlockType.ITEM_DIAMOND_SHOVEL);
-        tileGenerated("diamond_sword", BlockType.ITEM_DIAMOND_SWORD);
-        tileGenerated("diamond_hoe", BlockType.ITEM_DIAMOND_HOE);
-        tileGenerated("golden_pickaxe", BlockType.ITEM_GOLDEN_PICKAXE);
-        tileGenerated("golden_axe", BlockType.ITEM_GOLDEN_AXE);
-        tileGenerated("golden_shovel", BlockType.ITEM_GOLDEN_SHOVEL);
-        tileGenerated("golden_sword", BlockType.ITEM_GOLDEN_SWORD);
-        tileGenerated("golden_hoe", BlockType.ITEM_GOLDEN_HOE);
+        tileSprite("wooden_pickaxe", "wooden_pickaxe.png", BlockType.ITEM_WOODEN_PICKAXE);
+        tileSprite("wooden_axe", "wooden_axe.png", BlockType.ITEM_WOODEN_AXE);
+        tileSprite("wooden_shovel", "wooden_shovel.png", BlockType.ITEM_WOODEN_SHOVEL);
+        tileSprite("wooden_sword", "wooden_sword.png", BlockType.ITEM_WOODEN_SWORD);
+        tileSprite("wooden_hoe", "wooden_hoe.png", BlockType.ITEM_WOODEN_HOE);
+        tileSprite("stone_pickaxe", "stone_pickaxe.png", BlockType.ITEM_STONE_PICKAXE);
+        tileSprite("stone_axe", "stone_axe.png", BlockType.ITEM_STONE_AXE);
+        tileSprite("stone_shovel", "stone_shovel.png", BlockType.ITEM_STONE_SHOVEL);
+        tileSprite("stone_sword", "stone_sword.png", BlockType.ITEM_STONE_SWORD);
+        tileSprite("stone_hoe", "stone_hoe.png", BlockType.ITEM_STONE_HOE);
+        tileSprite("iron_pickaxe", "iron_pickaxe.png", BlockType.ITEM_IRON_PICKAXE);
+        tileSprite("iron_axe", "iron_axe.png", BlockType.ITEM_IRON_AXE);
+        tileSprite("iron_shovel", "iron_shovel.png", BlockType.ITEM_IRON_SHOVEL);
+        tileSprite("iron_sword_item", "iron_sword_item.png", BlockType.ITEM_IRON_SWORD);
+        tileSprite("iron_hoe", "iron_hoe.png", BlockType.ITEM_IRON_HOE);
+        tileSprite("diamond_pickaxe", "diamond_pickaxe.png", BlockType.ITEM_DIAMOND_PICKAXE);
+        tileSprite("diamond_axe", "diamond_axe.png", BlockType.ITEM_DIAMOND_AXE);
+        tileSprite("diamond_shovel", "diamond_shovel.png", BlockType.ITEM_DIAMOND_SHOVEL);
+        tileSprite("diamond_sword", "diamond_sword.png", BlockType.ITEM_DIAMOND_SWORD);
+        tileSprite("diamond_hoe", "diamond_hoe.png", BlockType.ITEM_DIAMOND_HOE);
+        tileSprite("golden_pickaxe", "golden_pickaxe.png", BlockType.ITEM_GOLDEN_PICKAXE);
+        tileSprite("golden_axe", "golden_axe.png", BlockType.ITEM_GOLDEN_AXE);
+        tileSprite("golden_shovel", "golden_shovel.png", BlockType.ITEM_GOLDEN_SHOVEL);
+        tileSprite("golden_sword", "golden_sword.png", BlockType.ITEM_GOLDEN_SWORD);
+        tileSprite("golden_hoe", "golden_hoe.png", BlockType.ITEM_GOLDEN_HOE);
         // [ECO] Meteorite tools
-        tileGenerated("meteorite_pickaxe", BlockType.ITEM_METEORITE_PICKAXE);
-        tileGenerated("meteorite_axe", BlockType.ITEM_METEORITE_AXE);
-        tileGenerated("meteorite_shovel", BlockType.ITEM_METEORITE_SHOVEL);
-        tileGenerated("meteorite_sword", BlockType.ITEM_METEORITE_SWORD);
-        tileGenerated("meteorite_hoe", BlockType.ITEM_METEORITE_HOE);
+        tileSprite("meteorite_pickaxe", "meteorite_pickaxe.png", BlockType.ITEM_METEORITE_PICKAXE);
+        tileSprite("meteorite_axe", "meteorite_axe.png", BlockType.ITEM_METEORITE_AXE);
+        tileSprite("meteorite_shovel", "meteorite_shovel.png", BlockType.ITEM_METEORITE_SHOVEL);
+        tileSprite("meteorite_sword", "meteorite_sword.png", BlockType.ITEM_METEORITE_SWORD);
+        tileSprite("meteorite_hoe", "meteorite_hoe.png", BlockType.ITEM_METEORITE_HOE);
 
         // Armor
         tileGenerated("leather_helmet", BlockType.ITEM_LEATHER_HELMET);
@@ -627,6 +627,30 @@ tile("spruce_planks", "spruce_planks.png", BlockType.SPRUCE_PLANKS);
         generated++;
 
         int slot = nextSlot++;
+        blit(slot, pixels);
+        layerPixels.add(pixels);
+        slotByName.put(name, slot);
+        return slot;
+    }
+
+    /**
+     * Item/tool sprite: prefer a PNG (bundled or pack) and fall back to the
+     * procedural generator. Unlike {@link #tile}, alpha is never filled in -
+     * item sprites are cut-outs on a transparent background by design.
+     */
+    private int tileSprite(String name, String pngFile, BlockType type) {
+        Integer existing = slotByName.get(name);
+        if (existing != null) return existing;
+
+        int slot = nextSlot++;
+        int[] pixels = loadTilePng(pngFile);
+        if (pixels != null) {
+            loadedFromPng++;
+        } else {
+            pixels = TileGenerator.generate(name, type, 0);
+            generated++;
+        }
+
         blit(slot, pixels);
         layerPixels.add(pixels);
         slotByName.put(name, slot);
