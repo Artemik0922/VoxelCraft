@@ -52,9 +52,7 @@ public class TextField extends Widget {
         int fadeAlpha = (alpha >>> 24) & 0xFF;
 
         // Rounded glass inset field
-        int field = MenuTheme.lightContext
-            ? (focused ? 0xFFFDFFFF : 0xFFF6F8FC)
-            : (focused ? 0xFF0A0F18 : 0xFF0C111C);
+        int field = focused ? 0xFF3A2A1A : 0xFF332314; // walnut ink field
         ui.drawNineSlice(tex.glassField, x, y, width, height, 6,
             GuiAssets.GLASS_WIDGET, MenuTheme.col(fadeAlpha << 24, 255, field));
 

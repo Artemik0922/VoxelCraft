@@ -214,11 +214,12 @@ public class SelectWorldScreen2 extends Scene {
         // Walnut plank wall with a warm veil
         d.wall(0, 0, width, height, 0xFF6B4A2B);
         d.fill(0, 0, width, height, 0x73261A10);
-    }
 
-    @Override
-    protected void renderForeground(UiDraw d) {
-        // Title stamp: a paper tag overlapping the board's top edge
+        // Board, rows and chrome must all sit UNDER the element tree so the
+        // delete modal (a tree child) renders on top of them
+        drawBoard(d);
+
+        // Title stamp: a paper tag pinned OVER the board's top edge
         String title = tr("selectWorld.title");
         int stampW = d.font.width(title) + 20;
         d.paper(boardX + 8, boardY - 9, stampW, 18);
@@ -226,8 +227,6 @@ public class SelectWorldScreen2 extends Scene {
         d.fill(boardX + 15, boardY - 5, 1, 3, UiTheme.BRASS);
         d.fill(boardX + 15, boardY - 4, 1, 1, UiTheme.BRASS_LIGHT);
         d.text(title, boardX + 22, boardY - 4, UiTheme.INK);
-
-        drawBoard(d);
         if (!worlds.isEmpty()) {
             drawRows(d);
             drawScrollbar(d);
@@ -240,6 +239,11 @@ public class SelectWorldScreen2 extends Scene {
         }
 
         drawDetailsNote(d);
+    }
+
+    @Override
+    protected void renderForeground(UiDraw d) {
+
     }
 
     private void drawBoard(UiDraw d) {
@@ -308,7 +312,12 @@ public class SelectWorldScreen2 extends Scene {
 
         boolean has = selected >= 0 && selected < worlds.size();
         if (!has) {
-            d.text(tr("selectWorld.hint"), colX + 8, infoY + 8, UiTheme.INK_SOFT);
+            List<String> hintLines = wrap(d.font, tr("selectWorld.hint"), colW - 16);
+            int hy = infoY + 8;
+            for (String line : hintLines) {
+                d.text(line, colX + 8, hy, 0xFF5A4A34);
+                hy += FontRenderer.LINE_HEIGHT;
+            }
             return;
         }
         WorldMeta w = worlds.get(selected);
