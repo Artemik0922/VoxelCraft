@@ -1600,6 +1600,17 @@ if (fresh) {
      * The b/i letter disambiguates blocks with ids above 127 from items,
      * which the old purely-numeric encoding could not do.
      */
+    /** Finds the item carried by a sprite-only pseudo-block ("golden_sword"). */
+    private static Item itemForSpriteBlock(BlockType block) {
+        String wanted = block.name.endsWith("_item")
+            ? block.name.substring(0, block.name.length() - "_item".length())
+            : block.name;
+        for (Item it : ItemRegistry.all()) {
+            if (it.name.equals(wanted)) return it;
+        }
+        return null;
+    }
+
     private String serializeInventory(Inventory inv) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
@@ -1670,6 +1681,23 @@ if (fresh) {
                 } else {
                     BlockType block = BlockType.fromId(id);
                     if (block == null) continue;
+
+                    // Sprite-only pseudo-blocks (tools, food, materials) used
+                    // to leak into saves as block stacks - restore the real
+                    // item they carry, otherwise a sword comes back as a cube
+                    if (block.isItemSprite()) {
+                        Item it = itemForSpriteBlock(block);
+                        if (it != null) {
+                            if (slot < 9) inv.setHotbarItem(slot, it, count);
+                            else inv.setInventoryItem(slot - 9, it, count);
+                            ItemStack stored = slot < 9
+                                ? inv.getHotbarItem(slot)
+                                : inv.getInventoryItem(slot - 9);
+                            stored.setDurability(durability);
+                            continue;
+                        }
+                    }
+
                     if (slot < 9) inv.setHotbarItem(slot, block, count);
                     else inv.setInventoryItem(slot - 9, block, count);
                 }

@@ -77,7 +77,10 @@ public class CreativeInventoryScreen extends Screen {
         this.atlas = atlas;
 
         for (BlockType t : BlockType.values()) {
-            if (t != BlockType.AIR) palette.add(new ItemStack(t, 1));
+            // Sprite-only item pseudo-blocks duplicate the real palette
+            // entries and come back as placeless block stacks
+            if (t == BlockType.AIR || t.isItemSprite()) continue;
+            palette.add(new ItemStack(t, 1));
         }
         for (com.voxelgame.item.Item item : ItemRegistry.all()) {
             palette.add(new ItemStack(item, 1));

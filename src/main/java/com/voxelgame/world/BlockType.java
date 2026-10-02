@@ -452,7 +452,10 @@ public enum BlockType {
      * never be placed into the world and always draw as an extruded sprite.
      */
     public boolean isItemSprite() {
-        return name.startsWith("item_") || this == IRON_SWORD;
+        // The pseudo-blocks are registered as ITEM_* enum constants; their
+        // runtime names ("golden_sword", "iron_sword_item", ...) never
+        // start with a common prefix
+        return name().startsWith("ITEM_") || this == IRON_SWORD;
     }
 
     /** O(1) solid lookup for mesher/lighting hot paths. */
