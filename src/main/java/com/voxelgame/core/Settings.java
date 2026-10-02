@@ -80,11 +80,12 @@ public class Settings {
     /** Interface language; Russian by default. */
     public String language = Language.DEFAULT;
 
-    // First-person view model placement, tuned in game with F6
-    public float handItemX = 0.58f, handItemY = -0.48f, handItemZ = -1.45f;
-    public float handItemRotY = -25.0f, handItemRotX = 30.0f, handItemScale = 0.40f;
-    public float handArmX = 0.68f, handArmY = -0.52f, handArmZ = -1.05f;
-    public float handArmRotZ = -35.0f, handArmRotX = 15.0f;
+    // First-person view model fine offsets on top of the vanilla pose,
+    // tuned in game with F6. Zero = exactly the vanilla pose.
+    public float handItemX = 0.0f, handItemY = 0.0f, handItemZ = 0.0f;
+    public float handItemRotY = 0.0f, handItemRotX = 0.0f, handItemScale = 0.0f;
+    public float handArmX = 0.0f, handArmY = 0.0f, handArmZ = 0.0f;
+    public float handArmRotZ = 0.0f, handArmRotX = 0.0f;
 
     public static final int MIN_RENDER_DISTANCE = 2;
     public static final int MAX_RENDER_DISTANCE = 16;

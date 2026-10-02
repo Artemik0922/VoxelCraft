@@ -41,6 +41,14 @@ public abstract class Screen {
     /** Whether Escape closes this screen. */
     public boolean closableWithEscape() { return true; }
 
+    /**
+     * Menu-flow screens (main menu, options, world screens) render in the
+     * light "airy" style: white glass panels with dark text. In-game screens
+     * keep the dark glass. Swaps the whole {@link com.voxelgame.ui.MenuTheme}
+     * base palette for the duration of this render pass.
+     */
+    protected boolean lightTheme() { return false; }
+
     public void init(int width, int height) {
         this.width = width;
         this.height = height;
@@ -67,14 +75,19 @@ public abstract class Screen {
     }
 
     public void render(UIRenderer ui, FontRenderer font, GuiAssets tex, float mx, float my) {
-        renderBackground(ui, font, tex);
+        com.voxelgame.ui.MenuTheme.beginFrame(lightTheme());
+        try {
+            renderBackground(ui, font, tex);
 
-        for (Widget w : widgets) {
-            w.updateHover(mx, my);
-            w.render(ui, font, tex, mx, my);
+            for (Widget w : widgets) {
+                w.updateHover(mx, my);
+                w.render(ui, font, tex, mx, my);
+            }
+
+            renderForeground(ui, font, tex, mx, my);
+        } finally {
+            com.voxelgame.ui.MenuTheme.endFrame();
         }
-
-        renderForeground(ui, font, tex, mx, my);
     }
 
     protected void renderBackground(UIRenderer ui, FontRenderer font, GuiAssets tex) {}

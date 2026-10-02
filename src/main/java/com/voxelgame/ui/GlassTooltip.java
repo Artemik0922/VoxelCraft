@@ -42,12 +42,11 @@ public final class GlassTooltip {
         if (ty < 2) ty = my + 14;
         if (tx < 2) tx = 2;
 
-        GuiAssets g = GuiAssets.INSTANCE;
-        ui.drawNineSlice(g.glassShadow, tx + 2, ty + 3, tw, th,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xAA000000);
-        ui.drawNineSlice(g.glassPanel, tx, ty, tw, th,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xF8202432);
-        ui.fillRect(tx + 8, ty + 1, tw - 16, 1, 0x66FFFFFF);
+        com.voxelgame.ui2.UiMaterials m = com.voxelgame.ui2.UiMaterials.INSTANCE;
+        ui.drawNineSlice(m.paper, tx, ty, tw, th,
+            com.voxelgame.ui2.UiTheme.PAPER_BORDER, com.voxelgame.ui2.UiTheme.PAPER_TEX,
+            0xFFF6EDD8);
+        ui.drawRectOutline(tx + 1, ty + 1, tw - 2, th - 2, 0x662A1D12);
 
         int y = ty + 4;
         for (int i = 0; i < lines.size(); i++) {
@@ -55,7 +54,7 @@ public final class GlassTooltip {
             if (colors != null && i < colors.length && colors[i] != 0) {
                 col = colors[i];
             } else {
-                col = (i == 0) ? 0xFFFFFFFF : 0xFFB8C2DC;
+                col = (i == 0) ? 0xFF2A1D12 : 0xFF5A4A34;
             }
             font.drawWithShadow(ui, lines.get(i), tx + 5, y, col);
             y += lh;

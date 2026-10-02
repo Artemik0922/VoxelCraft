@@ -37,14 +37,21 @@ public final class Minimap {
     private static final long REBUILD_NANOS = 500_000_000L;
 
     private static final int PAD = 8;            // map inset from screen corner
-    private static final int RING = 3;           // metal ring thickness, gui px
-    private static final int COLOR_UNKNOWN = 0xFF141824;
-    private static final int OUTLINE = 0xE012141E;
+    private static final int RING = 3;           // frame thickness, gui px
 
-    private static final int RING_EDGE = 0xFF23252F;
-    private static final int RING_INNER = 0xFF2A2D3A;
-    private static final int RING_LIGHT = 0xFFD4D9E4;
-    private static final int RING_DARK = 0xFF61667A;
+    // Light chrome to match the airy menu style: white ring, dark labels
+    private static final int COLOR_UNKNOWN = 0xFFD8CBB0;
+    private static final int OUTLINE = 0xE0261A10;
+    private static final int SHADOW = 0x38261A10;
+
+    private static final int RING_EDGE = 0xFF8A6420;
+    private static final int RING_INNER = 0xFFC9973B;
+    private static final int RING_LIGHT = 0xFFEDD9A0;
+    private static final int RING_DARK = 0xFF6E5220;
+    private static final int RING_TEXT = 0xFF4A3220;
+    private static final int PILL = 0x92E8D9B8;
+    private static final int CAPTION = 0xFF2A1D12;
+    private static final int CAPTION_SUB = 0xFF6E5A3A;
 
     private static final int WATER_SHALLOW = 0x3E8AE0;
     private static final int WATER_DEEP = 0x16388C;
@@ -55,14 +62,18 @@ public final class Minimap {
     private static final int MARK_VILLAGE = 0xFFFFD24A;
     private static final int MARK_SPAWN = 0xFF7CDCFF;
     private static final int MARK_FIRE = 0xFFFF8030;
-    private static final int NEEDLE = 0xFFF4F7FF;
+    private static final int NEEDLE = 0xFFEDD9A0;
 
     private static final float TOAST_SECONDS = 1.4f;
+
+    /** Expanded map forces the widest stride and a fixed zoom. */
+    private static final int EXPANDED_SCALE = 3;
 
     private final Texture[] textures = new Texture[STRIDES.length];
     private int[] heights = new int[(MAX_STRIDE + 2) * (MAX_STRIDE + 2)];
 
     private int zoom = 1;
+    private boolean expanded = false;
     private int centerX = Integer.MIN_VALUE;
     private int centerZ = Integer.MIN_VALUE;
     private long lastRebuild;
@@ -74,8 +85,10 @@ public final class Minimap {
 
     public int pixelSize() { return STRIDES[zoom] * SCALES[zoom]; }
 
-    /** Total gui height of the map block: circle, ring and top padding. */
-    public int totalHeight() { return PAD + pixelSize() + 2 * RING + 2; }
+    /** Total gui height of the map block: circle, ring and caption pill. */
+    public int totalHeight() {
+        return PAD + pixelSize() + 2 * RING + 4 + FontRenderer.LINE_HEIGHT * 2 + 6;
+    }
 
     /** True when the gui-space cursor is over the map circle. */
     public boolean hover(float mx, float my) {
@@ -92,6 +105,18 @@ public final class Minimap {
             toast = TOAST_SECONDS;
         }
     }
+
+    /** Fullscreen map mode (TAB): big centred disc + waypoint list. */
+    public boolean isExpanded() { return expanded; }
+
+    public void setExpanded(boolean on) {
+        if (expanded != on) {
+            expanded = on;
+            centerX = Integer.MIN_VALUE; // force rebuild at the new size
+        }
+    }
+
+    public void toggleExpanded() { setExpanded(!expanded); }
 
     public void update(double deltaTime) {
         if (toast > 0) toast = (float) Math.max(0, toast - deltaTime);
@@ -115,15 +140,17 @@ public final class Minimap {
     public void render(UIRenderer ui, FontRenderer font, World world,
                        double pdx, double pdy, double pdz, float yaw,
                        float daylight, String biomeLabel, String clock) {
-        int stride = STRIDES[zoom];
-        int scale = SCALES[zoom];
+        int zIdx = expanded ? STRIDES.length - 1 : zoom;
+        int stride = STRIDES[zIdx];
+        int scale = expanded ? expandedScale(ui.getWidth(), ui.getHeight())
+                             : SCALES[zIdx];
         int size = stride * scale;
         int radius = stride / 2;
 
-        Texture tex = textures[zoom];
+        Texture tex = textures[zIdx];
         if (tex == null) {
             tex = new Texture(stride, stride, new int[stride * stride]);
-            textures[zoom] = tex;
+            textures[zIdx] = tex;
         }
 
         long now = System.nanoTime();
@@ -131,35 +158,49 @@ public final class Minimap {
         int pz = (int) java.lang.Math.floor(pdz);
 
         int w = ui.getWidth();
-        mapX = w - PAD - size;
-        mapY = PAD + RING + 1;
+        int h = ui.getHeight();
+        if (expanded) {
+            // Centred, nudged left so the waypoint list fits on the right
+            cx = (w - 250) / 2f;
+            cy = h / 2f - 10;
+        } else {
+            mapX = w - PAD - size;
+            mapY = PAD + RING + 1;
+            cx = mapX + size / 2f;
+            cy = mapY + size / 2f;
+        }
         mapSize = size;
-        cx = mapX + size / 2f;
-        cy = mapY + size / 2f;
         outerR = size / 2f - 1;
         float innerR = outerR - RING;
 
         if (px != centerX || pz != centerZ || now - lastRebuild > REBUILD_NANOS) {
-            rebuild(world, tex, px, pz, stride, radius);
+            rebuild(world, tex, px, pz, stride, radius, scale);
         }
 
         ui.useSolidColor();
+
+        // Expanded mode: bright veil over the world so the big disc reads
+        if (expanded) {
+            ui.fillRect(0, 0, ui.getWidth(), ui.getHeight(), 0x5AFFFFFF);
+        }
 
         // Drop shadow under the whole disc
         for (int row = -(int) outerR; row <= (int) outerR; row++) {
             float half = (float) java.lang.Math.sqrt(
                 java.lang.Math.max(0, outerR * outerR - row * row));
-            ui.fillRect(cx - half + 2, cy + row + 3, half * 2, 1, 0x740A0E18);
+            ui.fillRect(cx - half + 2, cy + row + 3, half * 2, 1, SHADOW);
         }
 
         // Terrain quad (circular alpha mask lives in the texture itself),
         // gliding with the sub-block remainder
         float fracX = (float) (pdx - px);
         float fracZ = (float) (pdz - pz);
+        mapX = (int) (cx - size / 2f);
+        mapY = (int) (cy - size / 2f);
         ui.drawTexture(tex.getId(), mapX - fracX * scale, mapY - fracZ * scale,
             size, size, 0, 0, 1f, 1f, dayTint(daylight));
 
-        // Brushed-metal ring: shaded top-to-bottom with dark edge rows
+        // Brushed frame: shaded top-to-bottom with dark edge rows
         for (int row = -(int) outerR; row <= (int) outerR; row++) {
             float half = (float) java.lang.Math.sqrt(
                 java.lang.Math.max(0, outerR * outerR - row * row));
@@ -179,6 +220,27 @@ public final class Minimap {
             }
         }
 
+        // Engraved 45-degree ticks on the ring band
+        for (int i = 0; i < 8; i++) {
+            float ang = (float) (Math.PI / 4 * i);
+            float tx = (float) Math.sin(ang), ty = -(float) Math.cos(ang);
+            for (int r = (int) innerR + 1; r <= (int) outerR - 2; r++) {
+                ui.fillRect((int) (cx + tx * r), (int) (cy + ty * r), 1, 1, RING_DARK);
+            }
+        }
+
+        // Inner shadow: 3px translucent band just inside the map edge
+        for (int row = -(int) innerR; row <= (int) innerR; row++) {
+            float outer = (float) java.lang.Math.sqrt(
+                java.lang.Math.max(0, innerR * innerR - row * row));
+            float inner = (float) java.lang.Math.sqrt(
+                java.lang.Math.max(0, (innerR - 3) * (innerR - 3) - row * row));
+            if (outer > inner) {
+                ui.fillRect(cx - outer, cy + row, outer - inner, 1, 0x3C261A10);
+                ui.fillRect(cx + inner, cy + row, outer - inner, 1, 0x3C261A10);
+            }
+        }
+
         // Cardinal letters on the ring
         drawRingLetter(ui, font, cx, cy - outerR - 1, tr("hud.map.north"));
         drawRingLetter(ui, font, cx, cy + outerR - FontRenderer.GLYPH_H + 1, tr("hud.map.south"));
@@ -188,23 +250,35 @@ public final class Minimap {
         // World markers, then the compass needle
         drawSpawn(ui, world, pdx, pdz, scale, innerR);
         drawVillage(ui, world, pdx, pdz, scale, innerR, font);
+        drawWaypoints(ui, font, world, pdx, pdz, scale, innerR, !expanded);
         drawEntities(ui, world, pdx, pdz, scale, innerR);
         drawNeedle(ui, pdx, pdz, cx, cy, yaw, innerR);
 
-        // Captions under the disc
-        drawCaptions(ui, font, pdx, pdy, pdz, biomeLabel, clock);
+        if (expanded) {
+            drawWaypointList(ui, font, world, pdx, pdz);
+        } else {
+            // Captions under the disc
+            drawCaptions(ui, font, pdx, pdy, pdz, biomeLabel, clock);
+        }
 
         // Zoom toast fading near the bottom of the map
         if (toast > 0) {
-            String name = tr("hud.map.zoom." + zoom);
+            String name = tr("hud.map.zoom." + zIdx);
             String text = String.format(tr("hud.map.zoom"), name);
             int tw = font.scaledWidth(text, 1);
             int tx = (int) (cx - tw / 2f);
-            int ty = mapY + mapSize - 12;
-            ui.fillRect(tx - 4, ty - 2, tw + 8, FontRenderer.LINE_HEIGHT, 0x900A0E18);
+            int ty = (int) (cy + innerR) - 14;
+            ui.fillRect(tx - 5, ty - 2, tw + 10, FontRenderer.LINE_HEIGHT, PILL);
             int a = Math.min(255, (int) (toast / 0.4f * 255));
-            font.drawScaledWithShadow(ui, text, tx, ty, 1, (a << 24) | 0xFFE8C860);
+            font.drawScaledWithShadow(ui, text, tx, ty, 1, (a << 24) | (CAPTION & 0xFFFFFF));
         }
+    }
+
+    /** Expanded map zoom: as large as the space left of the list allows. */
+    private static int expandedScale(int screenW, int screenH) {
+        int fit = Math.min((screenW - 320) / STRIDES[STRIDES.length - 1],
+                           (screenH - 120) / STRIDES[STRIDES.length - 1]);
+        return Math.max(2, Math.min(EXPANDED_SCALE, fit));
     }
 
     /** Metal shade for one ring row: light at the top, dark at the bottom. */
@@ -217,14 +291,15 @@ public final class Minimap {
     }
 
     private void drawRingLetter(UIRenderer ui, FontRenderer font, float x, float y, String letter) {
-        font.drawScaledWithShadow(ui, letter, x, (int) y, 1, 0xFFEDF0F8);
+        font.drawScaledWithShadow(ui, letter, x, (int) y, 1, RING_TEXT);
     }
 
     // ------------------------------------------------------------------
     // Raster
     // ------------------------------------------------------------------
 
-    private void rebuild(World world, Texture tex, int px, int pz, int stride, int radius) {
+    private void rebuild(World world, Texture tex, int px, int pz, int stride,
+                         int radius, int scale) {
         centerX = px;
         centerZ = pz;
         lastRebuild = System.nanoTime();
@@ -243,7 +318,7 @@ public final class Minimap {
         // is baked into the texture so the quad needs no clipping
         float half = stride / 2f;
         float maskR = (mapSize > 0 ? (mapSize / 2f - RING - 1) : half * 3)
-            / Math.max(1, SCALES[zoom]); // texel-space radius of the disc
+            / Math.max(1, scale); // texel-space radius of the disc
 
         int[] raster = new int[stride * stride];
         for (int r = 0; r < stride; r++) {
@@ -577,6 +652,88 @@ public final class Minimap {
         diamond(ui, mx, my, color);
     }
 
+    /**
+     * Player waypoints: a colored diamond each, with a name + distance
+     * caption clamped to the disc like the village marker. When space is
+     * tight (small corner map) only the nearest few captions are drawn.
+     */
+    private void drawWaypoints(UIRenderer ui, FontRenderer font, World world,
+                               double pdx, double pdz, int scale, float innerR,
+                               boolean limitCaptions) {
+        var meta = world.getSave() == null ? null : world.getSave().getMeta();
+        if (meta == null) return;
+
+        int captions = 0;
+        for (com.voxelgame.world.save.Waypoint wp : meta.waypoints) {
+            double dx = wp.x + 0.5 - pdx;
+            double dz = wp.z + 0.5 - pdz;
+            double dist = java.lang.Math.sqrt(dx * dx + dz * dz);
+
+            float mx = (float) (cx + dx * scale);
+            float my = (float) (cy + dz * scale);
+            float rdx = mx - cx, rdy = my - cy;
+            float d = (float) java.lang.Math.sqrt(rdx * rdx + rdy * rdy);
+            boolean clamped = d > innerR - 6;
+            if (clamped) {
+                float k = (innerR - 6) / d;
+                mx = cx + rdx * k;
+                my = cy + rdy * k;
+            }
+            diamond(ui, mx, my, wp.color);
+
+            if (expanded || !limitCaptions || captions < 3) {
+                String text = wp.name + " \u00B7 " + formatDistance(dist);
+                int tw = font.scaledWidth(text, 1);
+                int tx = (int) (mx + (dx > 0 ? -tw - 5 : 5));
+                int ty = (int) (my + (dz > 0 ? -FontRenderer.LINE_HEIGHT - 2 : 2));
+                float lx = java.lang.Math.max(cx - innerR + 2, java.lang.Math.min(tx, cx + innerR - 2 - tw));
+                float ly = java.lang.Math.max(cy - innerR + 2, java.lang.Math.min(ty, cy + innerR - 2 - FontRenderer.LINE_HEIGHT));
+                font.drawScaledWithShadow(ui, text, lx, ly, 1, 0xFF000000 | RING_TEXT);
+                captions++;
+            }
+        }
+    }
+
+    /** Side panel of the expanded map: every waypoint with its distance. */
+    private void drawWaypointList(UIRenderer ui, FontRenderer font, World world,
+                                  double pdx, double pdz) {
+        var meta = world.getSave() == null ? null : world.getSave().getMeta();
+        int w = 236; // fixed-width panel, independent of map size
+        int x = (int) (cx + outerR) + 24;
+        var uiW = ui.getWidth();
+        if (x + w > uiW - 8) x = uiW - 8 - w;
+
+        var rows = meta == null ? java.util.List.<com.voxelgame.world.save.Waypoint>of()
+                                : meta.waypoints;
+        int titleH = FontRenderer.LINE_HEIGHT + 10;
+        int rowH = FontRenderer.LINE_HEIGHT + 6;
+        int bodyH = Math.min(rows.size(), 14) * rowH;
+        int y = (int) cy - (titleH + bodyH) / 2;
+
+        ui.fillRoundedRect(x, y, w, titleH + bodyH + 6, 5, 0xCCFFFFFF);
+        ui.fillRoundedRect(x, y, 3, titleH + bodyH + 6, 2, 0xFFC9973B);
+
+        font.draw(ui, tr("hud.map.waypoints"), x + 10, y + 5, 0xFF000000 | CAPTION);
+        int ry = y + titleH;
+        if (rows.isEmpty()) {
+            font.draw(ui, tr("hud.map.waypoints.empty"), x + 10, ry + 2, 0xFF000000 | CAPTION_SUB);
+            return;
+        }
+        for (int i = 0; i < rows.size() && i < 14; i++) {
+            com.voxelgame.world.save.Waypoint wp = rows.get(i);
+            double ddx = wp.x + 0.5 - pdx;
+            double ddz = wp.z + 0.5 - pdz;
+            double dist = java.lang.Math.sqrt(ddx * ddx + ddz * ddz);
+            ui.fillRect(x + 10, ry + 4, 6, 6, 0xFF000000 | wp.color);
+            String line = font.trimToWidth(wp.name, w - 74);
+            font.draw(ui, line, x + 22, ry + 3, 0xFF000000 | CAPTION);
+            String distText = formatDistance(dist);
+            font.draw(ui, distText, x + w - 8 - font.scaledWidth(distText, 1),
+                ry + 3, 0xFF000000 | CAPTION_SUB);
+            ry += rowH;
+        }
+    }
+
     private static String formatDistance(double blocks) {
         if (blocks < 1000) return (int) blocks + tr("hud.map.m");
         return String.format(java.util.Locale.ROOT, "%.1f", blocks / 1000.0) + tr("hud.map.km");
@@ -600,31 +757,86 @@ public final class Minimap {
         ui.fillRect(x, y + 2, 1, 1, color);
     }
 
-    /** Compass needle from the centre, pointing along the view yaw. */
+    /** Navigator-style heading arrow: filled pointer with an outline. */
     private void drawNeedle(UIRenderer ui, double pdx, double pdz,
                             float ccx, float ccy, float yaw, float innerR) {
         float rad = (float) java.lang.Math.toRadians(yaw);
         float ax = (float) java.lang.Math.cos(rad);
         float az = (float) java.lang.Math.sin(rad);
-        int len = (int) (innerR - 9);
 
-        // Outline pass: the same sweep nudged one pixel in each direction
-        for (int ox = -1; ox <= 1; ox++) {
-            for (int oy = -1; oy <= 1; oy++) {
-                if (ox == 0 && oy == 0) continue;
-                needleLine(ui, (int) ccx + ox, (int) ccy + oy, ax, az, len, OUTLINE);
+        float L = innerR - 9f;  // tip distance from the pivot
+        float W = 5.5f;         // half width of the arrow base
+        float B = 6f;           // how far the base sits behind the pivot
+        float N = 2.5f;         // depth of the base notch
+
+        fillArrow(ui, ccx, ccy, ax, az, L, W, B, N, OUTLINE, true);
+        fillArrow(ui, ccx, ccy, ax, az, L, W, B, N, NEEDLE, false);
+
+        // Engraved pivot dot at the player's position
+        for (int oy = -2; oy <= 2; oy++) {
+            for (int ox = -2; ox <= 2; ox++) {
+                if (ox * ox + oy * oy <= 4) {
+                    ui.fillRect((int) ccx + ox, (int) ccy + oy, 1, 1, OUTLINE);
+                }
             }
         }
-        needleLine(ui, (int) ccx, (int) ccy, ax, az, len, NEEDLE);
-        ui.fillRect(ccx - 1, ccy - 1, 3, 3, 0xFF0D111C);
-        ui.fillRect(ccx, ccy, 1, 1, NEEDLE);
+        ui.fillRect((int) ccx, (int) ccy, 1, 1, NEEDLE);
     }
 
-    private void needleLine(UIRenderer ui, int cx0, int cy0, float ax, float az, int len, int color) {
-        for (int t = 1; t <= len; t++) {
-            ui.fillRect(cx0 + java.lang.Math.round(ax * t),
-                cy0 + java.lang.Math.round(az * t), 2, 2, color);
+    /**
+     * Rasterises the heading arrow: two triangles (tip-right-notch and
+     * tip-notch-left) scanned over their bounding box. The outline pass
+     * dilates the shape by one pixel so it reads against any terrain.
+     */
+    private void fillArrow(UIRenderer ui, float ccx, float ccy,
+                           float ax, float az, float L, float W, float B, float N,
+                           int color, boolean outline) {
+        float px = -az, pz = ax;
+        float tipX = ccx + ax * L,          tipY = ccy + az * L;
+        float rBX  = ccx - ax * B + px * W, rBY  = ccy - az * B + pz * W;
+        float lBX  = ccx - ax * B - px * W, lBY  = ccy - az * B - pz * W;
+        float nX   = ccx - ax * (B - N),    nY   = ccy - az * (B - N);
+
+        int minX = (int) java.lang.Math.floor(Math.min(Math.min(tipX, rBX), Math.min(lBX, nX))) - 1;
+        int maxX = (int) java.lang.Math.ceil(Math.max(Math.max(tipX, rBX), Math.max(lBX, nX))) + 1;
+        int minY = (int) java.lang.Math.floor(Math.min(Math.min(tipY, rBY), Math.min(lBY, nY))) - 1;
+        int maxY = (int) java.lang.Math.ceil(Math.max(Math.max(tipY, rBY), Math.max(lBY, nY))) + 1;
+
+        for (int y = minY; y <= maxY; y++) {
+            for (int x = minX; x <= maxX; x++) {
+                if (arrowContains(x + 0.5f, y + 0.5f, tipX, tipY, rBX, rBY, nX, nY, lBX, lBY)
+                    || (outline && (arrowContains(x + 1.5f, y + 0.5f, tipX, tipY, rBX, rBY, nX, nY, lBX, lBY)
+                        || arrowContains(x - 0.5f, y + 0.5f, tipX, tipY, rBX, rBY, nX, nY, lBX, lBY)
+                        || arrowContains(x + 0.5f, y + 1.5f, tipX, tipY, rBX, rBY, nX, nY, lBX, lBY)
+                        || arrowContains(x + 0.5f, y - 0.5f, tipX, tipY, rBX, rBY, nX, nY, lBX, lBY)))) {
+                    ui.fillRect(x, y, 1, 1, color);
+                }
+            }
         }
+    }
+
+    /** Convex quad test via two triangles: (tip,right,notch) + (tip,notch,left). */
+    private static boolean arrowContains(float x, float y,
+                                         float tipX, float tipY,
+                                         float rBX, float rBY,
+                                         float nX, float nY,
+                                         float lBX, float lBY) {
+        return pointInTri(x, y, tipX, tipY, rBX, rBY, nX, nY)
+            || pointInTri(x, y, tipX, tipY, nX, nY, lBX, lBY);
+    }
+
+    private static boolean pointInTri(float px, float py,
+                                      float ax, float ay, float bx, float by, float cx, float cy) {
+        float d1 = triSign(px, py, ax, ay, bx, by);
+        float d2 = triSign(px, py, bx, by, cx, cy);
+        float d3 = triSign(px, py, cx, cy, ax, ay);
+        boolean neg = d1 < 0 || d2 < 0 || d3 < 0;
+        boolean pos = d1 > 0 || d2 > 0 || d3 > 0;
+        return !(neg && pos);
+    }
+
+    private static float triSign(float px, float py, float ax, float ay, float bx, float by) {
+        return (px - bx) * (ay - by) - (ax - bx) * (py - by);
     }
 
     private void drawCaptions(UIRenderer ui, FontRenderer font,
@@ -633,9 +845,6 @@ public final class Minimap {
         String coords = String.format("X %d  Y %d  Z %d",
             (int) java.lang.Math.floor(pdx), (int) java.lang.Math.floor(pdy),
             (int) java.lang.Math.floor(pdz));
-        int cy0 = mapY + mapSize + RING + 4;
-        font.drawScaledWithShadow(ui, coords, cx - font.scaledWidth(coords, 1) / 2f, cy0,
-            1, 0xFFE6ECF8);
 
         // Second line: biome and clock
         String bio = prettyBiome(biomeLabel);
@@ -645,10 +854,21 @@ public final class Minimap {
             if (sub.length() > 0) sub.append("  \u00B7  ");
             sub.append(clock);
         }
+
+        // Soft white pill behind both caption lines so dark text stays
+        // readable over any footage
+        int pw = Math.max(font.scaledWidth(coords, 1), font.scaledWidth(sub.toString(), 1));
+        int px0 = (int) (cx - pw / 2f - 6);
+        int py0 = mapY + mapSize + RING + 3;
+        int pillH = FontRenderer.LINE_HEIGHT * (sub.length() > 0 ? 2 : 1) + 5;
+        ui.fillRoundedRect(px0, py0, pw + 12, pillH, 4, PILL);
+
+        font.draw(ui, coords, cx - font.scaledWidth(coords, 1) / 2f, py0 + 3,
+            0xFF000000 | CAPTION);
         if (sub.length() > 0) {
-            font.drawScaledWithShadow(ui, sub.toString(),
+            font.draw(ui, sub.toString(),
                 cx - font.scaledWidth(sub.toString(), 1) / 2f,
-                cy0 + FontRenderer.LINE_HEIGHT, 1, 0xFF000000 | MenuTheme.TEXT_SECONDARY);
+                py0 + 3 + FontRenderer.LINE_HEIGHT, 0xFF000000 | CAPTION_SUB);
         }
     }
 

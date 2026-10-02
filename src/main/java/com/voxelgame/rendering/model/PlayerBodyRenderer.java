@@ -1,5 +1,6 @@
 package com.voxelgame.rendering.model;
 
+import com.voxelgame.item.ItemStack;
 import com.voxelgame.player.Player;
 import com.voxelgame.rendering.Camera;
 import com.voxelgame.rendering.Shader;
@@ -42,13 +43,39 @@ public class PlayerBodyRenderer {
     }
 
     /**
-     * @param held block in the selected hotbar slot; AIR or flat items are
-     *             held invisibly (only the bare hand shows)
+     * @param heldStack stack in the selected hotbar slot; blocks render as a
+     *                  cube, items as a 3D voxel model in the hand
      */
     public void render(Camera camera, Player player, float yaw, float daylight,
-                       Vector3f sunColor, TextureAtlas atlas, BlockType held,
+                       Vector3f sunColor, TextureAtlas atlas, ItemStack heldStack,
                        float limbSwing, float limbSwingAmount,
                        float attackPhase, float headPitch, float hurtFlash) {
+
+        BlockType held = null;
+        int voxelLayer = -1;
+        if (heldStack != null && !heldStack.isEmpty()) {
+            if (heldStack.isBlock()) {
+                held = heldStack.getBlockType();
+                if (held.isItemSprite()) {
+                    voxelLayer = atlas.getSlot(held.id, 2);
+                    held = null;
+                }
+            } else if (heldStack.getItem() != null && heldStack.getItem().spriteName != null) {
+                voxelLayer = atlas.getLayerOf(heldStack.getItem().spriteName);
+            }
+        }
+
+        renderBody(camera, player, yaw, daylight, sunColor, atlas, held,
+            limbSwing, limbSwingAmount, attackPhase, headPitch, hurtFlash,
+            voxelLayer);
+    }
+
+    /** Body plus the held block/item, shared by the public entry point. */
+    private void renderBody(Camera camera, Player player, float yaw, float daylight,
+                            Vector3f sunColor, TextureAtlas atlas, BlockType held,
+                            float limbSwing, float limbSwingAmount,
+                            float attackPhase, float headPitch, float hurtFlash,
+                            int voxelLayer) {
 
         boolean sneaking = player.isSneaking();
         float bobY = (float) Math.abs(Math.sin(limbSwing * 0.6662f)) * 0.05f * limbSwingAmount;
@@ -82,7 +109,7 @@ public class PlayerBodyRenderer {
             limbSwing, limbSwingAmount, attackPhase, headPitch, sneaking, bobY);
 
         // ----- Held block in the right hand -----
-        if (held != null && held != BlockType.AIR && !isFlatItem(held)) {
+        if (held != null && held != BlockType.AIR) {
             model.computeHandMatrix(baseMatrix, attackPhase, sneaking,
                 limbSwing, limbSwingAmount, handMatrix);
 
@@ -97,10 +124,10 @@ public class PlayerBodyRenderer {
             atlas.bindArray();
 
             heldModel.set(handMatrix);
-            // Lift the cube into the palm, tilt it slightly forward
-            heldModel.translate(0, -0.16f, 0);
-            heldModel.rotateX((float) Math.toRadians(-18));
-            heldModel.scale(0.26f);
+            heldModel.translate(0, -0.02f, 0);
+            // Vanilla block thirdperson_righthand display: rot [0,45,0], scale 0.5
+            heldModel.rotateY((float) Math.toRadians(45));
+            heldModel.scale(0.45f);
             blockShader.setUniformMat4("model", heldModel);
             cube.render(atlas, held, blockShader);
 
@@ -108,12 +135,46 @@ public class PlayerBodyRenderer {
             atlas.unbindArray();
         }
 
-        bodyShader.unbind();
-    }
+        // ----- Held item (3D extruded sprite) in the right hand -----
+        if (voxelLayer >= 0) {
+            ItemModel3D itemModel = ItemModel3D.get(atlas, voxelLayer);
+            if (itemModel != null && itemModel.getVertexCount() > 0) {
+                model.computeHandMatrix(baseMatrix, attackPhase, sneaking,
+                    limbSwing, limbSwingAmount, handMatrix);
 
-    /** Items rendered as flat sprites instead of 3D cubes in the hand. */
-    private boolean isFlatItem(BlockType type) {
-        return type == BlockType.IRON_SWORD;
+                blockShader.bind();
+                blockShader.setUniformMat4("projection", camera.getProjectionMatrix());
+                blockShader.setUniformMat4("view", camera.getViewMatrix());
+                blockShader.setUniform1i("blockTextures", 0);
+                blockShader.setUniform1f("lightLevel", 0.15f + 0.85f * daylight);
+                blockShader.setUniform3f("sunColor", sunColor);
+
+                glActiveTexture(GL_TEXTURE0);
+                atlas.bindArray();
+
+                heldModel.set(handMatrix);
+                heldModel.translate(0, 0.04f, 0);
+                // Vanilla item/handheld thirdperson_righthand display:
+                // rotation [0, -90, 55], translation [0, 4, 0.5]/16, scale 0.85
+                heldModel.rotateX((float) Math.toRadians(-90));
+                heldModel.rotateY((float) Math.toRadians(-90));
+                heldModel.rotateZ((float) Math.toRadians(55));
+                heldModel.scale(0.85f);
+
+                blockShader.setUniformMat4("model", heldModel);
+
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+                glFrontFace(GL_CCW);
+
+                itemModel.render(blockShader);
+
+                blockShader.unbind();
+                atlas.unbindArray();
+            }
+        }
+
+        bodyShader.unbind();
     }
 
     public void cleanup() {

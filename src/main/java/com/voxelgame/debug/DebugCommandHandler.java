@@ -1,6 +1,6 @@
 package com.voxelgame.debug;
 
-import java.io.FileInputStream;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -80,8 +80,8 @@ public final class DebugCommandHandler {
     }
 
     private void pollInbox() {
-        try {
-            long size = Files.exists(IN_FILE) ? Files.size(IN_FILE) : 0L;
+        try (RandomAccessFile raf = new RandomAccessFile(IN_FILE.toFile(), "r")) {
+            long size = raf.length();
             if (readOffset < 0) {
                 readOffset = size; // first sight: don't replay commands left over from an older run
                 return;
@@ -93,14 +93,16 @@ public final class DebugCommandHandler {
             }
             if (size <= readOffset) return;
 
+            // Read from the stored offset: a plain stream would hand back the
+            // head of the file again on every poll, so a second command would
+            // re-run a prefix of the first one and never run itself.
             byte[] buf = new byte[(int) (size - readOffset)];
+            raf.seek(readOffset);
             int got = 0;
-            try (FileInputStream fis = new FileInputStream(IN_FILE.toFile())) {
-                while (got < buf.length) {
-                    int r = fis.read(buf, got, buf.length - got);
-                    if (r < 0) break;
-                    got += r;
-                }
+            while (got < buf.length) {
+                int r = raf.read(buf, got, buf.length - got);
+                if (r < 0) break;
+                got += r;
             }
             // A short read means the writer was still flushing; retry the
             // whole range next tick instead of parsing zero-padded garbage

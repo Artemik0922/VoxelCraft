@@ -116,7 +116,7 @@ public class LightEngine {
         boolean hasWork() { return head < tail; }
 
         int popX() { return ((queue[head] >>> 20) & 0xFFF) + (baseX << 4); }
-        int popZ() { return ((queue[head] >>> 12) & 0xFF) + (baseZ << 4); }
+        int popZ() { return ((queue[head] >>> 12) & 0xFFF) + (baseZ << 4); }
         int popY() { return queue[head] & 0xFFF; }
         void advance() { head++; }
     }

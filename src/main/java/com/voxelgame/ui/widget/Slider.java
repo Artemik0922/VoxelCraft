@@ -56,8 +56,9 @@ public class Slider extends Widget {
         int fadeAlpha = (alpha >>> 24) & 0xFF;
 
         // Draw groove as a rounded glass inset
+        int groove = MenuTheme.lightContext ? 0xFFDDE4EE : 0xFF10141F;
         ui.drawNineSlice(tex.glassTrack, x, y, width, height, 4,
-            GuiAssets.GLASS_WIDGET, MenuTheme.col(fadeAlpha << 24, 255, 0xFF10141F));
+            GuiAssets.GLASS_WIDGET, MenuTheme.col(fadeAlpha << 24, 255, groove));
 
         // Knob - a glass bead riding on the groove
         int knobX = x + 1 + (int) (normalized * (width - KNOB_WIDTH - 2));

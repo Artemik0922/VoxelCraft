@@ -44,6 +44,7 @@ import com.voxelgame.ui.UIRenderer;
 import com.voxelgame.ui.GuiAssets;
 import com.voxelgame.ui.MenuTheme;
 import com.voxelgame.ui.screen.*;
+import com.voxelgame.ui2.*;
 import com.voxelgame.ui.screen.ChestScreen;
 import com.voxelgame.ui.screen.FurnaceScreen;
 import com.voxelgame.rendering.model.*;
@@ -134,14 +135,14 @@ public class Game {
         new java.util.concurrent.ConcurrentLinkedQueue<>();
     private float netStateTimer = 0f;
     private static final float NET_STATE_INTERVAL = 0.05f;
-    private com.voxelgame.ui.screen.MultiplayerScreen multiplayerScreen;
+    private MultiplayerScreen2 multiplayerScreen;
     
     // Interface
     private UIRenderer ui;
     private FontRenderer font;
     private GuiAssets uiTextures;
-    private ScreenManager screens;
-    /** Tracks ScreenManager.revision() to re-apply cursor after fades. */
+    private com.voxelgame.ui2.SceneManager2 screens;
+    /** Tracks SceneManager2.revision() to re-apply cursor after fades. */
     private int lastScreensRevision = -1;
     
     public static final String VERSION = "VoxelCraft 0.4 (LWJGL3)";
@@ -334,16 +335,7 @@ public class Game {
         // Typed text arrives here rather than through key events, so the
         // keyboard layout is honoured and Cyrillic can be entered
         glfwSetCharCallback(window, (win, codepoint) -> {
-            Screen top = screens.current();
-            if (top instanceof CreateWorldScreen c) {
-                c.charTyped((char) codepoint);
-            } else if (top instanceof com.voxelgame.ui.screen.MultiplayerScreen m) {
-                m.charTyped((char) codepoint);
-            } else if (top instanceof com.voxelgame.ui.screen.CreativeInventoryScreen ci) {
-                ci.charTyped((char) codepoint);
-            } else if (top instanceof com.voxelgame.ui.screen.CraftingScreen cs) {
-                cs.charTyped((char) codepoint);
-            }
+            screens.charTyped((char) codepoint);
             if (chat.isOpen()) {
                 chat.charTyped((char) codepoint);
             }
@@ -426,7 +418,9 @@ public class Game {
         ui = new UIRenderer();
         font = new FontRenderer();
         uiTextures = new GuiAssets();
-        screens = new ScreenManager();
+        new com.voxelgame.ui2.UiMaterials();
+        com.voxelgame.ui2.UiDraw.initFont(font);
+        screens = new com.voxelgame.ui2.SceneManager2();
         ui.setGuiScaleSetting(settings.guiScale);
         ui.resize(width, height);
         screens.resize(ui.getWidth(), ui.getHeight());
@@ -444,6 +438,7 @@ public class Game {
         CommandRegistry.register(new VillageCommand());
         CommandRegistry.register(new AsteroidCommand());
         CommandRegistry.register(new TradeCommand());
+        CommandRegistry.register(new com.voxelgame.chat.commands.WaypointCommand());
         ConnectCommand.game = this;
 
         // Initialize achievement system
@@ -465,7 +460,8 @@ public class Game {
         currentSave = null;
         lastBiomeId = null;
         
-        screens.open(new MainMenuScreen(new MainMenuScreen.Callbacks() {
+        screens.open(new com.voxelgame.ui2.MainMenuScreen2(
+            new com.voxelgame.ui2.MainMenuScreen2.Callbacks() {
             @Override public void onSingleplayer() { openWorldList(); }
             @Override public void onMultiplayer() { openMultiplayerScreen(); }
             @Override public void onOptions() { openOptions(false); }
@@ -478,8 +474,8 @@ public class Game {
     }
     
     private void openMultiplayerScreen() {
-        multiplayerScreen = new com.voxelgame.ui.screen.MultiplayerScreen(
-            new com.voxelgame.ui.screen.MultiplayerScreen.Callbacks() {
+        multiplayerScreen = new MultiplayerScreen2(
+            new MultiplayerScreen2.Callbacks() {
                 @Override public void onConnect(String name, String host, int port) {
                     playerName = name;
                     connectToServer(host, port);
@@ -530,7 +526,7 @@ public class Game {
     
     /** True while the title screen is showing its orbiting world backdrop. */
     private boolean isPanoramaActive() {
-        return screens.current() instanceof MainMenuScreen && panorama.isAnchored();
+        return screens.current() instanceof com.voxelgame.ui2.MainMenuScreen2 && panorama.isAnchored();
     }
 
     /** Light for loose block entities: dims with the day like everything else. */
@@ -539,7 +535,7 @@ public class Game {
     }
     
     private void openPauseMenu() {
-        screens.open(new PauseScreen(new PauseScreen.Callbacks() {
+        screens.open(new PauseScreen2(new PauseScreen2.Callbacks() {
             @Override public void onResume() { closeScreens(); }
             @Override public void onOptions() { openOptions(true); }
             @Override public void onQuitToTitle() {
@@ -823,7 +819,7 @@ public class Game {
     }
 
     private void openDeathScreen(Player.DeathCause cause, boolean hardcore) {
-        screens.open(new DeathScreen(cause, hardcore, new DeathScreen.Callbacks() {
+        screens.open(new DeathScreen2(cause, hardcore, new DeathScreen2.Callbacks() {
             @Override public void onRespawn() { respawnPlayer(); }
 @Override public void onTitleScreen() {
                 saveWorldSync();
@@ -887,7 +883,7 @@ public class Game {
     }
     
     private void openSound(boolean overWorld) {
-        screens.push(new SoundSettingsScreen(settings, new SoundSettingsScreen.Listener() {
+        screens.push(new SoundSettingsScreen2(settings, new SoundSettingsScreen2.Listener() {
             @Override public void onMusicVolume(float volume) {
                 settings.musicVolume = volume;
             }
@@ -905,7 +901,7 @@ public class Game {
     
     private void openDifficulty(boolean overWorld) {
         boolean locked = player.isHardcore();
-        screens.push(new DifficultyScreen(settings, new DifficultyScreen.Listener() {
+        screens.push(new DifficultyScreen2(settings, new DifficultyScreen2.Listener() {
             @Override public void onDifficultyChanged(int difficulty) {
                 settings.difficulty = difficulty;
             }
@@ -945,7 +941,7 @@ public class Game {
     
     /** Graphics settings; every control applies live. */
     private void openVideoSettings(boolean overWorld) {
-        screens.push(new VideoSettingsScreen(settings, new VideoSettingsScreen.Listener() {
+        screens.push(new VideoSettingsScreen2(settings, new VideoSettingsScreen2.Listener() {
             @Override public void onRenderDistance(int chunks) {
                 settings.renderDistance = chunks;
                 renderDistance = chunks;
@@ -1011,8 +1007,8 @@ public class Game {
     }
     
     private void openControls(boolean overWorld) {
-        screens.push(new ControlsScreen(settings, keyBindings,
-            new ControlsScreen.Listener() {
+        screens.push(new ControlsScreen2(settings, keyBindings,
+            new ControlsScreen2.Listener() {
                 @Override public void onSensitivityChanged(float value) {
                     settings.mouseSensitivity = value;
                 }
@@ -1119,7 +1115,8 @@ public class Game {
     
     /** World list, reached from Singleplayer. */
     private void openWorldList() {
-        screens.open(new SelectWorldScreen(new SelectWorldScreen.Callbacks() {
+        screens.open(new com.voxelgame.ui2.SelectWorldScreen2(
+            new com.voxelgame.ui2.SelectWorldScreen2.Callbacks() {
             @Override public void onPlay(WorldMeta meta) { loadWorld(meta); }
             @Override public void onCreate() { openCreateWorld(null); }
             @Override public void onRecreate(WorldMeta meta) { openCreateWorld(meta); }
@@ -1129,7 +1126,7 @@ public class Game {
     }
     
     private void openCreateWorld(WorldMeta template) {
-        screens.open(new CreateWorldScreen(new CreateWorldScreen.Callbacks() {
+        screens.open(new CreateWorldScreen2(new CreateWorldScreen2.Callbacks() {
             @Override public void onCreate(WorldMeta meta) { createWorld(meta); }
             @Override public void onCancel() { openWorldList(); }
         }, template));
@@ -1251,7 +1248,7 @@ if (fresh) {
             // The screen does not pause the game; the main loop streams chunks
             // while this flag is set and skips input + world logic.
             loadingWorld = true;
-            screens.open(new LoadingScreen(meta.displayName, world, () -> {
+            screens.open(new LoadingScreen2(meta.displayName, world, () -> {
                 loadingWorld = false;
                 closeScreens();
             }));
@@ -1685,7 +1682,7 @@ if (fresh) {
      * whole stack, so labels change without a restart.
      */
     private void openLanguage(boolean overWorld) {
-        screens.push(new LanguageScreen(new LanguageScreen.Callbacks() {
+        screens.push(new LanguageScreen2(new LanguageScreen2.Callbacks() {
             @Override public void onLanguageChosen(String code) {
                 settings.language = code;
                 settings.save();
@@ -1708,7 +1705,7 @@ if (fresh) {
      * menu launched it.
      */
     private void openOptions(boolean overWorld) {
-        screens.push(new OptionsScreen(settings, new OptionsScreen.Listener() {
+        screens.push(new OptionsScreen2(settings, new OptionsScreen2.Listener() {
             @Override public void onRenderDistanceChanged(int chunks) {
                 settings.renderDistance = chunks;
                 renderDistance = chunks;
@@ -2304,6 +2301,9 @@ if (!paused) {
         particles.blockAtlas = renderer.getTextureAtlas();
         VillageCommand.currentWorld = world;
         TpCommand.currentPlayerPos = player.getPosition();
+        com.voxelgame.chat.commands.WaypointCommand.playerPos = player.getPosition();
+        com.voxelgame.chat.commands.WaypointCommand.meta =
+            currentSave != null ? currentSave.getMeta() : null;
         TpCommand.teleporter = (x, y, z) -> {
             player.getPosition().set(x, y, z);
             camera.setPosition(new Vector3f(x, y + eyeHeight, z));
@@ -2445,8 +2445,9 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             @Override public void onDisconnect(String reason) {
                 netEvents.add(() -> {
                     chat.addMessage(reason, 0xFFFF5555);
-                    if (multiplayerScreen != null && screens.current() instanceof com.voxelgame.ui.screen.MultiplayerScreen) {
-                        multiplayerScreen.setStatus(reason);
+                    if (multiplayerScreen != null
+                        && screens.current() instanceof MultiplayerScreen2 mp) {
+                        mp.setStatus(reason);
                     }
                     disconnectFromServer();
                 });
@@ -2458,11 +2459,11 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             chat.setMessageSink(text -> {
                 if (netClient != null && netClient.isConnected()) netClient.sendChat(text);
             });
-            chat.addMessage("Р СџР С•Р Т‘Р С”Р В»РЎР‹РЎвЂЎР ВµР Р…Р С‘Р Вµ Р С” " + host + ":" + port + "РІР‚В¦", 0xFFAAAAFF);
+            chat.addMessage("Подключение к " + host + ":" + port + "…", 0xFFAAAAFF);
         } catch (java.io.IOException e) {
-            chat.addMessage("Р СњР Вµ РЎС“Р Т‘Р В°Р В»Р С•РЎРѓРЎРЉ Р С—Р С•Р Т‘Р С”Р В»РЎР‹РЎвЂЎР С‘РЎвЂљРЎРЉРЎРѓРЎРЏ: " + e.getMessage(), 0xFFFF5555);
+            chat.addMessage("Не удалось подключиться: " + e.getMessage(), 0xFFFF5555);
             if (multiplayerScreen != null) {
-                multiplayerScreen.setStatus("Р СњР Вµ РЎС“Р Т‘Р В°Р В»Р С•РЎРѓРЎРЉ Р С—Р С•Р Т‘Р С”Р В»РЎР‹РЎвЂЎР С‘РЎвЂљРЎРЉРЎРѓРЎРЏ: " + e.getMessage());
+                multiplayerScreen.setStatus("Не удалось подключиться: " + e.getMessage());
             }
             netClient = null;
         }
@@ -2524,7 +2525,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         player.setHorizontalVelocity(0, 0);
         camera.setPosition(new Vector3f(sx, sy + eyeHeight, sz));
         player.setHealth(20);
-        chat.addMessage("Р СџР С•Р Т‘Р С”Р В»РЎР‹РЎвЂЎР ВµР Р…Р С•. Р СљР С‘РЎР‚ РЎРѓ РЎРѓР С‘Р Т‘Р С•Р С РЎРѓР ВµРЎР‚Р Р†Р ВµРЎР‚Р В°, РЎвЂљРЎвЂ№ Р Р…Р В° РЎРѓР С—Р В°Р Р†Р Р…Р Вµ.", 0xFFAAFFAA);
+        chat.addMessage("Подключено. Мир с сидом сервера, ты на спавне.", 0xFFAAFFAA);
         // Joined from the main menu: leave the menu and start playing
         if (screens.isOpen()) {
             closeScreens();
@@ -3258,7 +3259,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
     private void trySleep(int x, int y, int z) {
         if (sleeping || waking) return;
         if (!dayNight.isNight()) {
-            chat.addMessage("Р СљР С•Р В¶Р Р…Р С• РЎРѓР С—Р В°РЎвЂљРЎРЉ РЎвЂљР С•Р В»РЎРЉР С”Р С• Р Р…Р С•РЎвЂЎРЎРЉРЎР‹!", 0xFFFFAA00);
+            chat.addMessage("Можно спать только ночью!", 0xFFFFAA00);
             return;
         }
         bedSpawn = new Vector3i(x, y, z);
@@ -3303,7 +3304,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             player.setVerticalVelocity(0);
             player.setHorizontalVelocity(0, 0);
         }
-        chat.addMessage("Р вЂќР С•Р В±РЎР‚Р С•Р Вµ РЎС“РЎвЂљРЎР‚Р С•!", 0xFFAAFFAA);
+        chat.addMessage("Доброе утро!", 0xFFAAFFAA);
     }
 
     /**
@@ -3529,7 +3530,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             playerBodyRenderer.render(camera, player, bodyYaw,
                 dayNight.getDaylight(), dayNight.getSunColor(),
                 renderer.getTextureAtlas(),
-                player.getInventory().getSelectedItem().getBlockType(),
+                player.getInventory().getSelectedItem(),
                 limbSwing, limbSwingAmount, heldItem.getAttackPhase(),
                 headPitch, player.isInvincible() ? 0.55f : 0.0f);
         }
@@ -3576,7 +3577,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
 
         // [Glass] When a menu sits on top of the live world, frost the scene
         // into a blurred backdrop so UI panels can read as frosted glass
-        Screen top = screens.current();
+        com.voxelgame.ui2.Scene top = screens.current();
         if (screens.isOpen() && top != null && top.usesBlurredBackdrop()) {
             postProcess.blurSceneForBackdrop();
             MenuTheme.blurredBackdrop = postProcess.getBackdropTexture();
@@ -3595,6 +3596,8 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
      * through UIRenderer so no stray GL state reaches the next frame.
      */
     private void renderInterface() {
+        // The Workshop theme's wood finish follows the menuTheme setting
+        com.voxelgame.ui2.UiTheme.INSTANCE.setFinishIndex(settings.menuTheme);
         ui.begin();
         
         // [UI-002] Damage vignette: red edges when player takes damage
@@ -4180,6 +4183,12 @@ if (targeted == BlockType.CHEST) {
                     // Place block with collision check [GP-012]
                     if (targetedBlock != null) {
                         int blockId = player.getInventory().getSelectedBlockId();
+                        // Sprite-only stacks (tools, food, materials) are
+                        // items, not placeable blocks — vanilla no-ops here
+                        if (blockId != 0) {
+                            BlockType selected = BlockType.fromId(blockId);
+                            if (selected != null && selected.isItemSprite()) return;
+                        }
                         if (blockId != 0) {
                             // [BED] Beds place as a two-block pair: the foot
                             // lands in the placement cell, the head in the
@@ -4337,20 +4346,16 @@ netClient.sendBlockChange(world.getLastPlacedX(),
         if (screens.isOpen()) {
             if (screens.keyPressed(key, mods)) return;
 
-            Screen top = screens.current();
+            com.voxelgame.ui2.Scene top = screens.current();
 
             // E closes any container/inventory screen, mirroring the key
             // that opened it
             if (key == keyBindings.get(KeyBindings.Action.INVENTORY)
-                && (top instanceof CreativeInventoryScreen
-                    || top instanceof SurvivalInventoryScreen
-                    || top instanceof CraftingScreen
-                    || top instanceof ChestScreen
-                    || top instanceof FurnaceScreen)) {
+                && top.closesWithInventoryKey()) {
                 closeScreens();
                 return;
             }
-            
+
             // F3 still toggles the debug panel from anywhere
             if (key == GLFW_KEY_F3) {
                 hud.toggleDebug();
@@ -4372,7 +4377,7 @@ netClient.sendBlockChange(world.getLastPlacedX(),
             if (key == GLFW_KEY_ESCAPE && top != null && top.closableWithEscape()) {
                 // Closing the last screen returns to gameplay
                 screens.pop();
-                if (!screens.isOpen() && top instanceof OptionsScreen) {
+                if (!screens.isOpen() && top.fallsBackToMainMenu()) {
                     // Options opened straight from the title: fall back to it
                     openMainMenu();
                 } else {
@@ -4395,6 +4400,10 @@ netClient.sendBlockChange(world.getLastPlacedX(),
         {
             switch (key) {
                 case GLFW_KEY_ESCAPE:
+                    if (hud.isMinimapExpanded()) {
+                        hud.toggleMinimapExpanded(); // close the map first
+                        break;
+                    }
                     openPauseMenu();
                     break;
 
@@ -4406,9 +4415,22 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                     break;
 
                 case GLFW_KEY_M:
-                    hud.toggleMinimap();
+                    if (hud.isMinimapExpanded()) {
+                        hud.toggleMinimapExpanded(); // TAB owns the fullscreen map
+                    } else {
+                        hud.toggleMinimap();
+                    }
                     break;
-                
+
+                case GLFW_KEY_TAB:
+                    // Fullscreen map with the waypoint list (Esc also closes)
+                    hud.toggleMinimapExpanded();
+                    break;
+
+                case GLFW_KEY_B:
+                    addWaypointHere();
+                    break;
+
                 case GLFW_KEY_SPACE:
                     // Double-space toggles creative flight
                     if (player.isCreative()) {
@@ -4463,6 +4485,22 @@ netClient.sendBlockChange(world.getLastPlacedX(),
     // --- Screenshot (F2) ---
     private int screenshotCounter = 0;
 
+    /** [MAP] Drops a waypoint at the player's feet (B). */
+    private void addWaypointHere() {
+        if (world == null || world.getSave() == null || world.getSave().getMeta() == null) return;
+        var meta = world.getSave().getMeta();
+        int n = meta.waypoints.size() + 1;
+        String name = String.format(com.voxelgame.core.Language.tr("minimap.waypoint.new"), n);
+        int color = com.voxelgame.world.save.WorldMeta.WAYPOINT_COLORS
+            [(n - 1) % com.voxelgame.world.save.WorldMeta.WAYPOINT_COLORS.length];
+        int bx = (int) java.lang.Math.floor(player.getPosition().x);
+        int by = (int) java.lang.Math.floor(player.getPosition().y);
+        int bz = (int) java.lang.Math.floor(player.getPosition().z);
+        meta.addWaypoint(name, bx, by, bz, color);
+        chat.addMessage(String.format(com.voxelgame.core.Language.tr("minimap.waypoint.added"),
+            name + " (" + bx + ", " + bz + ")"), 0xFF55FF55);
+    }
+
     private void takeScreenshot() {
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         String filename = String.format("screenshot_%04d-%02d-%02d_%02d-%02d-%02d.png",
@@ -4502,10 +4540,10 @@ netClient.sendBlockChange(world.getLastPlacedX(),
 
             if (success) {
                 System.out.println("Screenshot saved: " + filename);
-                chat.addMessage("Р РЋР С”РЎР‚Р С‘Р Р…РЎв‚¬Р С•РЎвЂљ РЎРѓР С•РЎвЂ¦РЎР‚Р В°Р Р…РЎвЂР Р…: " + filename, 0xFF55FF55);
+                chat.addMessage("Скриншот сохранён: " + filename, 0xFF55FF55);
             } else {
                 System.err.println("Failed to save screenshot");
-                chat.addMessage("Р С›РЎв‚¬Р С‘Р В±Р С”Р В° РЎРѓР С•РЎвЂ¦РЎР‚Р В°Р Р…Р ВµР Р…Р С‘РЎРЏ РЎРѓР С”РЎР‚Р С‘Р Р…РЎв‚¬Р С•РЎвЂљР В°", 0xFFFF5555);
+                chat.addMessage("Ошибка сохранения скриншота", 0xFFFF5555);
             }
 } catch (Exception e) {
             System.err.println("Screenshot error: " + e.getMessage());
@@ -4527,7 +4565,7 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                 + " | set_block x y z <name|id> | get_block x y z | give <block|item> [count]"
                 + " | create_world <name> <seed> [creative|survival] | load_world <folder>"
                 + " | save | weather <clear|rain|thunder|snow> | spawn_mob x y z | kill_mobs"
-                + " | village | quit");
+                + " | village | close | quit");
 
             case "status" -> {
                 requirePlayer(out);
@@ -4545,6 +4583,15 @@ netClient.sendBlockChange(world.getLastPlacedX(),
             }
 
             case "screenshot" -> takeScreenshot(t.length > 1 ? t[1] : "debug_shot.png");
+
+            case "click" -> {
+                // GUI-pixel coordinates (virtual canvas), not screen pixels
+                float cx = num(t, 1), cy = num(t, 2);
+                int button = t.length > 3 ? numI(t, 3) : 0;
+                boolean hit = screens.mouseClicked(cx, cy, button);
+                screens.mouseReleased(cx, cy, button);
+                out.accept("click " + cx + "," + cy + " -> " + (hit ? "consumed" : "missed"));
+            }
 
             case "tp" -> {
                 requirePlayer(out);
@@ -4808,6 +4855,126 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                 }
                 applyCursorMode();
                 out.accept("opened ui: " + which);
+            }
+
+            case "close" -> {
+                if (screens.isOpen()) {
+                    screens.pop();
+                    out.accept("closed top screen");
+                } else {
+                    out.accept("no screen open");
+                }
+            }
+
+            case "menu" -> {
+                if (currentSave != null) saveWorldSync();
+                openMainMenu();
+                out.accept("back at main menu");
+            }
+
+            case "worldlist" -> {
+                openWorldList();
+                out.accept("world select screen open");
+            }
+
+            case "icontest" -> {
+                BlockType ib = BlockType.fromName(arg(t, 1));
+                if (ib == null) throw new IllegalArgumentException("unknown block " + arg(t, 1));
+                TextureAtlas atlas = renderer.getTextureAtlas();
+                for (int face : new int[]{2, 0, 1}) {
+                    int slot = atlas.getSlot(ib.id, face);
+                    int[] px = atlas.getLayerPixels(slot);
+                    int opaque = 0;
+                    if (px != null) {
+                        for (int p : px) if ((p >>> 24) >= 128) opaque++;
+                    }
+                    out.accept("face " + face + ": slot " + slot + " pixels "
+                        + (px == null ? "null" : "len " + px.length + " opaque " + opaque)
+                        + " first " + (px == null ? "-" : Integer.toHexString(px[0])));
+                }
+                out.accept("solid=" + ib.solid + " isItemSprite=" + ib.isItemSprite()
+                    + " icons.has=" + com.voxelgame.ui.BlockIconAtlas.get(atlas).has(ib.id));
+            }
+
+            case "icondump" -> {
+                com.voxelgame.ui.BlockIconAtlas.dumpTo("debug/icon_atlas.png");
+                out.accept("icon atlas dumped");
+            }
+
+            case "inv" -> {
+                requirePlayer(out);
+                Inventory inv = player.getInventory();
+                for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
+                    ItemStack st = inv.getHotbarItem(i);
+                    String what = st.isEmpty() ? "(empty)"
+                        : st.isBlock() ? "block:" + st.getBlockType().name
+                        : "item:" + (st.getItem() != null ? st.getItem().name : "?");
+                    out.accept("slot " + (i + 1) + ": " + what + " x" + st.getCount());
+                }
+            }
+
+            case "slot" -> {
+                int s = (int) num(t, 1) - 1;
+                player.getInventory().setSelectedSlot(s);
+                heldItem.startEquip();
+                out.accept("selected hotbar slot " + (s + 1));
+            }
+
+            case "view" -> {
+                int v = (int) num(t, 1);
+                if (v < 0 || v > 2) throw new IllegalArgumentException("view 0..2, got " + v);
+                viewMode = v;
+                out.accept("view mode " + v + (v == 0 ? " (first person)"
+                    : v == 1 ? " (third person behind)" : " (third person front)"));
+            }
+
+            case "fontdump" -> {
+                int tex = font.getTextureId();
+                int[] w = new int[1];
+                int[] h = new int[1];
+                org.lwjgl.opengl.GL11.glBindTexture(org.lwjgl.opengl.GL11.GL_TEXTURE_2D, tex);
+                org.lwjgl.opengl.GL11.glGetTexLevelParameteriv(
+                    org.lwjgl.opengl.GL11.GL_TEXTURE_2D, 0,
+                    org.lwjgl.opengl.GL11.GL_TEXTURE_WIDTH, w);
+                org.lwjgl.opengl.GL11.glGetTexLevelParameteriv(
+                    org.lwjgl.opengl.GL11.GL_TEXTURE_2D, 0,
+                    org.lwjgl.opengl.GL11.GL_TEXTURE_HEIGHT, h);
+                org.lwjgl.opengl.GL11.glBindTexture(org.lwjgl.opengl.GL11.GL_TEXTURE_2D, 0);
+
+                int fbo = org.lwjgl.opengl.GL30.glGenFramebuffers();
+                org.lwjgl.opengl.GL30.glBindFramebuffer(
+                    org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, fbo);
+                org.lwjgl.opengl.GL30.glFramebufferTexture2D(
+                    org.lwjgl.opengl.GL30.GL_FRAMEBUFFER,
+                    org.lwjgl.opengl.GL30.GL_COLOR_ATTACHMENT0,
+                    org.lwjgl.opengl.GL11.GL_TEXTURE_2D, tex, 0);
+                java.nio.ByteBuffer buf = org.lwjgl.system.MemoryUtil.memAlloc(w[0] * h[0] * 4);
+                org.lwjgl.opengl.GL11.glReadPixels(0, 0, w[0], h[0],
+                    org.lwjgl.opengl.GL11.GL_RGBA, org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE, buf);
+                org.lwjgl.opengl.GL30.glBindFramebuffer(
+                    org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, 0);
+                org.lwjgl.opengl.GL30.glDeleteFramebuffers(fbo);
+
+                java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+                    w[0], h[0], java.awt.image.BufferedImage.TYPE_INT_RGB);
+                for (int y = 0; y < h[0]; y++) {
+                    for (int x = 0; x < w[0]; x++) {
+                        int i = (y * w[0] + x) * 4;
+                        int r = buf.get(i) & 0xFF;
+                        int g = buf.get(i + 1) & 0xFF;
+                        int b = buf.get(i + 2) & 0xFF;
+                        img.setRGB(x, h[0] - 1 - y, (r << 16) | (g << 8) | b);
+                    }
+                }
+                java.io.File outF = new java.io.File(arg(t, 1) + ".png");
+                try {
+                    javax.imageio.ImageIO.write(img, "png", outF);
+                } catch (java.io.IOException io) {
+                    throw new RuntimeException(io);
+                }
+                org.lwjgl.system.MemoryUtil.memFree(buf);
+                out.accept("font texture " + tex + " " + w[0] + "x" + h[0]
+                    + " -> " + outF.getAbsolutePath());
             }
 
             case "quit" -> glfwSetWindowShouldClose(window, true);

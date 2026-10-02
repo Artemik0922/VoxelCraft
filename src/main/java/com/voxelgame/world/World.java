@@ -645,12 +645,13 @@ public class World {
         // Incremental light update for this single block change
         LightEngine.updateBlock(this, x, y, z, id);
 
-        // [GP-022] The cell above may have lost its support and start falling
+        // [GP-022] The cell above may have lost its support and start falling.
+        // The falling entity is set directly (not via setBlock) to avoid
+        // infinite recursion between setBlock -> maybeFall -> setBlock.
         if (id == BlockType.AIR.id || id == BlockType.WATER.id) {
-            maybeFall(x, y + 1, z);
+            checkFall(x, y + 1, z);
         } else if (isFallingBlock(id)) {
-            // A block placed with empty space below tumbles down
-            maybeFall(x, y, z);
+            checkFall(x, y, z);
         }
 
         // Mark neighboring chunks dirty if on edge
@@ -824,7 +825,10 @@ public class World {
             || id == BlockType.RED_SAND.id;
     }
 
-    /** [GP-022] If the cell holds falling material with air beneath, drop it. */
+    /**
+     * [GP-022] If the cell holds falling material with air beneath, drop it.
+     * Sets the cell to AIR directly to avoid recursion through setBlock.
+     */
     private void maybeFall(int x, int y, int z) {
         if (y < 0 || y >= Chunk.HEIGHT) return;
         int b = getBlock(x, y, z);
@@ -833,8 +837,20 @@ public class World {
         if (below != BlockType.AIR.id
             && below != BlockType.WATER.id
             && below != BlockType.LAVA.id) return;
-        setBlock(x, y, z, (byte) 0);
+        Chunk chunk = chunks.get(Chunk.key(x >> 4, z >> 4));
+        if (chunk != null) {
+            chunk.setBlock(x & 15, y, z & 15, 0);
+            chunk.markModified();
+            chunk.setDirty(true);
+            chunk.setLightDirty(true);
+        }
+        LightEngine.updateBlock(this, x, y, z, BlockType.AIR.id);
         fallingBlocks.add(new FallingBlockEntity(this, x, y, z, b));
+    }
+
+    /** Non-recursive check used by setBlock. */
+    private void checkFall(int x, int y, int z) {
+        maybeFall(x, y, z);
     }
     
     private void markDirty(int cx, int cz) {

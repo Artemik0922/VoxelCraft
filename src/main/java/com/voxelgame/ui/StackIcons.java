@@ -68,6 +68,15 @@ public final class StackIcons {
 
     private static void drawBlockTile(UIRenderer ui, TextureAtlas atlas, BlockType block,
                                       int x, int y, int size) {
+        // Vanilla look: real cubes get an isometric 3D icon, everything
+        // else (plants, doors, sprite-only items) stays a flat tile
+        if (block.solid && !block.isItemSprite()) {
+            BlockIconAtlas icons = BlockIconAtlas.get(atlas);
+            if (icons.has(block.id)) {
+                icons.draw(ui, block.id, x, y, size);
+                return;
+            }
+        }
         TextureAtlas.TextureCoords uv = atlas.getCoords(block.id, 2);
         ui.drawTexture(atlas.getTexture().getId(), x, y, size, size,
             uv.u1, uv.v2, uv.u2, uv.v1, 0xFFFFFFFF);
@@ -125,7 +134,7 @@ public final class StackIcons {
         List<Integer> colors = new ArrayList<>();
 
         lines.add(displayName(stack));
-        colors.add(0xFFFFFFFF);
+        colors.add(0xFF2A1D12);
 
         int maxDur = stack.getMaxDurability();
         if (maxDur > 0 && stack.isDamaged()) {

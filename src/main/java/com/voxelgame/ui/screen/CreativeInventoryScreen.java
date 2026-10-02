@@ -160,7 +160,7 @@ public class CreativeInventoryScreen extends Screen {
     protected void renderBackground(UIRenderer ui, FontRenderer font, GuiAssets gui) {
         MenuTheme.drawWorldOverlay(ui, width, height);
         ui.drawNineSlice(gui.glassPanel, panelX, panelY, panelW, panelH,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF332314);
     }
 
     @Override
@@ -175,7 +175,7 @@ public class CreativeInventoryScreen extends Screen {
         lastMx = mx;
         lastMy = my;
 
-        font.draw(ui, tr("container.creative"), gridX, panelY + PANEL_PAD, 0xFFE8EEFF);
+        font.draw(ui, tr("container.creative"), gridX, panelY + PANEL_PAD, 0xFFF2E6C8);
 
         hovered = null;
         drawSearchField(ui, font, gui, mx, my);
@@ -219,8 +219,8 @@ public class CreativeInventoryScreen extends Screen {
                 ItemStack stack = filtered.get(index);
                 if (over) hovered = stack;
 
-                ui.drawNineSlice(over ? gui.glassSlotHover : gui.glassSlot,
-                    sx, sy, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+                ui.drawNineSlice(gui.glassSlot,
+                    sx, sy, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, over ? 0xFF9A7D4C : 0xFF3A2A1A);
                 StackIcons.drawIcon(ui, atlas, stack, sx + 1, sy + 1, ICON);
             }
         }
@@ -229,7 +229,7 @@ public class CreativeInventoryScreen extends Screen {
     /** Recessed glass track with a rounded glass thumb. */
     private void drawScrollbar(UIRenderer ui, GuiAssets gui, float mx, float my) {
         ui.drawNineSlice(gui.glassTrack, scrollX, gridY, SCROLLBAR_W, gridH,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF151A2A);
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF26180E);
 
         if (maxScrollRow() <= 0) return;
 
@@ -254,8 +254,8 @@ public class CreativeInventoryScreen extends Screen {
             boolean over = inside(mx, my, sx, hotbarY, SLOT, SLOT);
             boolean selected = i == inv.getSelectedSlot();
 
-            ui.drawNineSlice(over ? gui.glassSlotHover : gui.glassSlot,
-                sx, hotbarY, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+            ui.drawNineSlice(gui.glassSlot,
+                sx, hotbarY, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, over ? 0xFF9A7D4C : 0xFF3A2A1A);
 
             ItemStack stack = inv.getHotbarItem(i);
             if (!stack.isEmpty()) {

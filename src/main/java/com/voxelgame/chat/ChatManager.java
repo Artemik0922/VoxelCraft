@@ -215,6 +215,11 @@ public class ChatManager {
         }
     }
 
+    /** Warm translucent strip behind a tape message. */
+    private static int warmStrip(int alpha) {
+        return (alpha << 24) | 0x261A10;
+    }
+
     /** Update message ages. Removes expired messages. */
     public void update(float dt) {
         tape.removeIf(m -> {
@@ -255,7 +260,7 @@ public class ChatManager {
 
             // Background
             int bgAlpha = (int) (alpha * 128);
-            ui.fillRect(4, y - 1, font.width(m.text) + 4, lineHeight, (bgAlpha << 24));
+            ui.fillRect(4, y - 1, font.width(m.text) + 4, lineHeight, warmStrip(bgAlpha));
 
             font.draw(ui, m.text, 6, y, argb);
             y -= lineHeight;
@@ -264,7 +269,7 @@ public class ChatManager {
         // --- Input line ---
         if (open) {
             // Background bar
-            ui.fillRect(0, height - inputHeight, width, inputHeight, 0x80000000);
+            ui.fillRect(0, height - inputHeight, width, inputHeight, 0x90261A10);
 
             String display = "> " + buffer.toString();
             font.draw(ui, display, 4, height - inputHeight + 2, 0xFFFFFFFF);

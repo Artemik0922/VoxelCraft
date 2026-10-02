@@ -157,9 +157,9 @@ public class TradingScreen extends Screen {
     protected void renderBackground(UIRenderer ui, FontRenderer font, GuiAssets gui) {
         MenuTheme.drawWorldOverlay(ui, width, height);
         ui.drawNineSlice(gui.glassPanel, panelX, panelY, panelW, panelH,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF332314);
 
-        font.draw(ui, tr(titleKey), listX, panelY + 8, 0xFFE8EEFF);
+        font.draw(ui, tr(titleKey), listX, panelY + 8, 0xFFF2E6C8);
         font.drawRight(ui, tr("trade.emeralds") + ": " + emeraldCount(),
             panelX + panelW - PANEL_PAD, panelY + 8, 0xFFE8B23A);
 
@@ -228,8 +228,8 @@ public class TradingScreen extends Screen {
             int sx = storageX + (i % COLS) * SLOT;
             int sy = storageY + (i / COLS) * SLOT;
             boolean over = inside(mx, my, sx, sy);
-            ui.drawNineSlice(over ? gui.glassSlotHover : gui.glassSlot,
-                sx, sy, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+            ui.drawNineSlice(gui.glassSlot,
+                sx, sy, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, over ? 0xFF9A7D4C : 0xFF3A2A1A);
             ItemStack stack = inv.getInventoryItem(i);
             if (!stack.isEmpty()) {
                 StackIcons.drawStack(ui, font, atlas, stack, sx + 1, sy + 1);
@@ -240,8 +240,8 @@ public class TradingScreen extends Screen {
         for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
             int sx = hotbarX + i * SLOT;
             boolean over = inside(mx, my, sx, hotbarY);
-            ui.drawNineSlice(over ? gui.glassSlotHover : gui.glassSlot,
-                sx, hotbarY, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+            ui.drawNineSlice(gui.glassSlot,
+                sx, hotbarY, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, over ? 0xFF9A7D4C : 0xFF3A2A1A);
             ItemStack stack = inv.getHotbarItem(i);
             if (!stack.isEmpty()) {
                 StackIcons.drawStack(ui, font, atlas, stack, sx + 1, hotbarY + 1);
@@ -295,8 +295,8 @@ public class TradingScreen extends Screen {
         x += 8;
 
         boolean overGive = hoverX >= x && hoverX < x + SLOT && hoverY >= ry + 4 && hoverY < ry + 4 + SLOT;
-        ui.drawNineSlice(overGive ? gui.glassSlotHover : gui.glassSlot,
-            x, ry + 4, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+        ui.drawNineSlice(gui.glassSlot,
+            x, ry + 4, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, overGive ? 0xFF9A7D4C : 0xFF3A2A1A);
         StackIcons.drawStack(ui, font, atlas, o.give, x + 1, ry + 5);
 
         String stockTxt = soldOut ? "×0" : "×" + stock;
@@ -347,15 +347,15 @@ public class TradingScreen extends Screen {
         String badge = soldOut ? tr("trade.sold_out") : tr("trade.stock") + ": ×" + stock;
         int nameMax = Math.max(20, selW - font.width(badge) - 4);
         String name = font.trimToWidth(StackIcons.displayName(o.give), nameMax);
-        font.draw(ui, name, selX, y0 + 26, soldOut ? 0xFF4A5055 : 0xFFE8EEFF);
+        font.draw(ui, name, selX, y0 + 26, soldOut ? 0xFF4A5055 : 0xFFF2E6C8);
         font.draw(ui, badge, selX + selW - font.width(badge), y0 + 26,
             soldOut ? 0xFFD05050 : 0xFF8EA2C2);
     }
 
     private void drawGlassSlotAt(UIRenderer ui, GuiAssets gui, int x, int y) {
         boolean over = hoverX >= x && hoverX < x + SLOT && hoverY >= y && hoverY < y + SLOT;
-        ui.drawNineSlice(over ? gui.glassSlotHover : gui.glassSlot,
-            x, y, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+        ui.drawNineSlice(gui.glassSlot,
+            x, y, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, over ? 0xFF9A7D4C : 0xFF3A2A1A);
     }
 
     private void drawCount(UIRenderer ui, FontRenderer font, int n, int x, int y,
@@ -368,7 +368,7 @@ public class TradingScreen extends Screen {
     private void drawScrollbar(UIRenderer ui, GuiAssets gui) {
         if (maxScrollRow() <= 0) return;
         ui.drawNineSlice(gui.glassTrack, scrollbarX, listY, SCROLLBAR_W, listH,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF151A2A);
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF26180E);
 
         int thumbH = Math.max(12, listH * LIST_ROWS / Math.max(1, offers.length));
         int travel = listH - thumbH;

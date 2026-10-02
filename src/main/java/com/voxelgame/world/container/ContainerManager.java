@@ -69,6 +69,12 @@ public class ContainerManager {
             }
         }
 
+        // A stale non-chest container at this position (block was replaced)
+        // must not masquerade as the chest inventory
+        ContainerData existing = get(x, y, z);
+        if (existing != null && existing.type == ContainerData.Type.CHEST) return existing;
+        if (existing != null) remove(x, y, z);
+
         // Single chest
         return getOrCreate(x, y, z, ContainerData.Type.CHEST);
     }

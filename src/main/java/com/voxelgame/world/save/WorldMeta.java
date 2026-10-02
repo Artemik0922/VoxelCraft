@@ -64,6 +64,9 @@ public class WorldMeta {
     // Inventory data: "slot:id:count:durability;slot:id:count:durability;..."
     public String inventoryData = "";
 
+    /** Player-placed minimap markers; persisted packed in waypointData. */
+    public final java.util.List<Waypoint> waypoints = new java.util.ArrayList<>();
+
     /** Time of day, so a world resumes at the hour it was left. */
     public double dayTime = 0.25;
 
@@ -114,6 +117,7 @@ public class WorldMeta {
         m.put("spawnY", Float.toString(spawnY));
         m.put("spawnZ", Float.toString(spawnZ));
         m.put("inventoryData", inventoryData);
+        m.put("waypointData", encodeWaypoints());
 
         StringBuilder sb = new StringBuilder("{\n");
         int i = 0;
@@ -164,6 +168,7 @@ public class WorldMeta {
             w.spawnY = parseFloat(m.get("spawnY"), 70);
             w.spawnZ = parseFloat(m.get("spawnZ"), 0);
             w.inventoryData = m.getOrDefault("inventoryData", "");
+            w.decodeWaypoints(m.getOrDefault("waypointData", ""));
             return w;
 
         } catch (Exception e) {
@@ -173,6 +178,68 @@ public class WorldMeta {
     }
 
     // ------------------------------------------------------------------
+
+    /** Palette cycled through when the player drops a new waypoint. */
+    public static final int[] WAYPOINT_COLORS = {
+        0xFFE4593B, 0xFF35A7E0, 0xFF3DBC5A, 0xFFE0A72B,
+        0xFFB05AE0, 0xFFE05A96, 0xFF2BB9A2, 0xFF8A6A3B,
+    };
+
+    /**
+     * Waypoints ride in one packed string field, same idea as
+     * inventoryData: "name|x|y|z|color;name|x|y|z|color;...". Delimiters
+     * are stripped from names on the way in.
+     */
+    public void addWaypoint(String name, int x, int y, int z, int color) {
+        String clean = name.replace(";", " ").replace("|", " ").replace(":", " ").trim();
+        if (clean.isEmpty()) clean = "Waypoint";
+        waypoints.add(new Waypoint(clean, x, y, z, color));
+    }
+
+    /** Removes by (case-insensitive) name; true when something was removed. */
+    public boolean removeWaypoint(String name) {
+        for (int i = 0; i < waypoints.size(); i++) {
+            if (waypoints.get(i).name.equalsIgnoreCase(name)) {
+                waypoints.remove(i);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void clearWaypoints() {
+        waypoints.clear();
+    }
+
+    private String encodeWaypoints() {
+        StringBuilder sb = new StringBuilder();
+        for (Waypoint w : waypoints) {
+            if (sb.length() > 0) sb.append(';');
+            sb.append(w.name.replace(";", " ").replace("|", " "))
+              .append('|').append(w.x)
+              .append('|').append(w.y)
+              .append('|').append(w.z)
+              .append('|').append(Integer.toHexString(w.color));
+        }
+        return sb.toString();
+    }
+
+    private void decodeWaypoints(String data) {
+        waypoints.clear();
+        if (data == null || data.isEmpty()) return;
+        for (String part : data.split(";")) {
+            String[] f = part.split("\\|");
+            if (f.length < 5) continue;
+            try {
+                waypoints.add(new Waypoint(f[0],
+                    Integer.parseInt(f[1].trim()), Integer.parseInt(f[2].trim()),
+                    Integer.parseInt(f[3].trim()),
+                    (int) Long.parseLong(f[4].trim(), 16)));
+            } catch (NumberFormatException e) {
+                // Skip a corrupt row rather than dropping the rest
+            }
+        }
+    }
 
     private static String escape(String s) {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");

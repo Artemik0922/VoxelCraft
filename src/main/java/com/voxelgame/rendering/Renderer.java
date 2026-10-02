@@ -1,6 +1,9 @@
 package com.voxelgame.rendering;
 
+import com.voxelgame.item.Item;
+import com.voxelgame.item.ItemStack;
 import com.voxelgame.rendering.model.BlockCube;
+import com.voxelgame.rendering.model.ItemModel3D;
 import com.voxelgame.world.*;
 import com.voxelgame.world.entity.AsteroidEntity;
 import com.voxelgame.world.entity.FallingBlockEntity;
@@ -47,6 +50,9 @@ public class Renderer {
 
     /** Last frame's batched item-entity mesh, rebuilt whenever items exist. */
     private Mesh itemBatchMesh = null;
+
+    /** Held-block pipeline for rendering dropped items as 3D voxel models. */
+    private Shader itemShader = null;
 
     // Reused each frame to avoid per-frame allocation
     private final List<RenderChunk> transparentQueue = new ArrayList<>();
@@ -113,6 +119,9 @@ public class Renderer {
             float dz = pos.z - camZ;
             if (dx * dx + dz * dz > cullSq) continue;
 
+            // Items with a sprite tile render as 3D voxel models in pass II
+            if (isSpriteItem(item.getStack())) continue;
+
             BlockType renderBlock = item.getStack().isItem()
                 ? getItemRenderBlock(item.getStack().getItem())
                 : item.getStack().getBlockType();
@@ -170,8 +179,66 @@ public class Renderer {
         itemBatchMesh = new Mesh(positions, texCoords, normals, colors, layers, ao, wave, emissive, indices);
         itemBatchMesh.render();
 
+        renderSpriteItemEntities(items, world, camera, lightLevel);
+
         atlas.unbindArray();
         shader.unbind();
+    }
+
+    /** True when a dropped stack is rendered as a voxel item, not a cube. */
+    private boolean isSpriteItem(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return false;
+        if (stack.isBlock()) return false;
+        Item it = stack.getItem();
+        return it != null && it.spriteName != null;
+    }
+
+    /**
+     * Draw loose item entities that have a sprite tile as chunky 3D voxel
+     * models (the same ItemModel3D used in the players' hands), so a thrown
+     * sword no longer looks like a stone cube.
+     */
+    private void renderSpriteItemEntities(List<ItemEntity> items, World world,
+                                          Camera camera, float lightLevel) {
+        boolean any = false;
+        for (var item : items) {
+            ItemStack stack = item.getStack();
+            if (!isSpriteItem(stack)) continue;
+
+            Vector3f pos = item.getPosition();
+            Item it = stack.getItem();
+            int layer = textureAtlas.getLayerOf(it.spriteName);
+            ItemModel3D model3d = ItemModel3D.get(textureAtlas, layer);
+            if (model3d == null || model3d.getVertexCount() == 0) continue;
+
+            if (!any) {
+                if (itemShader == null) {
+                    itemShader = new Shader("shaders/heldblock.vert",
+                        "shaders/heldblock.frag");
+                }
+                itemShader.bind();
+                itemShader.setUniformMat4("projection", camera.getProjectionMatrix());
+                itemShader.setUniformMat4("view", camera.getViewMatrix());
+                itemShader.setUniform1i("blockTextures", 0);
+                itemShader.setUniform1f("lightLevel", lightLevel);
+                itemShader.setUniform3f("sunColor", new Vector3f(1.0f, 1.0f, 1.0f));
+                any = true;
+            }
+
+            Matrix4f model = new Matrix4f();
+            model.translate(pos.x, pos.y + item.getBobOffset(), pos.z);
+            model.rotateY((float) java.lang.Math.toRadians(item.getRotation()));
+            model.rotateX((float) java.lang.Math.toRadians(35));
+            model.scale(0.45f);
+            itemShader.setUniformMat4("model", model);
+
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+            glFrontFace(GL_CCW);
+
+            model3d.render(itemShader);
+        }
+        if (any) itemShader.unbind();
     }
 
     /**
@@ -838,6 +905,8 @@ public class Renderer {
         slidingDoorMesh = null;
         if (itemBatchMesh != null) itemBatchMesh.cleanup();
         itemBatchMesh = null;
+        if (itemShader != null) itemShader.cleanup();
+        itemShader = null;
         textureAtlas.cleanup();
     }
 

@@ -47,19 +47,21 @@ public final class MenuTheme {
         ACCENT_DIM = set[2];
     }
 
-    // Glass panels (RGB keeps its hue; alpha comes from col()/texture)
-    public static final int GLASS_PANEL       = 0xFF141826;
-    public static final int GLASS_PANEL_HOVER = 0xFF252F49;
-    public static final int GLASS_CARD        = 0xFF0F141E;
-    public static final int GLASS_ACTIVE      = 0xFF0D1119;
+    // Glass panels (RGB keeps its hue; alpha comes from col()/texture).
+    // Mutable: beginFrame() swaps the whole base between the dark glass
+    // (in-game screens) and the light "airy" set (menu flow screens).
+    public static int GLASS_PANEL       = 0xFF141826;
+    public static int GLASS_PANEL_HOVER = 0xFF252F49;
+    public static int GLASS_CARD        = 0xFF0F141E;
+    public static int GLASS_ACTIVE      = 0xFF0D1119;
 
     // Rims / edges
-    public static final int GLASS_EDGE_TOP    = 0xFFFFFFFF;
-    public static final int GLASS_EDGE_SIDE   = 0x3CFFFFFF;
-    public static final int GLASS_EDGE_BOTTOM = 0x1EFFFFFF;
-    public static final int GLASS_BORDER      = 0xB0FFFFFF;
-    public static final int GLASS_INNER       = 0x1AFFFFFF;
-    public static final int GLASS_SHADOW      = 0xFF06080C;
+    public static int GLASS_EDGE_TOP    = 0xFFFFFFFF;
+    public static int GLASS_EDGE_SIDE   = 0x3CFFFFFF;
+    public static int GLASS_EDGE_BOTTOM = 0x1EFFFFFF;
+    public static int GLASS_BORDER      = 0xB0FFFFFF;
+    public static int GLASS_INNER       = 0x1AFFFFFF;
+    public static int GLASS_SHADOW      = 0xFF06080C;
 
     // Legacy slate palette (still read by custom rows in screens that have
     // not been migrated to the glass look yet)
@@ -70,18 +72,82 @@ public final class MenuTheme {
     public static final int PANEL_BORDER   = 0x0A0E1C;
     public static final int PANEL_INNER    = 0x44547F;
 
-    // Text
-    public static final int TEXT_BRIGHT    = 0xFFFFFFFF;
-    public static final int TEXT_LABEL     = 0xFFDCE4F5;
-    public static final int TEXT_SECONDARY = 0xFF9AA8CC;
-    public static final int TEXT_DIM       = 0xFF66739A;
-    public static final int TEXT_WARNING   = 0xFFE06040;
+    // Text (mutable, swapped by beginFrame)
+    public static int TEXT_BRIGHT    = 0xFFFFFFFF;
+    public static int TEXT_LABEL     = 0xFFDCE4F5;
+    public static int TEXT_SECONDARY = 0xFF9AA8CC;
+    public static int TEXT_DIM       = 0xFF66739A;
+    public static int TEXT_WARNING   = 0xFFE06040;
 
-    // Misc
-    public static final int OVERLAY        = 0xC0141828;   // world wash (fallback)
-    public static final int OVERLAY_SOFT   = 0x8C141828;   // light wash over the blur
-    public static final int GLASS_WASH     = 0x4C09111C;   // soft tint over the blurred world
-    public static final int SEPARATOR      = 0x40A0B0D0;
+    // Misc (mutable, swapped by beginFrame)
+    public static int OVERLAY        = 0xC0141828;   // world wash (fallback)
+    public static int OVERLAY_SOFT   = 0x8C141828;   // light wash over the blur
+    public static int GLASS_WASH     = 0x4C09111C;   // soft tint over the blurred world
+    public static int SEPARATOR      = 0x40A0B0D0;
+
+    /**
+     * True while a menu-flow screen (main menu, options, world screens) is
+     * being rendered: panels switch to translucent white glass with dark
+     * text, and the world wash turns to a bright veil. In-game screens keep
+     * the dark glass. Set from {@link com.voxelgame.ui.screen.Screen#render}.
+     */
+    public static boolean lightContext = false;
+
+    /** Swaps the base palette for the current frame's screen style. */
+    public static void beginFrame(boolean light) {
+        lightContext = light;
+        if (light) {
+            GLASS_PANEL       = 0xFFFDFEFF;
+            GLASS_PANEL_HOVER = 0xFFFFFFFF;
+            GLASS_CARD        = 0xFFFAFBFE;
+            GLASS_ACTIVE      = 0xFFE9EDF4;
+
+            GLASS_EDGE_TOP    = 0xFFFFFFFF;
+            GLASS_EDGE_SIDE   = 0xFFD9E0EA;
+            GLASS_EDGE_BOTTOM = 0xFFC9D2DF;
+            GLASS_BORDER      = 0xFFC4CEDC;
+            GLASS_SHADOW      = 0xFF5A6880;
+
+            TEXT_BRIGHT       = 0xFF101A2C;
+            TEXT_LABEL        = 0xFF24324A;
+            TEXT_SECONDARY    = 0xFF5C6A84;
+            TEXT_DIM          = 0xFF96A0B6;
+            TEXT_WARNING      = 0xFFC0392B;
+
+            OVERLAY           = 0xAAE8EEF6;
+            OVERLAY_SOFT      = 0x66FFFFFF;
+            GLASS_WASH        = 0x52FFFFFF;
+            SEPARATOR         = 0x38708CA8;
+        } else {
+            // Workshop walnut: the in-game set serves the container screens
+            GLASS_PANEL       = 0xFF4A3626;
+            GLASS_PANEL_HOVER = 0xFF5C4530;
+            GLASS_CARD        = 0xFF3A2A1C;
+            GLASS_ACTIVE      = 0xFF332314;
+
+            GLASS_EDGE_TOP    = 0xFFEDD9A0;
+            GLASS_EDGE_SIDE   = 0x50C9973B;
+            GLASS_EDGE_BOTTOM = 0xFF6E5220;
+            GLASS_BORDER      = 0xFF8A6420;
+            GLASS_SHADOW      = 0xFF1C1208;
+
+            TEXT_BRIGHT       = 0xFFF2E6C8;
+            TEXT_LABEL        = 0xFFE8D9B8;
+            TEXT_SECONDARY    = 0xFFC9B68F;
+            TEXT_DIM          = 0xFFA89268;
+            TEXT_WARNING      = 0xFFE8764A;
+
+            OVERLAY           = 0xC0261A10;
+            OVERLAY_SOFT      = 0x8C261A10;
+            GLASS_WASH        = 0x4C261A10;
+            SEPARATOR         = 0x66C9973B;
+        }
+    }
+
+    /** Restores the dark in-game base; call when a light frame is done. */
+    public static void endFrame() {
+        beginFrame(false);
+    }
 
     /**
      * Blurred copy of the live scene, set every frame by Game when a menu is
@@ -112,31 +178,39 @@ public final class MenuTheme {
                                   float w, float h, float hover01) {
         GuiAssets tex = GuiAssets.INSTANCE;
         int r = GuiAssets.GLASS_BORDER;
+        boolean light = lightContext;
 
         // Soft offset drop shadow, growing slightly as the panel lifts
         ui.drawNineSlice(tex.glassShadow, x + 2, y + 4, w, h,
-            r, GuiAssets.GLASS_WIDGET, col(alpha, 255, GLASS_SHADOW));
+            r, GuiAssets.GLASS_WIDGET, col(alpha, light ? 110 : 255, GLASS_SHADOW));
 
         // Glass body tinted toward the accent; brightens smoothly on hover
-        int fill = blend(GLASS_PANEL, ACCENT, 0.09f + 0.07f * hover01);
+        int fill = blend(GLASS_PANEL, ACCENT, light ? 0.04f + 0.05f * hover01
+                                                    : 0.09f + 0.07f * hover01);
         if (hover01 > 0.01f) fill = blend(fill, GLASS_PANEL_HOVER, hover01);
         ui.drawNineSlice(tex.glassPanel, x, y, w, h,
-            r, GuiAssets.GLASS_WIDGET, col(alpha, 200, fill));
+            r, GuiAssets.GLASS_WIDGET, col(alpha, light ? 225 : 200, fill));
 
         // Vertical light falloff inside the rounded body (top-lit material)
         if (h > 2 * r + 2) {
-            ui.fillGradientV(x + r, y + r, w - 2 * r, h - 2 * r - 1,
-                col(alpha, 26, 0xFFFFFF), col(alpha, 0, 0x000000));
+            if (light) {
+                ui.fillGradientV(x + r, y + r, w - 2 * r, h - 2 * r - 1,
+                    col(alpha, 70, 0xFFFFFF), col(alpha, 26, 0x9FB0C8));
+            } else {
+                ui.fillGradientV(x + r, y + r, w - 2 * r, h - 2 * r - 1,
+                    col(alpha, 26, 0xFFFFFF), col(alpha, 0, 0x000000));
+            }
         }
 
         // Light rim along the top and bottom edges (kept inside the corners)
         int spanW = Math.max(0, (int) w - 2 * r);
         int spanH = Math.max(0, (int) h - 2 * r);
-        ui.fillRect(x + r, y, spanW, 1, col(alpha, 235, GLASS_EDGE_TOP));
-        ui.fillRect(x + r, y + h - 1, spanW, 1, col(alpha, 70, GLASS_EDGE_BOTTOM));
+        ui.fillRect(x + r, y, spanW, 1, col(alpha, light ? 255 : 235, GLASS_EDGE_TOP));
+        ui.fillRect(x + r, y + h - 1, spanW, 1,
+            col(alpha, light ? 230 : 70, GLASS_EDGE_BOTTOM));
         if (spanH > 0) {
-            ui.fillRect(x, y + r, 1, spanH, col(alpha, 90, GLASS_EDGE_SIDE));
-            ui.fillRect(x + w - 1, y + r, 1, spanH, col(alpha, 90, GLASS_EDGE_SIDE));
+            ui.fillRect(x, y + r, 1, spanH, col(alpha, light ? 255 : 90, GLASS_EDGE_SIDE));
+            ui.fillRect(x + w - 1, y + r, 1, spanH, col(alpha, light ? 255 : 90, GLASS_EDGE_SIDE));
         }
 
         // Hover accents fade in: a glowing top hairline and a left bar
@@ -160,30 +234,36 @@ public final class MenuTheme {
                                  float w, float h) {
         GuiAssets tex = GuiAssets.INSTANCE;
         int r = GuiAssets.GLASS_BORDER;
+        boolean light = lightContext;
 
         // Soft offset drop shadow
         ui.drawNineSlice(tex.glassShadow, x + 3, y + 6, w, h,
-            r, GuiAssets.GLASS_WIDGET, col(alpha, 255, GLASS_SHADOW));
+            r, GuiAssets.GLASS_WIDGET, col(alpha, light ? 120 : 255, GLASS_SHADOW));
 
         ui.drawNineSlice(tex.glassPanel, x, y, w, h,
             r, GuiAssets.GLASS_WIDGET,
-            col(alpha, 190, blend(GLASS_CARD, ACCENT, 0.07f)));
+            col(alpha, light ? 235 : 190, blend(GLASS_CARD, ACCENT, light ? 0.03f : 0.07f)));
 
         // Top-lit falloff inside the body
         if (h > 2 * r + 2) {
-            ui.fillGradientV(x + r, y + r, Math.max(0, (int) w - 2 * r), h - 2 * r - 1,
-                col(alpha, 18, 0xFFFFFF), col(alpha, 0, 0x000000));
+            if (light) {
+                ui.fillGradientV(x + r, y + r, Math.max(0, (int) w - 2 * r), h - 2 * r - 1,
+                    col(alpha, 60, 0xFFFFFF), col(alpha, 20, 0xA8B8CC));
+            } else {
+                ui.fillGradientV(x + r, y + r, Math.max(0, (int) w - 2 * r), h - 2 * r - 1,
+                    col(alpha, 18, 0xFFFFFF), col(alpha, 0, 0x000000));
+            }
         }
 
         ui.fillRect(x + r, y, Math.max(0, (int) w - 2 * r), 1,
             col(alpha, 255, GLASS_EDGE_TOP));
         ui.fillRect(x + r, y + h - 1, Math.max(0, (int) w - 2 * r), 1,
-            col(alpha, 50, GLASS_EDGE_BOTTOM));
+            col(alpha, light ? 220 : 50, GLASS_EDGE_BOTTOM));
 
         // Quiet accent baseline along the bottom inner edge
         int ix = (int) x + r + 4, iw = (int) w - 2 * (r + 4);
         if (iw > 0) {
-            ui.fillRect(ix, y + h - r - 5, iw, 1, col(alpha, 70, ACCENT_DIM));
+            ui.fillRect(ix, y + h - r - 5, iw, 1, col(alpha, light ? 45 : 70, ACCENT_DIM));
         }
     }
 
@@ -207,6 +287,31 @@ public final class MenuTheme {
      * UI content in front stays readable.
      */
     public static void drawBackdrop(UIRenderer ui, int w, int h, double time) {
+        if (lightContext) {
+            // Airy daylight fallback: pale blue sky, soft sun, light hills
+            ui.fillGradientMultiV(0, 0, w, h, 0xFFBFD9F2, 0xFFDCEBFA, 0xFFEFF6FC, 0xFFF8FBFD);
+
+            float pulse = 0.5f + 0.5f * (float) Math.sin(time * 1.1);
+            int sx = (int) (w * 0.72f);
+            int sy = h - 170;
+            for (int r = 4; r >= 1; r--) {
+                int a = (int) ((10 + 4 * pulse) / r) << 24;
+                ui.fillRect(sx - r * 6, sy - r * 6, r * 12, r * 12, a | ACCENT);
+            }
+            ui.fillRect(sx - 9, sy - 9, 18, 18, 0xFF000000 | ACCENT_LIGHT);
+
+            // Rolling hill silhouettes, quiet and low-contrast
+            ui.fillRect(0, h - 120, w, 120, 0xFFD4E2EE);
+            int ridge = h - 108;
+            for (int i = -1; i <= (w >> 5) + 1; i++) {
+                ui.fillRect(i * 32, ridge, 32, 2, 0xFFC2D4E4);
+            }
+
+            // Barely-there veil so UI text stays readable
+            ui.fillRect(0, 0, w, h, 0x10FFFFFF);
+            return;
+        }
+
         ui.fillGradientMultiV(0, 0, w, h, SKY_TOP, 0xFF1A2240, SKY_BOTTOM, 0xFF4A2E24);
 
         // Soft pulsing sun (tinted by the theme accent)

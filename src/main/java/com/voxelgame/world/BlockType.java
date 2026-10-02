@@ -446,6 +446,15 @@ public enum BlockType {
         return name == null ? null : BY_NAME.get(name);
     }
 
+    /**
+     * Sprite-only "blocks" (tools, food, materials): they exist in the block
+     * registry only to carry an atlas tile, but behave as items — they can
+     * never be placed into the world and always draw as an extruded sprite.
+     */
+    public boolean isItemSprite() {
+        return name.startsWith("item_") || this == IRON_SWORD;
+    }
+
     /** O(1) solid lookup for mesher/lighting hot paths. */
     private static final boolean[] SOLID = new boolean[512];
     private static final boolean[] TRANSPARENT = new boolean[512];
@@ -454,6 +463,7 @@ public enum BlockType {
     static {
         for (BlockType t : values()) {
             int idx = t.id;
+            if (idx < 0 || idx >= SOLID.length) continue;
             SOLID[idx] = t.solid;
             TRANSPARENT[idx] = !t.solid || t == WATER || t == GLASS || t == ICE
                 || t == OAK_LEAVES || t == SPRUCE_LEAVES || t == BIRCH_LEAVES
@@ -487,6 +497,7 @@ public enum BlockType {
     static {
         for (BlockType t : values()) {
             int idx = t.id;
+            if (idx < 0 || idx >= FLAMMABLE.length) continue;
             FLAMMABLE[idx] = t == OAK_LEAVES || t == SPRUCE_LEAVES || t == BIRCH_LEAVES
                 || t == JUNGLE_LEAVES || t == AUTUMN_LEAVES || t == CHERRY_LEAVES
                 || t == OAK_LOG || t == SPRUCE_LOG || t == BIRCH_LOG || t == JUNGLE_LOG

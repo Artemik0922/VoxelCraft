@@ -52,9 +52,10 @@ public final class TutorialToast implements Toast {
         int x = screenW - WIDTH - 6 + xOffset;
         int y = 6;
 
-        ui.drawNineSlice(gui.glassPanel, x, y, WIDTH, HEIGHT,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
-        ui.fillRect(x + 6, y + 1, WIDTH - 12, 1, 0x60FFFFFF);
+ui.drawNineSlice(com.voxelgame.ui2.UiMaterials.INSTANCE.paper, x, y, WIDTH, HEIGHT,
+            com.voxelgame.ui2.UiTheme.PAPER_BORDER, com.voxelgame.ui2.UiTheme.PAPER_TEX,
+            0xFFFFFFFF);
+        ui.fillRect(x + 6, y + 1, WIDTH - 12, 1, 0xFF8A6420);
 
         // Small book icon block on the left
         int iconSize = 20;
@@ -66,10 +67,10 @@ public final class TutorialToast implements Toast {
         ui.fillRect(iconX + 5, iconY + 5, 10, 10, 0xFFE8D8A8);
 
         int textX = iconX + iconSize + 6;
-        font.drawWithShadow(ui, tr("tutorial.title"), textX, y + 4, 0xFF7AE07A);
-        font.drawWithShadow(ui, tr("tutorial.move"), textX, y + 17, 0xFFFFFFFF);
-        font.drawWithShadow(ui, tr("tutorial.jumpSprint"), textX, y + 29, 0xFFFFFFFF);
-        font.drawWithShadow(ui, tr("tutorial.minePlace"), textX, y + 41, 0xFFFFFFFF);
-        font.drawWithShadow(ui, tr("tutorial.inventory"), textX, y + 53, 0xFFFFFFFF);
+        font.drawWithShadow(ui, tr("tutorial.title"), textX, y + 4, 0xFF4A6A2A);
+        font.drawWithShadow(ui, tr("tutorial.move"), textX, y + 17, 0xFF2A1D12);
+        font.drawWithShadow(ui, tr("tutorial.jumpSprint"), textX, y + 29, 0xFF2A1D12);
+        font.drawWithShadow(ui, tr("tutorial.minePlace"), textX, y + 41, 0xFF2A1D12);
+        font.drawWithShadow(ui, tr("tutorial.inventory"), textX, y + 53, 0xFF2A1D12);
     }
 }

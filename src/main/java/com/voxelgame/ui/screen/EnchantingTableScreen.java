@@ -241,7 +241,7 @@ public class EnchantingTableScreen extends Screen {
     protected void renderBackground(UIRenderer ui, FontRenderer font, GuiAssets gui) {
         MenuTheme.drawWorldOverlay(ui, width, height);
         ui.drawNineSlice(gui.glassPanel, panelX, panelY, panelW, panelH,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF332314);
     }
 
     @Override
@@ -251,7 +251,7 @@ public class EnchantingTableScreen extends Screen {
         lastMy = my;
 
         font.draw(ui, tr("container.enchanting"), panelX + PANEL_PAD,
-            panelY + PANEL_PAD, 0xFFE8EEFF);
+            panelY + PANEL_PAD, 0xFFF2E6C8);
 
         ItemStack tool = toolInSlot();
         ItemStack lapis = lapisInSlot();
@@ -348,8 +348,8 @@ public class EnchantingTableScreen extends Screen {
 
     private void drawGlassSlot(UIRenderer ui, GuiAssets gui, int sx, int sy, float mx, float my) {
         boolean hover = inside(mx, my, sx, sy, SLOT, SLOT);
-        ui.drawNineSlice(hover ? gui.glassSlotHover : gui.glassSlot,
-            sx, sy, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+        ui.drawNineSlice(gui.glassSlot,
+            sx, sy, SLOT, SLOT, 3, GuiAssets.SLOT_SIZE, hover ? 0xFF9A7D4C : 0xFF3A2A1A);
     }
 
     private static String roman(int n) {

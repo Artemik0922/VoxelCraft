@@ -13,21 +13,42 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
 
 /**
- * First-person view model: the player's arm and whatever block it holds.
+ * First-person view model, vanilla Minecraft pose pipeline.
+ *
+ * Three mutually exclusive states, exactly like the original game:
+ *  - empty hand: the bare right arm enters from the lower right corner
+ *    (skin-textured 4x12x4 limb, the classic arm chain);
+ *  - a block: the full cube, rotated so the top and two sides show;
+ *  - an item (tool, food, material): the 16x16 sprite extruded 1 texel
+ *    deep and swung up diagonally, like vanilla's item/handheld model.
+ *
+ * The transforms replicate vanilla's ItemInHandRenderer: hand base
+ * (0.56, -0.52, -0.72), the 45-degree yaw roll, the swing arc driven by
+ * sin(sqrt(progress)*PI) and sin(progress^2*PI), and the -0.6 equip drop.
  *
  * Drawn in its own pass after the world with the depth buffer cleared, so
- * the arm can never intersect nearby geometry, and with fog disabled so it
- * does not fade out at the edge of the render distance.
+ * the hand can never intersect nearby geometry, and with fog disabled so
+ * it does not fade out at the edge of the render distance.
  *
  * Everything sits in view space: the camera is treated as the origin, so
- * the arm follows the head automatically without tracking its transform.
+ * the hand follows the head automatically without tracking its transform.
  */
 public class HeldItemRenderer {
 
     /** Seconds for one full swing. */
     private static final float SWING_TIME = 0.25f;
-    /** Seconds for the shorter place-block jab. */
+    /** Seconds for the shorter place-block/use jab. */
     private static final float PLACE_TIME = 0.18f;
+
+    /** Vanilla hand anchor in view space (ItemInHandRenderer). */
+    private static final float HAND_X = 0.56f, HAND_Y = -0.52f, HAND_Z = -0.72f;
+    /** Vanilla arm anchor is slightly further out than the item anchor. */
+    private static final float ARM_X = 0.64f, ARM_Y = -0.60f, ARM_Z = -0.72f;
+    /** Vanilla equip drop: the item sinks 0.6 units while equipping. */
+    private static final float EQUIP_DROP = 0.6f;
+
+    /** 1/16: one skin/sprite pixel in world units. */
+    private static final float P = 1.0f / 16.0f;
 
     private final Shader modelShader;
     private final Shader blockShader;
@@ -35,7 +56,6 @@ public class HeldItemRenderer {
 
     private final ModelBox arm;
     private final BlockCube cube;
-    private final ItemSprite sprite;
 
     private final Matrix4f projection = new Matrix4f();
     private final Matrix4f identityView = new Matrix4f();
@@ -48,10 +68,8 @@ public class HeldItemRenderer {
 
     private float bobPhase = 0;
     private float bobAmount = 0;
-    /** Idle sway phase: slow periodic movement when standing still. */
-    private float idlePhase = 0;
 
-    /** Live-adjustable placement; see HandTuning. */
+    /** Live-adjustable offsets on top of the vanilla pose; see HandTuning. */
     private final HandTuning tuning = new HandTuning();
     public HandTuning getTuning() { return tuning; }
 
@@ -67,12 +85,10 @@ public class HeldItemRenderer {
 
         // The skin sheet draws the arm as a 4x12x4 limb, so the box must be
         // built with those dimensions or its UVs read a 32x12 strip of body
-        // and leg pixels instead. It is laid along -Z by the model matrix,
-        // not by swapping height and depth here.
+        // and leg pixels instead. Model space is Y-down like vanilla's.
         arm = new ModelBox(40, 16, 4, 12, 4, -2, -12, -2);
 
         cube = new BlockCube();
-        sprite = new ItemSprite();
     }
 
     // ------------------------------------------------------------------
@@ -134,10 +150,6 @@ public class HeldItemRenderer {
         } else {
             bobAmount += (0 - bobAmount) * Math.min(1, dt * 8);
         }
-
-        // Idle sway: slow periodic movement when standing still.
-        // Period ~3 seconds, very subtle. Makes the held item feel alive.
-        idlePhase += dt * 2.094f; // 2π / 3 ≈ 2.094 rad/s
     }
 
     // ------------------------------------------------------------------
@@ -158,7 +170,7 @@ public class HeldItemRenderer {
         glFrontFace(GL_CCW);
         glDisable(GL_BLEND);
 
-        // Narrower FOV than the world keeps the arm from looking distorted
+        // Narrower FOV than the world keeps the hand from looking distorted
         projection.identity().setPerspective(
             (float) Math.toRadians(70.0f),
             camera.getAspectRatio(), 0.05f, 8.0f);
@@ -174,44 +186,102 @@ public class HeldItemRenderer {
                 0);
         }
 
-        // What to draw in the hand: a block cube, a flat item sprite, or
-        // nothing. Items with a named sprite tile win over their block
-        // fallback, mirroring the inventory icon logic in StackIcons.
+        // What to draw in the hand: a block cube, an extruded item sprite,
+        // or the bare arm. Vanilla shows the arm only on an empty hand.
         BlockType renderBlock = null;
-        int spriteLayer = -1;
+        int voxelLayer = -1;
 
         if (held != null && !held.isEmpty()) {
             if (held.isBlock()) {
-                renderBlock = held.getBlockType();
+                BlockType type = held.getBlockType();
+                if (isItemSprite(type)) {
+                    voxelLayer = atlas.getSlot(type.id, 2);
+                } else {
+                    renderBlock = type;
+                }
             } else if (held.getItem() != null) {
                 Item item = held.getItem();
                 if (item.spriteName != null) {
-                    spriteLayer = atlas.getLayerOf(item.spriteName);
+                    voxelLayer = atlas.getLayerOf(item.spriteName);
                 }
-                if (spriteLayer < 0 && item.blockType != null) {
+                if (voxelLayer < 0 && item.blockType != null
+                        && !isItemSprite(item.blockType)) {
                     renderBlock = item.blockType;
                 }
             }
         }
 
         boolean hasBlock = renderBlock != null && renderBlock != BlockType.AIR;
-        boolean hasSprite = spriteLayer >= 0;
 
-        if (hasSprite) {
-            renderHeldSprite(atlas, spriteLayer, lightLevel, sunColor);
+        if (voxelLayer >= 0) {
+            renderHeldItemModel(atlas, voxelLayer, lightLevel, sunColor);
         } else if (hasBlock) {
-            if (isFlatItem(renderBlock)) {
-                renderHeldSprite(atlas, renderBlock, lightLevel, sunColor);
-            } else {
-                renderHeldBlock(atlas, renderBlock, lightLevel, sunColor);
-            }
+            renderHeldBlock(atlas, renderBlock, lightLevel, sunColor);
+        } else {
+            renderArm(lightLevel, sunColor);
         }
-        renderArm(hasBlock || hasSprite, lightLevel, sunColor);
 
         glDepthMask(true);
     }
 
-    private void renderArm(boolean holdingBlock, float lightLevel, Vector3f sunColor) {
+    /** Sprite-only block types (tools, food, materials) — never a cube. */
+    static boolean isItemSprite(BlockType type) {
+        return type != null && type.isItemSprite();
+    }
+
+    // ------------------------------------------------------------------
+    // Vanilla pose chains
+    // ------------------------------------------------------------------
+
+    /**
+     * Shared vanilla anchor: swing pre-offset, hand position with the equip
+     * drop, and the 45-degree attack roll with the swing terms. Vanilla
+     * ItemInHandRenderer#applyItemArmAttackTransform.
+     *
+     * @param s 0..1 swing progress (0 = resting pose)
+     */
+    private void applyVanillaHand(Matrix4f m, float s, float armAnchor) {
+        float sq = (float) Math.sqrt(s);
+        float sinSq = (float) Math.sin(sq * Math.PI);
+        float sinQuad = (float) Math.sin(s * s * Math.PI);
+
+        if (s > 0.001f) {
+            // Vanilla swing pre-offset: forward scoop, up then down
+            if (armAnchor > 0) {
+                m.translate(-0.3f * sinSq, 0.4f * (float) Math.sin(sq * Math.PI * 2),
+                    -0.4f * sinQuad);
+            } else {
+                m.translate(-0.4f * sinSq, 0.2f * (float) Math.sin(sq * Math.PI * 2),
+                    -0.2f * sinQuad);
+            }
+        }
+
+        if (armAnchor > 0) {
+            m.translate(ARM_X, ARM_Y - EQUIP_DROP * (1 - equipProgress), ARM_Z);
+        } else {
+            m.translate(HAND_X, HAND_Y - EQUIP_DROP * (1 - equipProgress), HAND_Z);
+        }
+
+        // Attack roll: 45 degrees at rest, swept away by the swing
+        m.rotateY((float) Math.toRadians(45 - 20 * sinQuad));
+        m.rotateZ((float) Math.toRadians(-20 * sinSq));
+        m.rotateX((float) Math.toRadians(-80 * sinSq));
+        m.rotateY((float) Math.toRadians(-20 * sinQuad));
+    }
+
+    /** Walking bob: the hand rolls gently with the step rhythm. */
+    private void applyBob(Matrix4f m) {
+        if (bobAmount > 0.001f) {
+            m.rotateZ((float) Math.sin(bobPhase) * 0.045f * bobAmount);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Passes
+    // ------------------------------------------------------------------
+
+    /** The bare right arm, vanilla renderPlayerArm chain. */
+    private void renderArm(float lightLevel, Vector3f sunColor) {
         modelShader.bind();
         modelShader.setUniformMat4("projection", projection);
         modelShader.setUniformMat4("view", identityView);
@@ -222,26 +292,39 @@ public class HeldItemRenderer {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, skin.getTextureId());
 
-        // Arm enters from the lower right corner, angled about 45 degrees
-        // towards the item so the hand meets the underside of the block
         model.identity();
 
-        model.translate(tuning.armX, tuning.armY, tuning.armZ);
-        model.rotateZ((float) Math.toRadians(tuning.armRotZ));
-        model.rotateX((float) Math.toRadians(tuning.armRotX));
-
-        // Lay the limb along -Z so it reaches away from the camera. The box
-        // itself stays 4x12x4 to match how the skin is drawn.
-        model.rotateX((float) Math.toRadians(90));
-
-        applySwing(model);
+        // Vanilla arm swing pre-offset + equip drop; the arm pose itself is
+        // authored directly in view space (the item anchor chain does not
+        // apply to the bare arm)
+        float s = activeSwing();
+        if (s > 0.001f) {
+            float sq = (float) Math.sqrt(s);
+            model.translate(-0.3f * (float) Math.sin(sq * Math.PI),
+                0.4f * (float) Math.sin(sq * Math.PI * 2),
+                -0.4f * (float) Math.sin(s * Math.PI));
+        }
+        model.translate(0, -EQUIP_DROP * (1 - equipProgress), 0);
         applyBob(model);
-        applyEquip(model);
+
+        // Fist just off the bottom-right corner; the limb runs mostly away
+        // from the camera (strong vanilla foreshortening), shoulder hidden
+        // behind the screen edge (ModelBox is in world units, hand end at
+        // its y=0 origin, shoulder 12px along -Y)
+        model.translate(0.48f, -0.36f, -0.62f);
+        model.rotateY((float) Math.toRadians(-66));
+        model.rotateZ((float) Math.toRadians(60));
 
         modelShader.setUniformMat4("model", model);
         arm.render();
 
         modelShader.unbind();
+    }
+
+    private float activeSwing() {
+        if (swinging) return swingProgress;
+        if (placing) return placeProgress;
+        return 0;
     }
 
     private void renderHeldBlock(TextureAtlas atlas, BlockType held,
@@ -256,20 +339,21 @@ public class HeldItemRenderer {
         glActiveTexture(GL_TEXTURE0);
         atlas.bindArray();
 
-        // View space: camera at the origin looking down -Z, +Y up, +X right,
-        // so the lower right of the screen is (+X, -Y, -Z).
         model.identity();
-
-        model.translate(tuning.itemX, tuning.itemY, tuning.itemZ);
-        model.rotateY((float) Math.toRadians(tuning.itemRotY));
-        model.rotateX((float) Math.toRadians(tuning.itemRotX));
-
-        applySwing(model);
+        applyVanillaHand(model, activeSwing(), 0);
         applyBob(model);
-        applyEquip(model);
 
-        // Applied last, so it scales the item and not the offsets above
-        model.scale(tuning.itemScale);
+        model.translate(tuning.offsetX, tuning.offsetY, tuning.offsetZ);
+
+        // Vanilla 1.8 doBlockTransformations shape, retuned so the cube sits
+        // fully on screen in the lower right, top and two sides showing
+        model.scale(0.35f);
+        model.translate(0.05f, 0.35f, 0.05f);
+        model.rotateY((float) Math.toRadians(30));
+        model.rotateX((float) Math.toRadians(-80));
+        model.rotateY((float) Math.toRadians(60));
+        // Our cube is centred, vanilla's hangs off the origin corner
+        model.translate(0.5f, 0.5f, 0.5f);
 
         blockShader.setUniformMat4("model", model);
 
@@ -279,21 +363,16 @@ public class HeldItemRenderer {
         atlas.unbindArray();
     }
 
-    /** Items rendered as flat sprites instead of 3D cubes. */
-    private boolean isFlatItem(BlockType type) {
-        return type == BlockType.IRON_SWORD;
-    }
+    /**
+     * Render a held item as the vanilla item/handheld model: the sprite
+     * extruded 1 texel deep, firstperson_righthand display
+     * (rotation [0, -90, 25], translation [1.13, 3.2, 1.13]/16, scale 0.68).
+     */
+    private void renderHeldItemModel(TextureAtlas atlas, int layer,
+                                     float lightLevel, Vector3f sunColor) {
+        ItemModel3D itemModel = ItemModel3D.get(atlas, layer);
+        if (itemModel == null || itemModel.getVertexCount() == 0) return;
 
-    /** Render a flat item sprite (swords, tools) in first person. */
-    private void renderHeldSprite(TextureAtlas atlas, BlockType held,
-                                   float lightLevel, Vector3f sunColor) {
-        renderHeldSprite(atlas, atlas.getSlot(held.id, 2),
-            lightLevel, sunColor);
-    }
-
-    /** Render a flat item sprite from a named atlas layer (tools, food, etc). */
-    private void renderHeldSprite(TextureAtlas atlas, int layer,
-                                   float lightLevel, Vector3f sunColor) {
         blockShader.bind();
         blockShader.setUniformMat4("projection", projection);
         blockShader.setUniformMat4("view", identityView);
@@ -305,92 +384,37 @@ public class HeldItemRenderer {
         atlas.bindArray();
 
         model.identity();
-
-        // Flat items are held blade-up, angled diagonally across the view
-        model.translate(0.65f, -0.55f, -1.2f);
-        model.rotateY((float) Math.toRadians(-35.0f));
-        model.rotateX((float) Math.toRadians(55.0f));
-        model.rotateZ((float) Math.toRadians(-15.0f));
-
-        applySwing(model);
+        applyVanillaHand(model, activeSwing(), 0);
         applyBob(model);
-        applyEquip(model);
 
-        model.scale(1.2f);
+        model.translate(tuning.offsetX, tuning.offsetY, tuning.offsetZ);
+
+        // firstperson_righthand display block, translation in 1/16 units.
+        // The +90/+20 pair stands the tool up nearly vertical, blade tilted
+        // slightly left — the vanilla rest pose
+        model.translate(-0.06f, 0.10f, 0);
+        model.translate(1.13f * P, 3.2f * P, 1.13f * P);
+        model.rotateY((float) Math.toRadians(90));
+        model.rotateZ((float) Math.toRadians(20));
+        model.scale(0.68f);
 
         blockShader.setUniformMat4("model", model);
 
-        sprite.render(atlas, layer, blockShader);
+        // Closed voxel boxes: backface culling halves the fill cost
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
+
+        itemModel.render(blockShader);
 
         blockShader.unbind();
         atlas.unbindArray();
     }
 
-    /** Swing arc on left click, plus the shorter jab when placing. */
-    private void applySwing(Matrix4f m) {
-        if (swinging) {
-            // arc runs 0 -> 1 -> 0 across the swing
-            float arc = (float) Math.sin(swingProgress * Math.PI);
-
-            m.translate(0, -0.20f * arc, 0.10f * arc);
-            m.rotateX((float) Math.toRadians(-65.0f * arc));
-            m.rotateZ((float) Math.toRadians(-25.0f * arc));
-        }
-
-        if (placing) {
-            float jab = (float) Math.sin(placeProgress * Math.PI);
-            m.translate(0, 0, -0.20f * jab);
-            m.rotateX((float) Math.toRadians(-16.0f * jab));
-        }
-    }
-
-    /**
-     * Slight roll while walking. The translation part of the bob lives in
-     * the view matrix so it moves arm and item together.
-     * When standing still (bobAmount≈0), applies subtle idle sway instead.
-     */
-    private void applyBob(Matrix4f m) {
-        if (bobAmount > 0.001f) {
-            // Walking: gentle roll matching camera bob
-            m.rotateZ((float) Math.sin(bobPhase) * 0.045f * bobAmount);
-        } else if (equipProgress >= 1.0f && !swinging && !placing) {
-            // Idle: very subtle periodic sway so the item never looks frozen
-            // Amplitude ±0.035 rad (~2 degrees) vertical and slight rotation
-            float idle = (float) Math.sin(idlePhase);
-            m.translate(0, idle * 0.005f, 0);
-            m.rotateX(idle * 0.035f);
-            m.rotateZ((float) Math.cos(idlePhase * 0.7f) * 0.018f);
-        }
-    }
-
-    /**
-     * Equip animation: the item drops out of frame and springs back with a
-     * slight overshoot whenever the selected slot changes.
-     */
-    private void applyEquip(Matrix4f m) {
-        if (equipProgress >= 1.0f) return;
-
-        float t = equipProgress;
-
-        // Dip down over the first half, rise back with overshoot
-        float drop;
-        if (t < 0.5f) {
-            float k = t / 0.5f;
-            drop = -0.55f * k;
-        } else {
-            float k = (t - 0.5f) / 0.5f;
-            // Overshoot slightly past the rest pose, then settle
-            drop = -0.55f * (1 - k) + 0.06f * (float) Math.sin(k * Math.PI);
-        }
-
-        m.translate(0, drop, 0);
-        m.rotateX((float) Math.toRadians(38.0f * -drop));
-    }
-
     public void cleanup() {
         arm.cleanup();
         cube.cleanup();
-        sprite.cleanup();
+        ItemModel3D.cleanupAll();
         modelShader.cleanup();
         blockShader.cleanup();
     }

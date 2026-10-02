@@ -56,20 +56,23 @@ public class Toggle extends Widget {
         int swX = x + width - SWITCH_W - 6;
         int swY = y + (height - SWITCH_H) / 2;
 
-        // Pill groove: amber when on, dark glass when off
-        int groove = value ? MenuTheme.ACCENT_DIM : 0xFF141A28;
+        // Pill groove: accent when on, quiet inset when off
+        int groove = value ? MenuTheme.ACCENT_DIM
+                           : (MenuTheme.lightContext ? 0xFFDDE4EE : 0xFF141A28);
         ui.drawNineSlice(tex.glassTrack, swX, swY, SWITCH_W, SWITCH_H, 4,
             GuiAssets.GLASS_WIDGET, MenuTheme.col(fadeAlpha << 24, 255, groove));
         if (value) {
-            // Amber fill strength follows the knob so it fades in smoothly
+            // Accent fill strength follows the knob so it fades in smoothly
             ui.drawNineSlice(tex.glassTrack, swX, swY, SWITCH_W, SWITCH_H, 4,
-                GuiAssets.GLASS_WIDGET, MenuTheme.col(fadeAlpha << 24, (int) (90 * knobProgress), MenuTheme.ACCENT));
+                GuiAssets.GLASS_WIDGET, MenuTheme.col(fadeAlpha << 24, (int) (110 * knobProgress), MenuTheme.ACCENT));
         }
 
-        // Knob - a small round glass bead sliding between the two ends
+        // Knob - a small round bead sliding between the two ends
         int bead = SWITCH_H - 2;
         int knobX = swX + 1 + (int) (knobProgress * (SWITCH_W - bead - 2));
-        int knobCol = MenuTheme.lerp(0xFFB8C2DC, MenuTheme.SUNSET_HI, knobProgress);
+        int knobCol = MenuTheme.lightContext
+            ? MenuTheme.lerp(0xFFFFFFFF, MenuTheme.ACCENT, knobProgress)
+            : MenuTheme.lerp(0xFFB8C2DC, MenuTheme.SUNSET_HI, knobProgress);
         ui.drawNineSlice(tex.glassPanel, knobX, swY + 1, bead, bead,
             GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET,
             MenuTheme.col(fadeAlpha << 24, 255, knobCol));

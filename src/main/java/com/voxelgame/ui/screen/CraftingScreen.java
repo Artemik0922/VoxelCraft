@@ -136,8 +136,8 @@ public class CraftingScreen extends Screen {
     protected void renderBackground(UIRenderer ui, FontRenderer font, GuiAssets gui) {
         MenuTheme.drawWorldOverlay(ui, width, height);
         ui.drawNineSlice(gui.glassPanel, panelX, panelY, panelW, panelH,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
-        font.draw(ui, tr("container.crafting"), gridStartX, panelY + 8, 0xFFE8EEFF);
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF332314);
+        font.draw(ui, tr("container.crafting"), gridStartX, panelY + 8, 0xFFF2E6C8);
     }
 
     @Override
@@ -154,9 +154,9 @@ public class CraftingScreen extends Screen {
             for (int x = 0; x < 3; x++) {
                 int sx = gridStartX + x * SLOT;
                 int sy = gridStartY + y * SLOT;
-                ui.drawNineSlice(mx >= sx && mx < sx + SLOT && my >= sy && my < sy + SLOT
-                    ? gui.glassSlotHover : gui.glassSlot, sx, sy, SLOT, SLOT,
-                    3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+                boolean over = mx >= sx && mx < sx + SLOT && my >= sy && my < sy + SLOT;
+                ui.drawNineSlice(gui.glassSlot, sx, sy, SLOT, SLOT,
+                    3, GuiAssets.SLOT_SIZE, over ? 0xFF9A7D4C : 0xFF3A2A1A);
                 ItemStack item = grid[y * 3 + x];
                 if (!item.isEmpty()) {
                     StackIcons.drawStack(ui, font, atlas, item, sx + 1, sy + 1);
@@ -170,7 +170,7 @@ public class CraftingScreen extends Screen {
 
         // Output
         ui.drawNineSlice(gui.glassSlot, outputX, outputY, SLOT, SLOT,
-            3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+            3, GuiAssets.SLOT_SIZE, 0xFF3A2A1A);
         if (!resultSlot.isEmpty()) {
             StackIcons.drawStack(ui, font, atlas, resultSlot, outputX + 1, outputY + 1);
             if (inside(mx, my, outputX, outputY)) hovered = resultSlot;
@@ -182,7 +182,7 @@ public class CraftingScreen extends Screen {
         ui.useSolidColor();
         ui.fillRect(bookButtonX + 4, bookButtonY + bookButtonH - 2,
             bookButtonW - 8, 1, MenuTheme.ACCENT);
-        font.draw(ui, tr("recipeBook.toggle"), bookButtonX + 5, bookButtonY + 4, 0xFFE8EEFF);
+        font.draw(ui, tr("recipeBook.toggle"), bookButtonX + 5, bookButtonY + 4, 0xFFF2E6C8);
 
         if (bookOpen) {
             renderBook(ui, font, gui, mx, my);
@@ -192,9 +192,9 @@ public class CraftingScreen extends Screen {
         for (int i = 0; i < Inventory.MAIN_INVENTORY_SIZE; i++) {
             int sx = storageX + (i % 9) * SLOT;
             int sy = storageY + (i / 9) * SLOT;
-            ui.drawNineSlice(mx >= sx && mx < sx + SLOT && my >= sy && my < sy + SLOT
-                ? gui.glassSlotHover : gui.glassSlot, sx, sy, SLOT, SLOT,
-                3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+            boolean over = mx >= sx && mx < sx + SLOT && my >= sy && my < sy + SLOT;
+            ui.drawNineSlice(gui.glassSlot, sx, sy, SLOT, SLOT,
+                3, GuiAssets.SLOT_SIZE, over ? 0xFF9A7D4C : 0xFF3A2A1A);
             ItemStack stack = inv.getInventoryItem(i);
             if (!stack.isEmpty()) {
                 StackIcons.drawStack(ui, font, atlas, stack, sx + 1, sy + 1);
@@ -205,9 +205,9 @@ public class CraftingScreen extends Screen {
         // Hotbar strip
         for (int i = 0; i < Inventory.HOTBAR_SIZE; i++) {
             int sx = hotbarX + i * SLOT;
-            ui.drawNineSlice(mx >= sx && mx < sx + SLOT && my >= hotbarY && my < hotbarY + SLOT
-                ? gui.glassSlotHover : gui.glassSlot, sx, hotbarY, SLOT, SLOT,
-                3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+            boolean over = mx >= sx && mx < sx + SLOT && my >= hotbarY && my < hotbarY + SLOT;
+            ui.drawNineSlice(gui.glassSlot, sx, hotbarY, SLOT, SLOT,
+                3, GuiAssets.SLOT_SIZE, over ? 0xFF9A7D4C : 0xFF3A2A1A);
             ItemStack stack = inv.getHotbarItem(i);
             if (!stack.isEmpty()) {
                 StackIcons.drawStack(ui, font, atlas, stack, sx + 1, hotbarY + 1);
@@ -232,7 +232,7 @@ public class CraftingScreen extends Screen {
             GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF151A2A);
         ui.useSolidColor();
         ui.fillRect(bookX + 8, bookY + 1, bookW - 16, 1, 0x60FFFFFF);
-        font.draw(ui, tr("recipeBook.title"), bookX + 8, bookY + 6, 0xFFE8EEFF);
+        font.draw(ui, tr("recipeBook.title"), bookX + 8, bookY + 6, 0xFFF2E6C8);
 
         // Search bar filters the list below it
         searchField.render(ui, font, gui, mx, my);
@@ -270,7 +270,7 @@ public class CraftingScreen extends Screen {
             int ox = px + 3 * 8 + 10;
             font.draw(ui, "→", ox, py + 3, 0xFF8EA2C2);
             int outX = ox + 14;
-            ui.drawNineSlice(gui.glassSlot, outX, py, 18, 18, 3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+            ui.drawNineSlice(gui.glassSlot, outX, py, 18, 18, 3, GuiAssets.SLOT_SIZE, 0xFF3A2A1A);
             drawIngredientIcon(ui, r.getResult(), outX + 1, py + 1, 16);
             if (r.getResult().getCount() > 1) {
                 font.draw(ui, "x" + r.getResult().getCount(), outX + 10, py + 11, 0xFFB8C2DC);
@@ -279,7 +279,7 @@ public class CraftingScreen extends Screen {
             // Recipe name; dim when the inventory cannot cover one set
             String name = recipeName(r);
             boolean affordable = hasIngredients(r, 1);
-            font.draw(ui, name, outX + 22, py + 6, affordable ? 0xFFE8EEFF : 0xFF6B7488);
+            font.draw(ui, name, outX + 22, py + 6, affordable ? 0xFFF2E6C8 : 0xFF6B7488);
 
             // Hover highlight
             if (mx >= px && mx < bookX + bookW - 6 && my >= ey && my < ey + BOOK_ENTRY_H) {

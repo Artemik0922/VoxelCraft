@@ -12,6 +12,30 @@ After a thorough codebase analysis, **approximately 120+ tasks (60%+) were alrea
 
 ---
 
+## Phase R — 3D Items & Item Texture Art
+
+### 🟢 COMPLETED — R1: Voxel 3D held items, third-person items, dropped items
+
+- **Files:** `rendering/model/ItemModel3D.java` (new), `HeldItemRenderer.java`, `PlayerBodyRenderer.java`, `Renderer.java`, `TextureAtlas.java` (`getLayerPixels`), `Game.java`
+- **Implementation:**
+  - `ItemModel3D` turns a 16×16 sprite into a chunky 3D model: every non-transparent pixel becomes a box in a thin layer (`DEPTH=0.16`), CCW winding with backface culling, cached per atlas layer, rendered through the existing `heldblock` shader (`faceLayers[6]` uniform, alpha cutout)
+  - First person (F1): flat `ItemSprite` quads removed; held items render as the voxel model in the `HandTuning` pose (still adjustable via F6)
+  - Third person (F5): `PlayerBodyRenderer.render(..., ItemStack heldStack, ...)` draws the held voxel model in the hand
+  - Dropped items: `Renderer.renderSpriteItemEntities(...)` draws each entity as the voxel model (scale 0.45, spin)
+- **Testing:** build + `--headless` → 132/132 PASS
+
+### 🟢 COMPLETED — R2: Real item sprites + PNG-first pipeline
+
+- **Files:** `tools/gen_item_textures.py` (new), `TextureAtlas.java` (≈55 registrations switched `tileGenerated` → `tileSprite`), 58 new PNGs under `textures/blocks/`
+- **Implementation:**
+  - New procedural art: tools already existed (`gen_tool_textures.py`); added recognizable silhouettes for bread, apple, meats, drumsticks, bow (curved limb + string), arrow, potion bottles, armor (helmet/chestplate/leggings/boots × leather/iron/diamond/meteorite), gems, ingots, coal, bone, leather, feather, egg, wheat, shears, bucket, milk, slime ball, resin/wax, etc.
+  - Item registrations now prefer bundled PNG and fall back to the procedural generator (`tileSprite` semantics), keeping the atlas valid even without the PNGs
+- **Testing:** build + `--headless` → 132/132 PASS
+
+### 📋 PENDING — R3: Item animations (bow draw, eating, block-break tooth)
+
+---
+
 ## Tasks Implemented in This Session
 
 ### 🟢 COMPLETED — CRITICAL (🔴)

@@ -2,44 +2,76 @@ package com.voxelgame.ui;
 
 import org.lwjgl.system.MemoryUtil;
 
+import java.awt.Font;
+import java.awt.RenderingHints;
+import java.awt.font.FontRenderContext;
+import java.awt.image.BufferedImage;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Pixel bitmap font, generated at runtime. Nothing is loaded from disk.
+ * Bitmap font rasterised from Monocraft.ttf (SIL OFL 1.1, see
+ * assets/fonts/Monocraft-OFL.txt) at startup.
  *
- * Glyphs are hand-defined as 5x7 bit patterns and baked into a texture at
- * startup. Characters are variable width, so 'i' does not occupy the same
- * space as 'W'.
+ * Rasterisation goes through Java2D (not stb_truetype): Monocraft's outlines
+ * only land on the pixel grid after hinting, which stb does not do - without
+ * it every glyph edge turns into partial coverage and the text looks grey
+ * and frayed once scaled. Java2D with TEXT_ANTIALIAS_OFF + FRACTIONALMETRICS_OFF
+ * grid-fits the font, so at its 8px design size every glyph is a crisp 5x7
+ * bitmap with zero antialiased pixels.
  *
- * Latin and Cyrillic both fit because glyphs are addressed through a
- * codepoint-to-slot map rather than by masking the character to a byte:
- * masking collapsed U+0410 onto 0x10 and made Cyrillic unrenderable.
+ * Latin, Cyrillic and typographic punctuation are baked with the metrics of
+ * the old hand-drawn 5x7 glyphs (5px advance, caps 7px tall), so the existing
+ * layout code keeps working unchanged. Glyphs are addressed through a
+ * codepoint map rather than by masking the character to a byte: masking
+ * collapsed U+0410 onto 0x10 and made Cyrillic unrenderable.
  */
 public class FontRenderer {
 
     public static final int GLYPH_W = 5;
     public static final int GLYPH_H = 7;
-    /** Cell size in the atlas, leaving a guard pixel so glyphs never bleed. */
-    private static final int CELL = 8;
-    /** 32x32 cells = 1024 glyph slots, enough for Latin plus Cyrillic. */
-    private static final int GRID = 32;
-    private static final int TEX_SIZE = CELL * GRID; // 256
+    /** Cell size in the atlas, leaving guard pixels so glyphs never bleed. */
+    private static final int CELL = 12;
+    /** 21x21 cells = 441 glyph slots, enough for Latin, Cyrillic and symbols. */
+    private static final int COLS = 21;
+    private static final int GRID = 21;
+    private static final int TEX_SIZE = 256;
+
+    /** Rasterisation size: Monocraft's native pixel grid. */
+    private static final float FONT_SIZE = 8f;
+    /** Draw-line top to cap top: caps draw at y+0, like the old glyphs. */
+    private static final int CAP_TOP = 7;
+    private static final String FONT_RESOURCE = "assets/fonts/Monocraft.ttf";
 
     /** Baseline line height including descender space. */
     public static final int LINE_HEIGHT = 9;
 
-    private final int textureId;
-    private final int[] glyphWidth = new int[GRID * GRID];
-    /** Unicode codepoint -> atlas slot. */
-    private final Map<Character, Integer> slotOf = new HashMap<>();
+    private static class Glyph {
+        final int slot;
+        final int width;
+        final int height;
+        final int dx; // offset from the pen position to the bitmap left
+        final int dy; // offset from the draw y to the bitmap top
 
+        Glyph(int slot, int width, int height, int dx, int dy) {
+            this.slot = slot;
+            this.width = width;
+            this.height = height;
+            this.dx = dx;
+            this.dy = dy;
+        }
+    }
+
+    private final int textureId;
+    private final Map<Character, Glyph> glyphs = new HashMap<>();
     private int nextSlot = 0;
 
     public FontRenderer() {
+        Font font = readFont(FONT_RESOURCE);
         int[] pixels = new int[TEX_SIZE * TEX_SIZE];
-        bakeGlyphs(pixels);
+        bakeGlyphs(font, pixels);
         textureId = uploadTexture(pixels);
     }
 
@@ -58,10 +90,9 @@ public class FontRenderer {
     }
 
     public int charWidth(char c) {
-        if (c == ' ') return 3;
-        Integer slot = slotOf.get(c);
-        if (slot == null) return GLYPH_W;
-        return glyphWidth[slot] > 0 ? glyphWidth[slot] : GLYPH_W;
+        if (c == ' ') return GLYPH_W;
+        Glyph g = glyphs.get(c);
+        return g != null && g.width > 0 ? g.width : GLYPH_W;
     }
 
     /** Trim a string to fit a pixel width, appending an ellipsis. */
@@ -112,12 +143,9 @@ public class FontRenderer {
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             int w = charWidth(c);
-
-            if (c != ' ') {
-                Integer slot = slotOf.get(c);
-                if (slot != null) {
-                    drawGlyphQuad(ui, slot, w, penX, y, 1, argb);
-                }
+            Glyph g = glyphs.get(c);
+            if (g != null) {
+                drawGlyphQuad(ui, g, penX + g.dx, y + g.dy, 1, argb);
             }
             penX += w + 1;
         }
@@ -125,10 +153,7 @@ public class FontRenderer {
     }
 
     /**
-     * Draw one glyph scaled up, used for the oversized menu title.
-     *
-     * Screens used to duplicate this UV arithmetic inline, which broke the
-     * moment the atlas grew from 16x16 cells to 32x32.
+     * Draw one glyph run scaled up, used for the oversized menu title.
      */
     public void drawScaled(UIRenderer ui, String text, float x, float y,
                            int scale, int argb) {
@@ -140,12 +165,9 @@ public class FontRenderer {
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             int w = charWidth(c);
-
-            if (c != ' ') {
-                Integer slot = slotOf.get(c);
-                if (slot != null) {
-                    drawGlyphQuad(ui, slot, w, penX, y, scale, argb);
-                }
+            Glyph g = glyphs.get(c);
+            if (g != null) {
+                drawGlyphQuad(ui, g, penX + g.dx * scale, y + g.dy * scale, scale, argb);
             }
             penX += (w + 1) * scale;
         }
@@ -162,17 +184,17 @@ public class FontRenderer {
         return width(text) * scale;
     }
 
-    private void drawGlyphQuad(UIRenderer ui, int slot, int w,
-                               float x, float y, int scale, int argb) {
-        int gx = slot % GRID;
-        int gy = slot / GRID;
+    private void drawGlyphQuad(UIRenderer ui, Glyph g, float x, float y,
+                               int scale, int argb) {
+        int gx = g.slot % COLS;
+        int gy = g.slot / COLS;
 
         float u0 = (gx * CELL) / (float) TEX_SIZE;
         float v0 = (gy * CELL) / (float) TEX_SIZE;
-        float u1 = (gx * CELL + w) / (float) TEX_SIZE;
-        float v1 = (gy * CELL + GLYPH_H) / (float) TEX_SIZE;
+        float u1 = (gx * CELL + g.width) / (float) TEX_SIZE;
+        float v1 = (gy * CELL + g.height) / (float) TEX_SIZE;
 
-        ui.drawTexture(textureId, x, y, w * scale, GLYPH_H * scale,
+        ui.drawTexture(textureId, x, y, g.width * scale, g.height * scale,
             u0, v0, u1, v1, argb);
     }
 
@@ -195,34 +217,91 @@ public class FontRenderer {
     // Glyph baking
     // ------------------------------------------------------------------
 
-    private void bakeGlyphs(int[] pixels) {
-        Map<Character, String[]> glyphs = new java.util.LinkedHashMap<>();
-        addLatin(glyphs);
-        addDigitsAndPunctuation(glyphs);
-        addCyrillic(glyphs);
+    private static Font readFont(String path) {
+        try (InputStream is = FontRenderer.class.getClassLoader()
+                .getResourceAsStream(path)) {
+            if (is == null) {
+                throw new IllegalStateException("font resource not found: " + path);
+            }
+            return Font.createFont(Font.TRUETYPE_FONT, is)
+                .deriveFont(Font.PLAIN, FONT_SIZE);
+        } catch (Exception e) {
+            throw new RuntimeException("failed to load " + path, e);
+        }
+    }
 
-        for (Map.Entry<Character, String[]> e : glyphs.entrySet()) {
-            char c = e.getKey();
-            String[] rows = e.getValue();
+    /** Codepoints covered by the font: ASCII, Cyrillic, common typography. */
+    private static void addCharRange(StringBuilder sb, int from, int to) {
+        for (int cp = from; cp <= to; cp++) sb.appendCodePoint(cp);
+    }
+
+    private void bakeGlyphs(Font font, int[] pixels) {
+        // Scratch big enough for descenders and diacritics around a centred
+        // baseline, so nothing clips at the cell edges
+        final int margin = 8;
+        BufferedImage scratch = new BufferedImage(CELL + margin * 2, CELL + margin * 2,
+            BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = scratch.createGraphics();
+        g.setFont(font);
+        g.setColor(java.awt.Color.WHITE);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+            RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+        g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS,
+            RenderingHints.VALUE_FRACTIONALMETRICS_OFF);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING,
+            RenderingHints.VALUE_RENDER_SPEED);
+        FontRenderContext frc = g.getFontRenderContext();
+        int ascent = g.getFontMetrics().getAscent();
+
+        StringBuilder cps = new StringBuilder();
+        addCharRange(cps, 0x20, 0x7E);   // printable ASCII
+        addCharRange(cps, 0x400, 0x45F); // Cyrillic + Ё ё + ЂЃЅІЇЈЉЊЋЌЎЏ...
+        // Typography used by menus, chat and toasts
+        cps.append("«»№×·−→±°…–—‘’‚“”„†‡•‰‹›€™¤¦¬µπ⚠☠");
+        Map<Integer, Boolean> seen = new HashMap<>();
+
+        for (int i = 0; i < cps.length(); i++) {
+            char c = cps.charAt(i);
+            if (seen.putIfAbsent((int) c, Boolean.TRUE) != null) continue;
+
+            java.awt.font.GlyphVector gv = font.createGlyphVector(frc, String.valueOf(c));
+            java.awt.Rectangle b = gv.getPixelBounds(frc, 0, 0);
 
             int slot = nextSlot++;
-            slotOf.put(c, slot);
+            if (slot >= COLS * GRID) {
+                throw new IllegalStateException("font atlas full at U+"
+                    + Integer.toHexString(c));
+            }
+            int gx = (slot % COLS) * CELL;
+            int gy = (slot / COLS) * CELL;
 
-            int gx = (slot % GRID) * CELL;
-            int gy = (slot / GRID) * CELL;
-
-            int used = 0;
-            for (int ry = 0; ry < rows.length && ry < GLYPH_H; ry++) {
-                String row = rows[ry];
-                for (int rx = 0; rx < row.length() && rx < GLYPH_W; rx++) {
-                    if (row.charAt(rx) == '#') {
-                        pixels[(gy + ry) * TEX_SIZE + (gx + rx)] = 0xFFFFFFFF;
-                        used = Math.max(used, rx + 1);
+            Glyph glyph;
+            if (b.width > 0 && b.height > 0
+                    && b.width <= CELL - 1 && b.height <= CELL - 1) {
+                // Baseline sits `margin + ascent` from the scratch top, so the
+                // ink lands at (margin + b.x, margin + ascent + b.y)
+                g.setBackground(new java.awt.Color(0, true));
+                g.clearRect(0, 0, scratch.getWidth(), scratch.getHeight());
+                g.drawString(String.valueOf(c), margin, margin + ascent);
+                for (int ry = 0; ry < b.height; ry++) {
+                    for (int rx = 0; rx < b.width; rx++) {
+                        int argb = scratch.getRGB(margin + b.x + rx,
+                            margin + ascent + b.y + ry);
+                        if (((argb >>> 24) & 0xFF) >= 128) {
+                            pixels[(gy + ry) * TEX_SIZE + (gx + rx)] =
+                                0xFF000000 | 0x00FFFFFF;
+                        }
                     }
                 }
+                glyph = new Glyph(slot, b.width, b.height, b.x, b.y + CAP_TOP);
+            } else {
+                // Whitespace or an uncovered codepoint: reserve the slot,
+                // drawing skips width-0 glyphs
+                glyph = new Glyph(slot, 0, 0, 0, 0);
             }
-            glyphWidth[slot] = Math.max(1, used);
+            glyphs.put(c, glyph);
         }
+        g.dispose();
     }
 
     private int uploadTexture(int[] pixels) {
@@ -252,190 +331,5 @@ public class FontRenderer {
 
         MemoryUtil.memFree(buf);
         return id;
-    }
-
-    // ------------------------------------------------------------------
-    // Glyph shapes. '#' is an opaque pixel.
-    // ------------------------------------------------------------------
-
-    private void addLatin(Map<Character, String[]> g) {
-        g.put('A', new String[]{" ### ", "#   #", "#   #", "#####", "#   #", "#   #", "#   #"});
-        g.put('B', new String[]{"#### ", "#   #", "#   #", "#### ", "#   #", "#   #", "#### "});
-        g.put('C', new String[]{" ### ", "#   #", "#    ", "#    ", "#    ", "#   #", " ### "});
-        g.put('D', new String[]{"#### ", "#   #", "#   #", "#   #", "#   #", "#   #", "#### "});
-        g.put('E', new String[]{"#####", "#    ", "#    ", "#### ", "#    ", "#    ", "#####"});
-        g.put('F', new String[]{"#####", "#    ", "#    ", "#### ", "#    ", "#    ", "#    "});
-        g.put('G', new String[]{" ### ", "#   #", "#    ", "#  ##", "#   #", "#   #", " ### "});
-        g.put('H', new String[]{"#   #", "#   #", "#   #", "#####", "#   #", "#   #", "#   #"});
-        g.put('I', new String[]{"###", " # ", " # ", " # ", " # ", " # ", "###"});
-        g.put('J', new String[]{"    #", "    #", "    #", "    #", "#   #", "#   #", " ### "});
-        g.put('K', new String[]{"#   #", "#  # ", "# #  ", "##   ", "# #  ", "#  # ", "#   #"});
-        g.put('L', new String[]{"#    ", "#    ", "#    ", "#    ", "#    ", "#    ", "#####"});
-        g.put('M', new String[]{"#   #", "## ##", "# # #", "#   #", "#   #", "#   #", "#   #"});
-        g.put('N', new String[]{"#   #", "##  #", "# # #", "#  ##", "#   #", "#   #", "#   #"});
-        g.put('O', new String[]{" ### ", "#   #", "#   #", "#   #", "#   #", "#   #", " ### "});
-        g.put('P', new String[]{"#### ", "#   #", "#   #", "#### ", "#    ", "#    ", "#    "});
-        g.put('Q', new String[]{" ### ", "#   #", "#   #", "#   #", "# # #", "#  # ", " ## #"});
-        g.put('R', new String[]{"#### ", "#   #", "#   #", "#### ", "# #  ", "#  # ", "#   #"});
-        g.put('S', new String[]{" ####", "#    ", "#    ", " ### ", "    #", "    #", "#### "});
-        g.put('T', new String[]{"#####", "  #  ", "  #  ", "  #  ", "  #  ", "  #  ", "  #  "});
-        g.put('U', new String[]{"#   #", "#   #", "#   #", "#   #", "#   #", "#   #", " ### "});
-        g.put('V', new String[]{"#   #", "#   #", "#   #", "#   #", "#   #", " # # ", "  #  "});
-        g.put('W', new String[]{"#   #", "#   #", "#   #", "#   #", "# # #", "## ##", "#   #"});
-        g.put('X', new String[]{"#   #", "#   #", " # # ", "  #  ", " # # ", "#   #", "#   #"});
-        g.put('Y', new String[]{"#   #", "#   #", " # # ", "  #  ", "  #  ", "  #  ", "  #  "});
-        g.put('Z', new String[]{"#####", "    #", "   # ", "  #  ", " #   ", "#    ", "#####"});
-
-        g.put('a', new String[]{"     ", "     ", " ### ", "    #", " ####", "#   #", " ####"});
-        g.put('b', new String[]{"#    ", "#    ", "#### ", "#   #", "#   #", "#   #", "#### "});
-        g.put('c', new String[]{"     ", "     ", " ### ", "#    ", "#    ", "#   #", " ### "});
-        g.put('d', new String[]{"    #", "    #", " ####", "#   #", "#   #", "#   #", " ####"});
-        g.put('e', new String[]{"     ", "     ", " ### ", "#   #", "#####", "#    ", " ### "});
-        g.put('f', new String[]{"  ## ", " #   ", "#### ", " #   ", " #   ", " #   ", " #   "});
-        g.put('g', new String[]{"     ", " ####", "#   #", "#   #", " ####", "    #", " ### "});
-        g.put('h', new String[]{"#    ", "#    ", "#### ", "#   #", "#   #", "#   #", "#   #"});
-        g.put('i', new String[]{"#", " ", "#", "#", "#", "#", "#"});
-        g.put('j', new String[]{"   #", "    ", "   #", "   #", "   #", "#  #", " ## "});
-        g.put('k', new String[]{"#    ", "#    ", "#   #", "#  # ", "###  ", "#  # ", "#   #"});
-        g.put('l', new String[]{"##", " #", " #", " #", " #", " #", " #"});
-        g.put('m', new String[]{"     ", "     ", "## # ", "# # #", "# # #", "# # #", "# # #"});
-        g.put('n', new String[]{"     ", "     ", "#### ", "#   #", "#   #", "#   #", "#   #"});
-        g.put('o', new String[]{"     ", "     ", " ### ", "#   #", "#   #", "#   #", " ### "});
-        g.put('p', new String[]{"     ", "#### ", "#   #", "#   #", "#### ", "#    ", "#    "});
-        g.put('q', new String[]{"     ", " ####", "#   #", "#   #", " ####", "    #", "    #"});
-        g.put('r', new String[]{"     ", "     ", "# ## ", "##   ", "#    ", "#    ", "#    "});
-        g.put('s', new String[]{"     ", "     ", " ####", "#    ", " ### ", "    #", "#### "});
-        g.put('t', new String[]{" #   ", " #   ", "#### ", " #   ", " #   ", " #  #", "  ## "});
-        g.put('u', new String[]{"     ", "     ", "#   #", "#   #", "#   #", "#   #", " ####"});
-        g.put('v', new String[]{"     ", "     ", "#   #", "#   #", "#   #", " # # ", "  #  "});
-        g.put('w', new String[]{"     ", "     ", "#   #", "#   #", "# # #", "# # #", " # # "});
-        g.put('x', new String[]{"     ", "     ", "#   #", " # # ", "  #  ", " # # ", "#   #"});
-        g.put('y', new String[]{"     ", "#   #", "#   #", "#   #", " ####", "    #", " ### "});
-        g.put('z', new String[]{"     ", "     ", "#####", "   # ", "  #  ", " #   ", "#####"});
-    }
-
-    private void addDigitsAndPunctuation(Map<Character, String[]> g) {
-        g.put('0', new String[]{" ### ", "#   #", "#  ##", "# # #", "##  #", "#   #", " ### "});
-        g.put('1', new String[]{"  #  ", " ##  ", "  #  ", "  #  ", "  #  ", "  #  ", " ### "});
-        g.put('2', new String[]{" ### ", "#   #", "    #", "   # ", "  #  ", " #   ", "#####"});
-        g.put('3', new String[]{"#####", "   # ", "  #  ", "   # ", "    #", "#   #", " ### "});
-        g.put('4', new String[]{"   # ", "  ## ", " # # ", "#  # ", "#####", "   # ", "   # "});
-        g.put('5', new String[]{"#####", "#    ", "#### ", "    #", "    #", "#   #", " ### "});
-        g.put('6', new String[]{"  ## ", " #   ", "#    ", "#### ", "#   #", "#   #", " ### "});
-        g.put('7', new String[]{"#####", "    #", "   # ", "  #  ", " #   ", " #   ", " #   "});
-        g.put('8', new String[]{" ### ", "#   #", "#   #", " ### ", "#   #", "#   #", " ### "});
-        g.put('9', new String[]{" ### ", "#   #", "#   #", " ####", "    #", "   # ", " ##  "});
-
-        g.put('.', new String[]{"  ", "  ", "  ", "  ", "  ", "##", "##"});
-        g.put(',', new String[]{"  ", "  ", "  ", "  ", "  ", "##", " #"});
-        g.put(':', new String[]{"  ", "##", "##", "  ", "  ", "##", "##"});
-        g.put(';', new String[]{"  ", "##", "##", "  ", "##", " #", "  "});
-        g.put('!', new String[]{"#", "#", "#", "#", "#", " ", "#"});
-        g.put('?', new String[]{" ### ", "#   #", "    #", "   # ", "  #  ", "     ", "  #  "});
-        g.put('/', new String[]{"    #", "    #", "   # ", "  #  ", " #   ", "#    ", "#    "});
-        g.put('\\', new String[]{"#    ", "#    ", " #   ", "  #  ", "   # ", "    #", "    #"});
-        g.put('-', new String[]{"     ", "     ", "     ", "#####", "     ", "     ", "     "});
-        g.put('+', new String[]{"     ", "  #  ", "  #  ", "#####", "  #  ", "  #  ", "     "});
-        g.put('=', new String[]{"     ", "     ", "#####", "     ", "#####", "     ", "     "});
-        g.put('_', new String[]{"     ", "     ", "     ", "     ", "     ", "     ", "#####"});
-        g.put('(', new String[]{"  #", " # ", "#  ", "#  ", "#  ", " # ", "  #"});
-        g.put(')', new String[]{"#  ", " # ", "  #", "  #", "  #", " # ", "#  "});
-        g.put('[', new String[]{"###", "#  ", "#  ", "#  ", "#  ", "#  ", "###"});
-        g.put(']', new String[]{"###", "  #", "  #", "  #", "  #", "  #", "###"});
-        g.put('<', new String[]{"   #", "  # ", " #  ", "#   ", " #  ", "  # ", "   #"});
-        g.put('>', new String[]{"#   ", " #  ", "  # ", "   #", "  # ", " #  ", "#   "});
-        g.put('%', new String[]{"##  #", "##  #", "   # ", "  #  ", " #   ", "#  ##", "#  ##"});
-        g.put('*', new String[]{"     ", "# # #", " ### ", "#####", " ### ", "# # #", "     "});
-        g.put('#', new String[]{" # # ", " # # ", "#####", " # # ", "#####", " # # ", " # # "});
-        g.put('\'', new String[]{"#", "#", " ", " ", " ", " ", " "});
-        g.put('"', new String[]{"# #", "# #", "   ", "   ", "   ", "   ", "   "});
-        g.put('@', new String[]{" ### ", "#   #", "# ###", "# # #", "# ###", "#    ", " ### "});
-        g.put('&', new String[]{" ##  ", "#  # ", " ##  ", " ##  ", "#  ##", "#  # ", " ## #"});
-        g.put('|', new String[]{"#", "#", "#", "#", "#", "#", "#"});
-
-        // Typography commonly used by trading / crafting text
-        g.put('×', new String[]{"     ", "#   #", " # # ", "  #  ", " # # ", "#   #", "     "});
-        g.put('→', new String[]{"   # ", "  ## ", " ### ", "#####", " ### ", "  ## ", "   # "});
-        g.put('−', new String[]{"     ", "     ", "     ", "#####", "     ", "     ", "     "});
-        g.put('·', new String[]{"     ", "     ", "     ", " ### ", "     ", "     ", "     "});
-    }
-
-    /**
-     * Cyrillic. Letters shared with Latin (А, В, Е, К, М, Н, О, Р, С, Т, Х)
-     * still get their own slot, so metrics stay independent.
-     */
-    private void addCyrillic(Map<Character, String[]> g) {
-        g.put('А', new String[]{" ### ", "#   #", "#   #", "#####", "#   #", "#   #", "#   #"});
-        g.put('Б', new String[]{"#####", "#    ", "#    ", "#### ", "#   #", "#   #", "#### "});
-        g.put('В', new String[]{"#### ", "#   #", "#   #", "#### ", "#   #", "#   #", "#### "});
-        g.put('Г', new String[]{"#####", "#    ", "#    ", "#    ", "#    ", "#    ", "#    "});
-        g.put('Д', new String[]{"  ###", " #  #", " #  #", " #  #", " #  #", "#####", "#   #"});
-        g.put('Е', new String[]{"#####", "#    ", "#    ", "#### ", "#    ", "#    ", "#####"});
-        g.put('Ё', new String[]{"# # #", "     ", "#####", "#    ", "#### ", "#    ", "#####"});
-        g.put('Ж', new String[]{"# # #", "# # #", "# # #", " ### ", "# # #", "# # #", "# # #"});
-        g.put('З', new String[]{" ### ", "#   #", "    #", "  ## ", "    #", "#   #", " ### "});
-        g.put('И', new String[]{"#   #", "#   #", "#  ##", "# # #", "##  #", "#   #", "#   #"});
-        g.put('Й', new String[]{"# # #", " ### ", "#   #", "#  ##", "# # #", "##  #", "#   #"});
-        g.put('К', new String[]{"#   #", "#  # ", "# #  ", "##   ", "# #  ", "#  # ", "#   #"});
-        g.put('Л', new String[]{"  ###", " #  #", " #  #", " #  #", " #  #", "#   #", "#   #"});
-        g.put('М', new String[]{"#   #", "## ##", "# # #", "#   #", "#   #", "#   #", "#   #"});
-        g.put('Н', new String[]{"#   #", "#   #", "#   #", "#####", "#   #", "#   #", "#   #"});
-        g.put('О', new String[]{" ### ", "#   #", "#   #", "#   #", "#   #", "#   #", " ### "});
-        g.put('П', new String[]{"#####", "#   #", "#   #", "#   #", "#   #", "#   #", "#   #"});
-        g.put('Р', new String[]{"#### ", "#   #", "#   #", "#### ", "#    ", "#    ", "#    "});
-        g.put('С', new String[]{" ### ", "#   #", "#    ", "#    ", "#    ", "#   #", " ### "});
-        g.put('Т', new String[]{"#####", "  #  ", "  #  ", "  #  ", "  #  ", "  #  ", "  #  "});
-        g.put('У', new String[]{"#   #", "#   #", "#   #", " ####", "    #", "#   #", " ### "});
-        g.put('Ф', new String[]{"  #  ", " ### ", "# # #", "# # #", "# # #", " ### ", "  #  "});
-        g.put('Х', new String[]{"#   #", "#   #", " # # ", "  #  ", " # # ", "#   #", "#   #"});
-        g.put('Ц', new String[]{"#  # ", "#  # ", "#  # ", "#  # ", "#  # ", "#####", "    #"});
-        g.put('Ч', new String[]{"#   #", "#   #", "#   #", " ####", "    #", "    #", "    #"});
-        g.put('Ш', new String[]{"# # #", "# # #", "# # #", "# # #", "# # #", "# # #", "#####"});
-        g.put('Щ', new String[]{"# # #", "# # #", "# # #", "# # #", "# # #", "#####", "    #"});
-        g.put('Ъ', new String[]{"##   ", " #   ", " #   ", " ### ", " #  #", " #  #", " ### "});
-        g.put('Ы', new String[]{"#   #", "#   #", "#   #", "### #", "#  ##", "#   #", "### #"});
-        g.put('Ь', new String[]{"#    ", "#    ", "#    ", "#### ", "#   #", "#   #", "#### "});
-        g.put('Э', new String[]{" ### ", "#   #", "    #", " ####", "    #", "#   #", " ### "});
-        g.put('Ю', new String[]{"#  ##", "# #  ", "# #  ", "###  ", "# #  ", "# #  ", "#  ##"});
-        g.put('Я', new String[]{" ####", "#   #", "#   #", " ####", "  # #", " #  #", "#   #"});
-
-        g.put('а', new String[]{"     ", "     ", " ### ", "    #", " ####", "#   #", " ####"});
-        g.put('б', new String[]{"   ##", "  #  ", " #   ", " ### ", " #  #", " #  #", " ### "});
-        g.put('в', new String[]{"     ", "     ", "###  ", "#  # ", "###  ", "#  # ", "###  "});
-        g.put('г', new String[]{"     ", "     ", "#### ", "#    ", "#    ", "#    ", "#    "});
-        g.put('д', new String[]{"     ", "     ", "  ## ", " #  #", " #  #", "#####", "#   #"});
-        g.put('е', new String[]{"     ", "     ", " ### ", "#   #", "#####", "#    ", " ### "});
-        g.put('ё', new String[]{"# # #", "     ", " ### ", "#   #", "#####", "#    ", " ### "});
-        g.put('ж', new String[]{"     ", "     ", "# # #", "# # #", " ### ", "# # #", "# # #"});
-        g.put('з', new String[]{"     ", "     ", " ### ", "    #", "  ## ", "    #", " ### "});
-        g.put('и', new String[]{"     ", "     ", "#   #", "#  ##", "# # #", "##  #", "#   #"});
-        g.put('й', new String[]{" ### ", "     ", "#   #", "#  ##", "# # #", "##  #", "#   #"});
-        g.put('к', new String[]{"     ", "     ", "#   #", "#  # ", "###  ", "#  # ", "#   #"});
-        g.put('л', new String[]{"     ", "     ", "  ###", " #  #", " #  #", "#   #", "#   #"});
-        g.put('м', new String[]{"     ", "     ", "#   #", "## ##", "# # #", "#   #", "#   #"});
-        g.put('н', new String[]{"     ", "     ", "#   #", "#   #", "#####", "#   #", "#   #"});
-        g.put('о', new String[]{"     ", "     ", " ### ", "#   #", "#   #", "#   #", " ### "});
-        g.put('п', new String[]{"     ", "     ", "#####", "#   #", "#   #", "#   #", "#   #"});
-        g.put('р', new String[]{"     ", "     ", "#### ", "#   #", "#### ", "#    ", "#    "});
-        g.put('с', new String[]{"     ", "     ", " ### ", "#    ", "#    ", "#   #", " ### "});
-        g.put('т', new String[]{"     ", "     ", "#####", "  #  ", "  #  ", "  #  ", "  #  "});
-        g.put('у', new String[]{"     ", "     ", "#   #", "#   #", " ####", "    #", " ### "});
-        g.put('ф', new String[]{"  #  ", " ### ", "# # #", "# # #", " ### ", "  #  ", "  #  "});
-        g.put('х', new String[]{"     ", "     ", "#   #", " # # ", "  #  ", " # # ", "#   #"});
-        g.put('ц', new String[]{"     ", "     ", "#  # ", "#  # ", "#  # ", "#####", "    #"});
-        g.put('ч', new String[]{"     ", "     ", "#   #", "#   #", " ####", "    #", "    #"});
-        g.put('ш', new String[]{"     ", "     ", "# # #", "# # #", "# # #", "# # #", "#####"});
-        g.put('щ', new String[]{"     ", "     ", "# # #", "# # #", "# # #", "#####", "    #"});
-        g.put('ъ', new String[]{"     ", "     ", "##   ", " #   ", " ### ", " #  #", " ### "});
-        g.put('ы', new String[]{"     ", "     ", "#   #", "#   #", "### #", "#  ##", "### #"});
-        g.put('ь', new String[]{"     ", "     ", "#    ", "#    ", "#### ", "#   #", "#### "});
-        g.put('э', new String[]{"     ", "     ", " ### ", "    #", " ####", "    #", " ### "});
-        g.put('ю', new String[]{"     ", "     ", "#  ##", "# #  ", "###  ", "# #  ", "#  ##"});
-        g.put('я', new String[]{"     ", "     ", " ####", "#   #", " ####", "  # #", " #  #"});
-
-        // Guillemets, common in Russian typography
-        g.put('«', new String[]{"     ", "  # #", " # # ", "# #  ", " # # ", "  # #", "     "});
-        g.put('»', new String[]{"     ", "# #  ", " # # ", "  # #", " # # ", "# #  ", "     "});
-        g.put('№', new String[]{"#  # ", "## # ", "# ## ", "#  # ", "     ", " ### ", " ### "});
     }
 }

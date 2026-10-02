@@ -52,7 +52,9 @@ public class TextField extends Widget {
         int fadeAlpha = (alpha >>> 24) & 0xFF;
 
         // Rounded glass inset field
-        int field = focused ? 0xFF0A0F18 : 0xFF0C111C;
+        int field = MenuTheme.lightContext
+            ? (focused ? 0xFFFDFFFF : 0xFFF6F8FC)
+            : (focused ? 0xFF0A0F18 : 0xFF0C111C);
         ui.drawNineSlice(tex.glassField, x, y, width, height, 6,
             GuiAssets.GLASS_WIDGET, MenuTheme.col(fadeAlpha << 24, 255, field));
 
@@ -83,8 +85,9 @@ public class TextField extends Widget {
 
             if (focused && ((int) (blinkTimer * 2) % 2 == 0)) {
                 int cx = x + 4 + font.width(visibleText);
+                int caret = MenuTheme.lightContext ? MenuTheme.ACCENT : MenuTheme.ACCENT_LIGHT;
                 ui.fillRect(cx, textY - 1, 1, FontRenderer.GLYPH_H + 2,
-                    MenuTheme.col(fadeAlpha << 24, 255, MenuTheme.ACCENT_LIGHT));
+                    MenuTheme.col(fadeAlpha << 24, 255, caret));
             }
         }
     }

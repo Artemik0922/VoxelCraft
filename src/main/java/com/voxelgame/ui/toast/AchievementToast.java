@@ -64,9 +64,10 @@ public final class AchievementToast implements Toast {
         int y = 6;
 
         // Background with frosted glass
-        ui.drawNineSlice(gui.glassPanel, x, y, WIDTH, HEIGHT,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF262034);
-        ui.fillRect(x + 6, y + 1, WIDTH - 12, 1, 0x60FFFFFF);
+ui.drawNineSlice(com.voxelgame.ui2.UiMaterials.INSTANCE.paper, x, y, WIDTH, HEIGHT,
+            com.voxelgame.ui2.UiTheme.PAPER_BORDER, com.voxelgame.ui2.UiTheme.PAPER_TEX,
+            0xFFFFFFFF);
+        ui.fillRect(x + 6, y + 1, WIDTH - 12, 1, 0xFF8A6420);
 
         // Icon (colored square if no block icon)
         int iconSize = 20;
@@ -83,8 +84,8 @@ public final class AchievementToast implements Toast {
 
         // Text lines
         int textX = iconX + iconSize + 6;
-        font.drawWithShadow(ui, title, textX, y + 5, 0xFFFFAA00); // Gold title
-        font.drawWithShadow(ui, description, textX, y + 17, 0xFFFFFFFF);
+        font.drawWithShadow(ui, title, textX, y + 5, 0xFF8A6420); // Engraved brass title
+        font.drawWithShadow(ui, description, textX, y + 17, 0xFF2A1D12);
     }
 
     private static double easeOut(double t) {

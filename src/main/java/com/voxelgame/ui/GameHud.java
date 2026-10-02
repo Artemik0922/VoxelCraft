@@ -59,6 +59,14 @@ public class GameHud {
     public void toggleMinimap() { minimapVisible = !minimapVisible; }
     public boolean isMinimapVisible() { return minimapVisible; }
 
+    /** Fullscreen map mode (TAB). Implies the map is on while it lasts. */
+    public void toggleMinimapExpanded() {
+        minimap.toggleExpanded();
+        if (minimap.isExpanded()) minimapVisible = true;
+    }
+
+    public boolean isMinimapExpanded() { return minimap.isExpanded(); }
+
     /** True when the gui cursor is over the rendered map (wheel zoom). */
     public boolean minimapHover(float mx, float my) {
         return minimapVisible && minimap.hover(mx, my);
@@ -251,7 +259,11 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
     private void drawHotbar(UIRenderer ui, FontRenderer font, GuiAssets gui,
                             Inventory inventory, int px, int py, int pw, int ph) {
         ui.drawNineSlice(gui.glassPanel, px, py, pw, ph,
-            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF10141E);
+            GuiAssets.GLASS_BORDER, GuiAssets.GLASS_WIDGET, 0xFF332314);
+        // Brass trim along the dock's top edge
+        ui.useSolidColor();
+        ui.fillRect(px + 2, py, pw - 4, 1, 0xFF8A6420);
+        ui.fillRect(px + 2, py + 1, pw - 4, 1, 0x50EDD9A0);
 
         int selected = inventory.getSelectedSlot();
 
@@ -260,7 +272,7 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
             int sy = py + HOTBAR_PAD;
 
             ui.drawNineSlice(gui.glassSlot, sx, sy, SLOT, SLOT,
-                3, GuiAssets.SLOT_SIZE, 0xFFFFFFFF);
+                3, GuiAssets.SLOT_SIZE, 0xFF3A2A1A);
 
             ItemStack stack = inventory.getHotbarItem(i);
             if (!stack.isEmpty()) {
@@ -314,11 +326,11 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
 
         ui.useSolidColor();
         // Soft halo so the frame reads against the glass slots
-        ui.fillRect(x - 1, y - 1, size + 2, size + 2, 0x2A000000 | MenuTheme.ACCENT);
-        ui.fillRect(x, y, size, 1, MenuTheme.ACCENT_LIGHT);
-        ui.fillRect(x, y + size - 1, size, 1, MenuTheme.ACCENT);
-        ui.fillRect(x, y, 1, size, MenuTheme.ACCENT_LIGHT);
-        ui.fillRect(x + size - 1, y, 1, size, MenuTheme.ACCENT);
+        ui.fillRect(x - 1, y - 1, size + 2, size + 2, 0x2A000000 | 0xFFC9973B);
+        ui.fillRect(x, y, size, 1, 0xFFEDD9A0);
+        ui.fillRect(x, y + size - 1, size, 1, 0xFFC9973B);
+        ui.fillRect(x, y, 1, size, 0xFFEDD9A0);
+        ui.fillRect(x + size - 1, y, 1, size, 0xFFC9973B);
     }
 
     /**
@@ -345,22 +357,9 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
 
     /** Flat sprite icon for a block or an item tile (tools, potions...). */
     private void drawItemStackIcon(UIRenderer ui, ItemStack stack, int x, int y, int size) {
-        if (stack.isBlock()) {
-            drawBlockIcon(ui, stack.getBlockType(), x, y, size, 1.0f);
-            return;
-        }
-        com.voxelgame.item.Item item = stack.getItem();
-        if (item != null && item.spriteName != null) {
-            int slot = atlas.getLayerOf(item.spriteName);
-            if (slot >= 0) {
-                TextureAtlas.TextureCoords uv = new TextureAtlas.TextureCoords(slot);
-                ui.drawTexture(atlas.getTexture().getId(), x, y, size, size,
-                    uv.u1, uv.v2, uv.u2, uv.v1, 0xFFFFFFFF);
-                return;
-            }
-        }
-        ui.useSolidColor();
-        ui.drawRectOutline(x + 2, y + 2, size - 4, size - 4, 0xFFFF55AA);
+        // Shared icon path: isometric 3D icons for cubes, flat sprites for
+        // items — identical to every container screen
+        StackIcons.drawIcon(ui, atlas, stack, x, y, size);
     }
 
     /** Vanilla strips the status rows to a 182px bar centred on the hotbar,
@@ -392,18 +391,19 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
             int x = barX + i * (HEART - 1);
             float filled = health - i * perHeart;
 
+            var mat = com.voxelgame.ui2.UiMaterials.INSTANCE;
             int sprite;
             if (filled >= perHeart - 0.001f) {
-                sprite = gui.heartFull;
+                sprite = mat.heartFull;
             } else if (filled >= perHeart * 0.5f) {
-                sprite = gui.heartHalf;
+                sprite = mat.heartHalf;
             } else {
-                sprite = gui.heartEmpty;
+                sprite = mat.heartEmpty;
             }
 
             // Always draw the container so the bar keeps its length
-            if (sprite != gui.heartEmpty) {
-                ui.drawSprite(gui.heartEmpty, x, y, HEART, HEART);
+            if (sprite != mat.heartEmpty) {
+                ui.drawSprite(mat.heartEmpty, x, y, HEART, HEART);
             }
             ui.drawSprite(sprite, x, y + (flash ? bump : 0), HEART, HEART, tint);
         }
@@ -425,13 +425,14 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
             int x = barX + STATUS_BAR_W - HOTBAR_PAD - (bars - i) * (HEART - 1);
             float filled = hunger - i * perBar;
 
+            var mat = com.voxelgame.ui2.UiMaterials.INSTANCE;
             int sprite;
             if (filled >= perBar - 0.001f) {
-                sprite = gui.drumstickFull;
+                sprite = mat.drumstickFull;
             } else if (filled >= perBar * 0.5f) {
-                sprite = gui.drumstickHalf;
+                sprite = mat.drumstickHalf;
             } else {
-                sprite = gui.drumstickEmpty;
+                sprite = mat.drumstickEmpty;
             }
             ui.drawSprite(sprite, x, y, HEART, HEART);
         }
@@ -453,7 +454,7 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
             if (filled <= 0) break;
             // Partial last bubble still reads as one bubble, like vanilla pops
             int x = barX + HOTBAR_PAD + i * (HEART - 1);
-            ui.drawSprite(gui.bubble, x, y, HEART, HEART);
+            ui.drawSprite(com.voxelgame.ui2.UiMaterials.INSTANCE.bubble, x, y, HEART, HEART);
         }
     }
 
@@ -469,8 +470,8 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
         int y = statusY - barH - 4;
 
         ui.useSolidColor();
-        ui.fillRect(x, y, barW, barH, 0xFF1B2332);
-        ui.fillRect(x, y - 1, barW, 1, 0xFF2A3450);
+        ui.fillRect(x, y, barW, barH, 0xFF26180E);
+        ui.fillRect(x, y - 1, barW, 1, 0xFF5A4326);
         ui.fillRect(x, y, (int) (barW * progress), barH, 0xFF88FF44);
         if (progress > 0) {
             ui.fillRect(x, y, (int) (barW * progress), 1, 0xFFC9FFB0);

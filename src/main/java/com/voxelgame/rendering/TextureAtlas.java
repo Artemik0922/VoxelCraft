@@ -302,40 +302,40 @@ tile("spruce_planks", "spruce_planks.png", BlockType.SPRUCE_PLANKS);
 
         // --- Items (flat sprites) ---
         tileSprite("iron_sword", "iron_sword.png", BlockType.IRON_SWORD);
-        tileGenerated("stick", BlockType.ITEM_STICK);
-        tileGenerated("coal", BlockType.ITEM_COAL);
-        tileGenerated("iron_ingot", BlockType.ITEM_IRON_INGOT);
-        tileGenerated("gold_ingot", BlockType.ITEM_GOLD_INGOT);
-        tileGenerated("diamond", BlockType.ITEM_DIAMOND);
+        tileSprite("stick", "stick.png", BlockType.ITEM_STICK);
+        tileSprite("coal", "coal.png", BlockType.ITEM_COAL);
+        tileSprite("iron_ingot", "iron_ingot.png", BlockType.ITEM_IRON_INGOT);
+        tileSprite("gold_ingot", "gold_ingot.png", BlockType.ITEM_GOLD_INGOT);
+        tileSprite("diamond", "diamond.png", BlockType.ITEM_DIAMOND);
         // [ECO] Currency and the space metal
-        tileGenerated("emerald", BlockType.ITEM_EMERALD);
-        tileGenerated("meteorite_ingot", BlockType.ITEM_METEORITE);
-        tileGenerated("leather", BlockType.ITEM_LEATHER);
-        tileGenerated("string", BlockType.ITEM_STRING);
-        tileGenerated("feather", BlockType.ITEM_FEATHER);
-        tileGenerated("flint", BlockType.ITEM_FLINT);
-        tileGenerated("flint_and_steel", BlockType.ITEM_FLINT_AND_STEEL);
-        tileGenerated("gunpowder", BlockType.ITEM_GUNPOWDER);
-        tileGenerated("wheat", BlockType.ITEM_WHEAT);
-        tileGenerated("egg", BlockType.ITEM_EGG);
+        tileSprite("emerald", "emerald.png", BlockType.ITEM_EMERALD);
+        tileSprite("meteorite_ingot", "meteorite_ingot.png", BlockType.ITEM_METEORITE);
+        tileSprite("leather", "leather.png", BlockType.ITEM_LEATHER);
+        tileSprite("string", "string.png", BlockType.ITEM_STRING);
+        tileSprite("feather", "feather.png", BlockType.ITEM_FEATHER);
+        tileSprite("flint", "flint.png", BlockType.ITEM_FLINT);
+        tileSprite("flint_and_steel", "flint_and_steel.png", BlockType.ITEM_FLINT_AND_STEEL);
+        tileSprite("gunpowder", "gunpowder.png", BlockType.ITEM_GUNPOWDER);
+        tileSprite("wheat", "wheat.png", BlockType.ITEM_WHEAT);
+        tileSprite("egg", "egg.png", BlockType.ITEM_EGG);
         // [ANM] Animal care items
-        tileGenerated("shears", BlockType.ITEM_SHEARS);
-        tileGenerated("bucket", BlockType.ITEM_BUCKET);
-        tileGenerated("milk", BlockType.ITEM_MILK);
+        tileSprite("shears", "shears.png", BlockType.ITEM_SHEARS);
+        tileSprite("bucket", "bucket.png", BlockType.ITEM_BUCKET);
+        tileSprite("milk", "milk.png", BlockType.ITEM_MILK);
         // [GP-009] Slime ball item
-        tileGenerated("slime_ball", BlockType.SLIME_BLOCK);
+        tileSprite("slime_ball", "slime_ball.png", BlockType.SLIME_BLOCK);
         // [POT] Potion bottles and HUD status-effect icons
-        tileGenerated("water_bottle", BlockType.SLIME_BLOCK);
-        tileGenerated("potion_healing", BlockType.SLIME_BLOCK);
-        tileGenerated("potion_speed", BlockType.SLIME_BLOCK);
-        tileGenerated("potion_strength", BlockType.SLIME_BLOCK);
-        tileGenerated("potion_fire_resistance", BlockType.SLIME_BLOCK);
+        tileSprite("water_bottle", "water_bottle.png", BlockType.SLIME_BLOCK);
+        tileSprite("potion_healing", "potion_healing.png", BlockType.SLIME_BLOCK);
+        tileSprite("potion_speed", "potion_speed.png", BlockType.SLIME_BLOCK);
+        tileSprite("potion_strength", "potion_strength.png", BlockType.SLIME_BLOCK);
+        tileSprite("potion_fire_resistance", "potion_fire_resistance.png", BlockType.SLIME_BLOCK);
         tileGenerated("effect_regeneration", BlockType.SLIME_BLOCK);
         tileGenerated("effect_speed", BlockType.SLIME_BLOCK);
         tileGenerated("effect_strength", BlockType.SLIME_BLOCK);
         tileGenerated("effect_fire_resistance", BlockType.SLIME_BLOCK);
         // [POT] Sugar for brewing the Speed potion
-        tileGenerated("sugar", BlockType.SLIME_BLOCK);
+        tileSprite("sugar", "sugar.png", BlockType.SLIME_BLOCK);
 
         // Tools
         tileSprite("wooden_pickaxe", "wooden_pickaxe.png", BlockType.ITEM_WOODEN_PICKAXE);
@@ -371,43 +371,43 @@ tile("spruce_planks", "spruce_planks.png", BlockType.SPRUCE_PLANKS);
         tileSprite("meteorite_hoe", "meteorite_hoe.png", BlockType.ITEM_METEORITE_HOE);
 
         // Armor
-        tileGenerated("leather_helmet", BlockType.ITEM_LEATHER_HELMET);
-        tileGenerated("leather_chestplate", BlockType.ITEM_LEATHER_CHESTPLATE);
-        tileGenerated("leather_leggings", BlockType.ITEM_LEATHER_LEGGINGS);
-        tileGenerated("leather_boots", BlockType.ITEM_LEATHER_BOOTS);
-        tileGenerated("iron_helmet", BlockType.ITEM_IRON_HELMET);
-        tileGenerated("iron_chestplate", BlockType.ITEM_IRON_CHESTPLATE);
-        tileGenerated("iron_leggings", BlockType.ITEM_IRON_LEGGINGS);
-        tileGenerated("iron_boots", BlockType.ITEM_IRON_BOOTS);
-        tileGenerated("diamond_helmet", BlockType.ITEM_DIAMOND_HELMET);
-        tileGenerated("diamond_chestplate", BlockType.ITEM_DIAMOND_CHESTPLATE);
-        tileGenerated("diamond_leggings", BlockType.ITEM_DIAMOND_LEGGINGS);
-        tileGenerated("diamond_boots", BlockType.ITEM_DIAMOND_BOOTS);
+        tileSprite("leather_helmet", "leather_helmet.png", BlockType.ITEM_LEATHER_HELMET);
+        tileSprite("leather_chestplate", "leather_chestplate.png", BlockType.ITEM_LEATHER_CHESTPLATE);
+        tileSprite("leather_leggings", "leather_leggings.png", BlockType.ITEM_LEATHER_LEGGINGS);
+        tileSprite("leather_boots", "leather_boots.png", BlockType.ITEM_LEATHER_BOOTS);
+        tileSprite("iron_helmet", "iron_helmet.png", BlockType.ITEM_IRON_HELMET);
+        tileSprite("iron_chestplate", "iron_chestplate.png", BlockType.ITEM_IRON_CHESTPLATE);
+        tileSprite("iron_leggings", "iron_leggings.png", BlockType.ITEM_IRON_LEGGINGS);
+        tileSprite("iron_boots", "iron_boots.png", BlockType.ITEM_IRON_BOOTS);
+        tileSprite("diamond_helmet", "diamond_helmet.png", BlockType.ITEM_DIAMOND_HELMET);
+        tileSprite("diamond_chestplate", "diamond_chestplate.png", BlockType.ITEM_DIAMOND_CHESTPLATE);
+        tileSprite("diamond_leggings", "diamond_leggings.png", BlockType.ITEM_DIAMOND_LEGGINGS);
+        tileSprite("diamond_boots", "diamond_boots.png", BlockType.ITEM_DIAMOND_BOOTS);
         // [ECO] Meteorite armour
-        tileGenerated("meteorite_helmet", BlockType.ITEM_METEORITE_HELMET);
-        tileGenerated("meteorite_chestplate", BlockType.ITEM_METEORITE_CHESTPLATE);
-        tileGenerated("meteorite_leggings", BlockType.ITEM_METEORITE_LEGGINGS);
-        tileGenerated("meteorite_boots", BlockType.ITEM_METEORITE_BOOTS);
+        tileSprite("meteorite_helmet", "meteorite_helmet.png", BlockType.ITEM_METEORITE_HELMET);
+        tileSprite("meteorite_chestplate", "meteorite_chestplate.png", BlockType.ITEM_METEORITE_CHESTPLATE);
+        tileSprite("meteorite_leggings", "meteorite_leggings.png", BlockType.ITEM_METEORITE_LEGGINGS);
+        tileSprite("meteorite_boots", "meteorite_boots.png", BlockType.ITEM_METEORITE_BOOTS);
 
         // Food
-        tileGenerated("bread", BlockType.ITEM_BREAD);
-        tileGenerated("raw_pork", BlockType.ITEM_RAW_PORK);
-        tileGenerated("cooked_pork", BlockType.ITEM_COOKED_PORK);
-        tileGenerated("raw_beef", BlockType.ITEM_RAW_BEEF);
-        tileGenerated("cooked_beef", BlockType.ITEM_COOKED_BEEF);
-        tileGenerated("raw_chicken", BlockType.ITEM_RAW_CHICKEN);
-        tileGenerated("cooked_chicken", BlockType.ITEM_COOKED_CHICKEN);
-        tileGenerated("raw_mutton", BlockType.ITEM_RAW_MUTTON);
-        tileGenerated("cooked_mutton", BlockType.ITEM_COOKED_MUTTON);
-        tileGenerated("apple", BlockType.ITEM_APPLE);
+        tileSprite("bread", "bread.png", BlockType.ITEM_BREAD);
+        tileSprite("raw_pork", "raw_pork.png", BlockType.ITEM_RAW_PORK);
+        tileSprite("cooked_pork", "cooked_pork.png", BlockType.ITEM_COOKED_PORK);
+        tileSprite("raw_beef", "raw_beef.png", BlockType.ITEM_RAW_BEEF);
+        tileSprite("cooked_beef", "cooked_beef.png", BlockType.ITEM_COOKED_BEEF);
+        tileSprite("raw_chicken", "raw_chicken.png", BlockType.ITEM_RAW_CHICKEN);
+        tileSprite("cooked_chicken", "cooked_chicken.png", BlockType.ITEM_COOKED_CHICKEN);
+        tileSprite("raw_mutton", "raw_mutton.png", BlockType.ITEM_RAW_MUTTON);
+        tileSprite("cooked_mutton", "cooked_mutton.png", BlockType.ITEM_COOKED_MUTTON);
+        tileSprite("apple", "apple.png", BlockType.ITEM_APPLE);
 
         // Misc
-        tileGenerated("bow", BlockType.ITEM_BOW);
-        tileGenerated("arrow", BlockType.ITEM_ARROW);
+        tileSprite("bow", "bow.png", BlockType.ITEM_BOW);
+        tileSprite("arrow", "arrow.png", BlockType.ITEM_ARROW);
         tile("torch", "torch.png", BlockType.ITEM_TORCH);
-        tileGenerated("rotten_flesh", BlockType.ITEM_ROTTEN_FLESH);
-        tileGenerated("bone", BlockType.ITEM_BONE);
-        tileGenerated("spider_eye", BlockType.ITEM_SPIDER_EYE);
+        tileSprite("rotten_flesh", "rotten_flesh.png", BlockType.ITEM_ROTTEN_FLESH);
+        tileSprite("bone", "bone.png", BlockType.ITEM_BONE);
+        tileSprite("spider_eye", "spider_eye.png", BlockType.ITEM_SPIDER_EYE);
 
         // [GP-013] Mining cracks: ten damage stages drawn over the block
         // being broken. Black lines on a fully transparent background, so
@@ -437,8 +437,8 @@ tile("spruce_planks", "spruce_planks.png", BlockType.SPRUCE_PLANKS);
         tile("bed_footboard", "bed_footboard.png", BlockType.BED);
 
         // [GP-PLANKS] Resin and wax: substitute crafting materials
-        tileGenerated("resin", BlockType.ITEM_GUNPOWDER);
-        tileGenerated("wax", BlockType.ITEM_GUNPOWDER);
+        tileSprite("resin", "resin.png", BlockType.ITEM_GUNPOWDER);
+        tileSprite("wax", "wax.png", BlockType.ITEM_GUNPOWDER);
 
         // [GP-073] Fire: transparent flame sprite drawn as a cross-quad
         tile("fire", "fire.png", BlockType.FIRE);
@@ -1391,6 +1391,12 @@ tile("spruce_planks", "spruce_planks.png", BlockType.SPRUCE_PLANKS);
     }
 
     public int getLayerCount() { return layerPixels.size(); }
+
+    /** Raw 16x16 ARGB pixel data of an array layer, or null when out of range. */
+    public int[] getLayerPixels(int layer) {
+        if (layer < 0 || layer >= layerPixels.size()) return null;
+        return layerPixels.get(layer);
+    }
 
     /** Array layer of the water tile, so the shader can animate just that one. */
     public int getWaterLayer() {
