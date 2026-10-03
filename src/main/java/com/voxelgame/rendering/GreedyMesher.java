@@ -120,6 +120,18 @@ public class GreedyMesher {
                         continue;
                     }
 
+                    // Lily pads lie flat on the water surface: one
+                    // double-sided horizontal quad at 1/16 of the cell
+                    if (id == BlockType.LILY_PAD.id) {
+                        int padLayer = atlas.getSlot(id, 2, wx, y, wz, chunk);
+                        float light = world.getLight(wx, y, wz) / (float) Chunk.MAX_LIGHT;
+                        float shade = 0.18f + 0.82f * light;
+                        float padBlockLight = world.getBlockLight(wx, y, wz) / (float) Chunk.MAX_LIGHT;
+                        float[] padTint = BiomeColors.tintFor(world, id, 2, wx, y, wz);
+                        addPadQuad(buf, x, y, z, padLayer, shade, padBlockLight, padTint);
+                        continue;
+                    }
+
                     if (door) {
                         // Vanilla door: a 3/16-thick panel. Closed it stands
                         // in the wall plane; open it has swung 90 degrees
@@ -150,6 +162,56 @@ public class GreedyMesher {
                     addCrossQuad(buf, x + jx, y, z + jz, layer, shade, blockLight, tint, true, height, !door);
                 }
             }
+        }
+    }
+
+    /**
+     * Lily pad: one horizontal quad at 1/16 of the cell, emitted from both
+     * sides so it reads from above and from under the water.
+     */
+    private static void addPadQuad(MeshGeom buf, float x, float y, float z,
+                                   int layer, float shade, float blockLight,
+                                   float[] tint) {
+        float yp = y + 1f / 16f;
+
+        float[][] corners = {
+            {x,     yp, z},
+            {x + 1, yp, z},
+            {x + 1, yp, z + 1},
+            {x,     yp, z + 1}
+        };
+        float[][] uvs = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+
+        for (int side = 0; side < 2; side++) {
+            int base = buf.positions.size() / 3;
+            // side 0 faces up, side 1 faces down
+            int[] order = (side == 0) ? new int[]{0, 1, 2, 3} : new int[]{0, 3, 2, 1};
+
+            for (int i = 0; i < 4; i++) {
+                int c = order[i];
+                buf.positions.add(corners[c][0]);
+                buf.positions.add(corners[c][1]);
+                buf.positions.add(corners[c][2]);
+
+                buf.texCoords.add(uvs[c][0]);
+                buf.texCoords.add(uvs[c][1]);
+
+                buf.normals.add(0.0f);
+                buf.normals.add(side == 0 ? 1.0f : -1.0f);
+                buf.normals.add(0.0f);
+
+                buf.colors.add(tint[0] * shade);
+                buf.colors.add(tint[1] * shade);
+                buf.colors.add(tint[2] * shade);
+
+                buf.ao.add(1.0f);
+                buf.layers.add((float) layer);
+                buf.wave.add(0.0f);
+                buf.blockLight.add(blockLight);
+            }
+
+            buf.indices.add(base);     buf.indices.add(base + 1); buf.indices.add(base + 2);
+            buf.indices.add(base);     buf.indices.add(base + 2); buf.indices.add(base + 3);
         }
     }
 

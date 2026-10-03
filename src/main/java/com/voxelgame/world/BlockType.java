@@ -460,6 +460,8 @@ public enum BlockType {
 
     /** O(1) solid lookup for mesher/lighting hot paths. */
     private static final boolean[] SOLID = new boolean[512];
+    /** O(1) leaf lookup: leaves render all faces (vanilla fancy mode). */
+    private static final boolean[] LEAVES = new boolean[512];
     private static final boolean[] TRANSPARENT = new boolean[512];
     /** O(1) emissive lookup for glowing blocks. */
     private static final boolean[] EMISSIVE = new boolean[512];
@@ -468,8 +470,10 @@ public enum BlockType {
             int idx = t.id;
             if (idx < 0 || idx >= SOLID.length) continue;
             SOLID[idx] = t.solid;
+            LEAVES[idx] = t.name.endsWith("_leaves");
             TRANSPARENT[idx] = !t.solid || t == WATER || t == GLASS || t == ICE
                 || t == OAK_LEAVES || t == SPRUCE_LEAVES || t == BIRCH_LEAVES
+                || t == JUNGLE_LEAVES
                 || t == AUTUMN_LEAVES || t == CHERRY_LEAVES
                 // Doors are thin 3/16 panels: neighbouring wall faces must
                 // stay visible around them, and the mesher draws the panel
@@ -572,6 +576,11 @@ public enum BlockType {
 
     public static boolean isTransparentFast(int id) {
         return id >= 0 && id < TRANSPARENT.length && TRANSPARENT[id];
+    }
+
+    /** O(1) leaf lookup for the mesher's face-culling rules. */
+    public static boolean isLeavesFast(int id) {
+        return id >= 0 && id < LEAVES.length && LEAVES[id];
     }
 
     /** Check if a block emits light (glowing). */

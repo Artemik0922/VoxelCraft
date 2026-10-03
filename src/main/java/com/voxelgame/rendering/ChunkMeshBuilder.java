@@ -223,7 +223,9 @@ public class ChunkMeshBuilder {
             // [BIOME] Crystal peaks shards grow as crossed gems, not cubes
             || t == BlockType.CRYSTAL
             // [BASE] Campfire renders as crossed flame-ish quads (non-solid)
-            || t == BlockType.CAMPFIRE;
+            || t == BlockType.CAMPFIRE
+            // Lily pads lie flat on the water (own horizontal quad)
+            || t == BlockType.LILY_PAD;
     }
 
     /** Public visibility test used by GreedyMesher. */
@@ -258,6 +260,9 @@ public class ChunkMeshBuilder {
 
         boolean blockTransparent = BlockType.isTransparentFast(blockId);
         boolean neighborTransparent = BlockType.isTransparentFast(neighborId);
+
+        // Leaves keep their faces across chunk borders too
+        if (BlockType.isLeavesFast(blockId)) return neighborTransparent;
 
         if (blockId == neighborId && blockTransparent) return false;
         if (blockTransparent && neighborTransparent) return false;
@@ -296,10 +301,16 @@ public class ChunkMeshBuilder {
         boolean blockTransparent = BlockType.isTransparentFast(blockId);
         boolean neighborTransparent = BlockType.isTransparentFast(neighborId);
 
+        // Leaves render every face against see-through neighbours, even
+        // between two leaf blocks (vanilla fancy mode) - culling them made
+        // every canopy a hollow shell
+        if (BlockType.isLeavesFast(blockId)) return neighborTransparent;
+
         // Two cells of the same transparent material share no visible face
         if (blockId == neighborId && blockTransparent) return false;
 
-        // Two leaf blocks share no visible face
+        // Two other transparent blocks (water-glass, glass-ice...) share
+        // no visible face either
         if (blockTransparent && neighborTransparent) return false;
 
         // Otherwise the face is drawn when the neighbour is see-through

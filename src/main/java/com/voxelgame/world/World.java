@@ -1023,6 +1023,22 @@ public class World {
             return false;
         }
         
+        // Lily pads snap to the water surface: placing one onto/into water
+        // puts it in the first air cell above the surface, so it floats
+        // instead of sinking to the seabed
+        int px = hit.placeX, py = hit.placeY, pz = hit.placeZ;
+        if (blockId == BlockType.LILY_PAD.id
+            && getBlock(px, py, pz) == BlockType.WATER.id) {
+            while (py + 1 < Chunk.HEIGHT
+                && getBlock(px, py + 1, pz) == BlockType.WATER.id) {
+                py++;
+            }
+            py++;
+            waterSimulation.removeWater(px, py, pz);
+            setBlock(px, py, pz, blockId);
+            return true;
+        }
+
         // [WQ] Placing a block into water displaces it: the pool drains or
         // re-levels around the new obstacle.
         if (getBlock(hit.placeX, hit.placeY, hit.placeZ) == BlockType.WATER.id) {
@@ -1345,6 +1361,12 @@ public class World {
                 out[0] = x - h;     out[1] = d.y; out[2] = z;
                 out[3] = x + h;     out[4] = d.y + 2; out[5] = z + 1;
             }
+            return out;
+        }
+        // Lily pads are walkable: a thin platform at the bottom of the cell
+        if (t == BlockType.LILY_PAD) {
+            out[0] = x; out[1] = y; out[2] = z;
+            out[3] = x + 1; out[4] = y + 0.06f; out[5] = z + 1;
             return out;
         }
         if (!BlockType.isSolidFast(id)) return null;
