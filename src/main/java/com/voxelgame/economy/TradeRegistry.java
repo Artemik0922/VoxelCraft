@@ -74,6 +74,7 @@ public final class TradeRegistry {
         });
 
         TABLES.put(Villager.Profession.FISHERMAN, new TradeOffer[]{
+            TradeOffer.buy(new ItemStack(ItemRegistry.RAW_FISH, 6), 1, HIGH),
             TradeOffer.buy(new ItemStack(ItemRegistry.STRING, 6), 1, HIGH),
             TradeOffer.sell(new ItemStack(ItemRegistry.EMERALD, 1),
                 new ItemStack(BlockType.ICE, 1), MED),

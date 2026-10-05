@@ -32,6 +32,9 @@ import org.joml.Vector3f;
  */
 public class Animal {
 
+    // [PERF] Скретч-AABB для физики (без аллокаций на тик)
+    private final float[] bbScratch = new float[6];
+
     public enum AnimalType {
         COW, PIG, CHICKEN, SHEEP, DEER, FOX, BEAR, PARROT
     }
@@ -694,7 +697,7 @@ public class Animal {
         int z0 = (int) Math.floor(minZ), z1 = (int) Math.floor(maxZ);
         int y0 = (int) Math.floor(minY), y1 = (int) Math.floor(maxY);
 
-        float[] bb = new float[6];
+        float[] bb = bbScratch;
         float blockMin = Float.MAX_VALUE;
         float blockMax = -Float.MAX_VALUE;
         float blockTop = -Float.MAX_VALUE;
@@ -766,7 +769,7 @@ public class Animal {
         int y0 = (int) Math.floor(position.y);
         int y1 = (int) Math.floor(position.y + height());
 
-        float[] bb = new float[6];
+        float[] bb = bbScratch;
         if (velocity.y <= 0) {
             // Falling: land on the highest AABB top the body overlaps
             float landY = -Float.MAX_VALUE;

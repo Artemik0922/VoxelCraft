@@ -259,6 +259,12 @@ public final class RecipeRegistry {
             null, null, item(ItemRegistry.STRING),
             null, item(ItemRegistry.STICK), item(ItemRegistry.STRING)),
 
+        // --- [FISH] Fishing rod (3 sticks + 2 string, vanilla layout) ---
+        Recipe.shaped(new ItemStack(ItemRegistry.FISHING_ROD),
+            null, null, item(ItemRegistry.STICK),
+            null, item(ItemRegistry.STICK), item(ItemRegistry.STRING),
+            item(ItemRegistry.STICK), null, item(ItemRegistry.STRING)),
+
         // --- Arrow ---
         Recipe.shaped(new ItemStack(ItemRegistry.ARROW, 4),
             null, item(ItemRegistry.FLINT), null,
@@ -433,6 +439,8 @@ public final class RecipeRegistry {
         new SmeltingRecipe(ItemRegistry.RAW_BEEF.id, ItemRegistry.COOKED_BEEF.id, 1),
         new SmeltingRecipe(ItemRegistry.RAW_CHICKEN.id, ItemRegistry.COOKED_CHICKEN.id, 1),
         new SmeltingRecipe(ItemRegistry.RAW_MUTTON.id, ItemRegistry.COOKED_MUTTON.id, 1),
+        // [FISH] Fresh catch dries into a proper meal
+        new SmeltingRecipe(ItemRegistry.RAW_FISH.id, ItemRegistry.COOKED_FISH.id, 1),
         // Other
         new SmeltingRecipe(BlockType.SAND.id, BlockType.GLASS.id, 1),
         new SmeltingRecipe(BlockType.COBBLESTONE.id, BlockType.STONE.id, 1),

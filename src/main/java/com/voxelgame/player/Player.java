@@ -82,6 +82,8 @@ public class Player {
     // Eating: hold right-click for 1.5s to eat the held item
     private int eatTimer = 0;
     private boolean eating = false;
+    /** [STATS] Сколько раз доедено до конца; игра опрашивает дельту. */
+    private int eatenCount = 0;
     
     // Inventory
     private Inventory inventory;
@@ -812,9 +814,11 @@ public class Player {
                         Item item = food.getItem();
                         eat(item.foodValue, item.saturation);
                         food.remove(1);
+                        eatenCount++; // [STATS] Game polls this for the stats screen
                     } else if (food.isBlock() && food.getBlockType() == BlockType.APPLE) {
                         eat(4, 2.0f); // Apple restores 4 hunger + 2 saturation
                         food.remove(1);
+                        eatenCount++; // [STATS]
                     }
                 }
                 eating = false;
@@ -826,8 +830,7 @@ public class Player {
     
     /** Begin eating (called while right-click is held in survival). */
     public void startEating() {
-        if (hunger < maxHunger && hasFood()) {
-            eating = true;
+        if (hunger < maxHunger && hasFood()) {            eating = true;
         }
     }
     
@@ -837,6 +840,9 @@ public class Player {
     }
     
     public boolean isEating() { return eating; }
+
+    /** [STATS] Сколько приёмов пищи было завершено за всю жизнь игрока. */
+    public int getEatenCount() { return eatenCount; }
     public float getEatProgress() {
         return eating ? eatTimer / 90.0f : 0;
     }

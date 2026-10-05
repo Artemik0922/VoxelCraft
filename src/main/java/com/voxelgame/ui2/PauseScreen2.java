@@ -16,6 +16,10 @@ public class PauseScreen2 extends Scene {
 
         void onOptions();
 
+        void onAchievements();
+
+        void onStatistics();
+
         void onQuitToTitle();
     }
 
@@ -42,16 +46,14 @@ public class PauseScreen2 extends Scene {
         resume.y = y;
 
         Button2 achievements = add(new Button2(tr("menu.achievements"),
-            (bw - 8) / 2, btnH, null));
+            (bw - 8) / 2, btnH, callbacks::onAchievements));
         achievements.x = bx;
         achievements.y = y + btnH + gap;
-        achievements.enabled = false;
 
         Button2 statistics = add(new Button2(tr("menu.statistics"),
-            (bw - 8) / 2, btnH, null));
+            (bw - 8) / 2, btnH, callbacks::onStatistics));
         statistics.x = bx + bw / 2 + 8;
         statistics.y = y + btnH + gap;
-        statistics.enabled = false;
 
         Button2 options = add(new Button2(tr("menu.options"), bw, btnH,
             callbacks::onOptions));

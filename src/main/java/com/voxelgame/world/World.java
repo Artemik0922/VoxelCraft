@@ -257,6 +257,11 @@ public class World {
     private final List<TntEntity> tntEntities = new ArrayList<>();
     public List<TntEntity> getTntEntities() { return tntEntities; }
 
+    /** [FISH] The active fishing bobber, or null when not fishing. */
+    private com.voxelgame.world.entity.FishingBobberEntity fishingBobber;
+    public com.voxelgame.world.entity.FishingBobberEntity getFishingBobber() { return fishingBobber; }
+    public void setFishingBobber(com.voxelgame.world.entity.FishingBobberEntity bobber) { this.fishingBobber = bobber; }
+
     // [GP-073] One burning cell. Life is in 60fps ticks: 10..30 seconds.
     public static final class FireBlock {
         public final int x, y, z;
@@ -339,33 +344,42 @@ public class World {
         if (save == null) return out;
         for (Chunk chunk : chunks.values()) {
             if (!chunk.isModified()) continue;
-            java.util.List<int[]> doorList = chunk.doorMetaEntries();
-            java.util.List<int[]> cropList = chunk.cropMetaEntries();
-            java.util.List<int[]> waterList = chunk.waterMetaEntries();
-            java.util.List<Object[]> rawContainers = containerManager.getContainersInChunk(
-                chunk.getChunkX(), chunk.getChunkZ());
-            Object[][] containers = new Object[rawContainers.size()][];
-            for (int i = 0; i < rawContainers.size(); i++) {
-                Object[] c = rawContainers.get(i);
-                com.voxelgame.world.container.ContainerData cd =
-                    (com.voxelgame.world.container.ContainerData) c[3];
-                containers[i] = new Object[] {
-                    c[0], c[1], c[2],
-                    cd.type.ordinal(),
-                    cd.serialize()
-                };
-            }
-            out.add(new com.voxelgame.world.save.WorldSave.ChunkSnapshot(
-                chunk.getChunkX(), chunk.getChunkZ(),
-                chunk.getBlocks().clone(),  // shallow copy of the array (short elements are immutable)
-                doorList.toArray(new int[0][]),
-                cropList.toArray(new int[0][]),
-                waterList.toArray(new int[0][]),
-                containers
-            ));
+            com.voxelgame.world.save.WorldSave.ChunkSnapshot snap = snapshotChunk(chunk);
+            if (snap != null) out.add(snap);
             chunk.clearModified();
         }
         return out;
+    }
+
+    /**
+     * [PERF] Копия одного чанка для фоновой записи (блоки + метаданные).
+     * Копирование делается на главном потоке, чтобы не гоняться с правками.
+     */
+    private com.voxelgame.world.save.WorldSave.ChunkSnapshot snapshotChunk(Chunk chunk) {
+        java.util.List<int[]> doorList = chunk.doorMetaEntries();
+        java.util.List<int[]> cropList = chunk.cropMetaEntries();
+        java.util.List<int[]> waterList = chunk.waterMetaEntries();
+        java.util.List<Object[]> rawContainers = containerManager.getContainersInChunk(
+            chunk.getChunkX(), chunk.getChunkZ());
+        Object[][] containers = new Object[rawContainers.size()][];
+        for (int i = 0; i < rawContainers.size(); i++) {
+            Object[] c = rawContainers.get(i);
+            com.voxelgame.world.container.ContainerData cd =
+                (com.voxelgame.world.container.ContainerData) c[3];
+            containers[i] = new Object[] {
+                c[0], c[1], c[2],
+                cd.type.ordinal(),
+                cd.serialize()
+            };
+        }
+        return new com.voxelgame.world.save.WorldSave.ChunkSnapshot(
+            chunk.getChunkX(), chunk.getChunkZ(),
+            chunk.getBlocks().clone(),  // shallow copy of the array (short elements are immutable)
+            doorList.toArray(new int[0][]),
+            cropList.toArray(new int[0][]),
+            waterList.toArray(new int[0][]),
+            containers
+        );
     }
     
     /** Reused request scratch so streaming allocates nothing per frame. */
@@ -448,13 +462,40 @@ public class World {
      * blocks the render thread while 17 chunks are generated inline.
      */
     public void update(Vector3f playerPos) {
+        update(playerPos, 2);
+    }
+
+    /**
+     * [PERF] Вариант с адаптивным бюджетом публикаций: при большом хвосте
+     * пересветов/пермешей у рендерера публикуем 1 чанк за кадр вместо 2.
+     */
+    public void update(Vector3f playerPos, int publishBudget) {
         int playerChunkX = (int) java.lang.Math.floor(playerPos.x / Chunk.SIZE);
         int playerChunkZ = (int) java.lang.Math.floor(playerPos.z / Chunk.SIZE);
-        
+
         // Publish whatever the workers finished
         int published = 0;
-        for (Chunk chunk : loader.collect(chunks)) {
+        for (Chunk chunk : loader.collect(chunks, publishBudget)) {
             published++;
+            if (chunk.isRestoredFromDisk()) {
+                // [PERF] Восстановлен с диска: меш уже помечен в loadBlocks,
+                // возвращаем двери/контейнеры и обновляем соседей
+                markNeighboursDirty(chunk.getChunkX(), chunk.getChunkZ());
+                syncDoorsForChunk(chunk);
+                java.util.List<Object[]> restored = chunk.takePendingContainers();
+                if (restored != null) {
+                    int wx0 = chunk.getChunkX() << 4;
+                    int wz0 = chunk.getChunkZ() << 4;
+                    for (Object[] c : restored) {
+                        containerManager.restore(
+                            wx0 + (Integer) c[0],
+                            (Integer) c[1],
+                            wz0 + (Integer) c[2],
+                            (com.voxelgame.world.container.ContainerData) c[3]);
+                    }
+                }
+                continue;
+            }
             // Apply structure blocks and loot deferred from the worker threads
             applyPendingStructureWrites(chunk);
             // Fresh chunks light+mesh from scratch; queue them themselves
@@ -501,32 +542,9 @@ public class World {
             int cz = (int) req[2];
             
             // A chunk the player edited is restored from disk; everything
-            // else is cheaper to regenerate than to read back
-            if (save != null && save.hasChunk(cx, cz)) {
-                Chunk stored = save.loadChunk(cx, cz);
-                if (stored != null) {
-                    chunks.put(Chunk.key(cx, cz), stored);
-                    markNeighboursDirty(cx, cz);
-                    syncDoorsForChunk(stored);
-                    // [CF] Containers restored from disk rejoin the manager
-                    java.util.List<Object[]> pending = stored.takePendingContainers();
-                    if (pending != null) {
-                        int wx0 = cx << 4;
-                        int wz0 = cz << 4;
-                        for (Object[] c : pending) {
-                            containerManager.restore(
-                                wx0 + (Integer) c[0],
-                                (Integer) c[1],
-                                wz0 + (Integer) c[2],
-                                (com.voxelgame.world.container.ContainerData) c[3]);
-                        }
-                    }
-                    requested++;
-                    continue;
-                }
-            }
-            
-            loader.request(cx, cz, generator);
+            // else is cheaper to regenerate than to read back.
+            // [PERF] Диск читается на воркере — главный поток больше не ждёт gzip.
+            loader.request(cx, cz, generator, save);
             pendingRequests++;
             requested++;
         }
@@ -544,9 +562,11 @@ public class World {
             dropDoorsForChunk(chunk);
             
             if (save != null && chunk.isModified()) {
-                save.saveChunk(chunk,
-                    containerManager.getContainersInChunk(
-                        chunk.getChunkX(), chunk.getChunkZ()));
+                // [PERF] Снапшот копируется здесь (главный поток), gzip+диск — в фоне
+                com.voxelgame.world.save.WorldSave.ChunkSnapshot snap = snapshotChunk(chunk);
+                chunk.clearModified();
+                com.voxelgame.world.save.WorldSave.writeSnapshotsAsync(save,
+                    java.util.List.of(snap));
             }
             return true;
         });
@@ -555,17 +575,25 @@ public class World {
         updateSlidingDoors(playerPos);
     }
     
-    /** A new chunk changes its neighbours' lighting and border faces. */
+    /**
+     * A new chunk changes its neighbours' lighting and border faces.
+     * [PERF] Только 4 рёберных соседа: свет распространяется по 6 направлениям
+     * и не может пройти через диагональный угол, а граней с угловым соседом
+     * нет. Раньше помечались все 8 — один новый чанк порождал до 9 пересветов
+     * и 9 пермешей, что и роняло FPS при стриминге.
+     */
     private void markNeighboursDirty(int cx, int cz) {
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                if (dx == 0 && dz == 0) continue;
-                Chunk n = chunks.get(Chunk.key(cx + dx, cz + dz));
-                if (n != null) {
-                    n.setDirty(true);
-                    n.setLightDirty(true);
-                }
-            }
+        markNeighbour(cx + 1, cz);
+        markNeighbour(cx - 1, cz);
+        markNeighbour(cx, cz + 1);
+        markNeighbour(cx, cz - 1);
+    }
+
+    private void markNeighbour(int cx, int cz) {
+        Chunk n = chunks.get(Chunk.key(cx, cz));
+        if (n != null) {
+            n.setDirty(true);
+            n.setLightDirty(true);
         }
     }
     
@@ -594,6 +622,28 @@ public class World {
     /** Last-resolved chunk for spatially-coherent access (mesher, raycast). */
     private Chunk lastChunk = null;
     private long lastChunkKey = Long.MIN_VALUE;
+
+    // [PERF] Массовые правки (взрывы, рефлоу воды): подавляем поштучный
+    // инкрементальный свет, затронутые чанки помечаются lightDirty и
+    // пересвечиваются одним проходом по бюджету вместо 5 колонок на блок.
+    private int batchEditDepth = 0;
+
+    /** Начать пакет правок: свет копится флагами, пересчёт отложен. */
+    public void beginBatchEdits() { batchEditDepth++; }
+
+    /** Завершить пакет правок (вложенность поддержана). */
+    public void endBatchEdits() {
+        if (batchEditDepth > 0) batchEditDepth--;
+    }
+
+    /** [PERF] Соседний чанк на границе пакета — тоже отложить свет и меш. */
+    private void markBatchNeighbor(int cx, int cz) {
+        Chunk n = getChunk(cx, cz);
+        if (n != null) {
+            n.setLightDirty(true);
+            n.setDirty(true);
+        }
+    }
 
     public int getBlock(int x, int y, int z) {
         int cx = x >> 4;
@@ -643,7 +693,19 @@ public class World {
         }
 
         // Incremental light update for this single block change
-        LightEngine.updateBlock(this, x, y, z, id);
+        if (batchEditDepth > 0) {
+            // [PERF] Пакет: откладываем пересчёт света, помечаем затронутые чанки
+            chunk.setLightDirty(true);
+            chunk.setDirty(true);
+            if (lx == 0 || lx == 15 || lz == 0 || lz == 15) {
+                if (lx == 0) markBatchNeighbor(cx - 1, cz);
+                if (lx == 15) markBatchNeighbor(cx + 1, cz);
+                if (lz == 0) markBatchNeighbor(cx, cz - 1);
+                if (lz == 15) markBatchNeighbor(cx, cz + 1);
+            }
+        } else {
+            LightEngine.updateBlock(this, x, y, z, id);
+        }
 
         // [GP-022] The cell above may have lost its support and start falling.
         // The falling entity is set directly (not via setBlock) to avoid
@@ -1745,8 +1807,15 @@ public class World {
 
     // --- Mob management ---
 
+    // [PERF] Ярусное тикание сущностей: дальние не тикают вовсе, средние — через кадр
+    private static final float ENTITY_FREEZE_RADIUS = 128.0f;
+    private static final float ENTITY_SLOW_RADIUS = 56.0f;
+    private static final int AI_TICK_STRIDE = 4;
+    private int aiTickPhase = 0;
+
     /** Update all mobs (AI + physics). */
     public void updateMobs(float dt, Player player) {
+        aiTickPhase = (aiTickPhase + 1) & (AI_TICK_STRIDE - 1);
         // [GP-040] Despawn far-away mobs: >128 blocks immediately, >64 with
         // a 10%-per-second random chance so the world thins out naturally
         if (playerRef != null) {
@@ -1762,7 +1831,9 @@ public class World {
             });
         }
 
+        Vector3f pp = playerRef != null ? playerRef.getPosition() : null;
         for (Zoloy mob : mobs) {
+            if (pp != null && !entityShouldTick(mob, pp)) continue;
             mob.update(dt, player);
         }
         mobs.removeIf(mob -> {
@@ -1773,6 +1844,29 @@ public class World {
             }
             return false;
         });
+    }
+
+    /**
+     * [PERF] Стробированный тик: дальше SLOW-радиуса сущность обновляется каждый
+     * AI_TICK_STRIDE-й кадр (со сдвигом фазы по identityHashCode), дальше
+     * FREEZE-радиуса — вообще не тикает (состояние сохраняется, день/ночь
+     * пересчитается по timeOfDay при пробуждении).
+     */
+    private boolean entityShouldTick(Object entity, Vector3f playerPos) {
+        Vector3f m;
+        if (entity instanceof Zoloy z) m = z.getPosition();
+        else if (entity instanceof Villager v) m = v.getPosition();
+        else if (entity instanceof Animal a) m = a.getPosition();
+        else return true;
+        float dx = m.x - playerPos.x;
+        float dz = m.z - playerPos.z;
+        float distSq = dx * dx + dz * dz;
+        if (distSq > ENTITY_FREEZE_RADIUS * ENTITY_FREEZE_RADIUS) return false;
+        if (distSq > ENTITY_SLOW_RADIUS * ENTITY_SLOW_RADIUS
+                && (System.identityHashCode(entity) & (AI_TICK_STRIDE - 1)) != aiTickPhase) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -1853,7 +1947,10 @@ public class World {
      * @param timeOfDay 0-24000 (0=6:00, 6000=12:00, 12000=18:00, 18000=0:00)
      */
     public void updateVillagers(float dt, Player player, int timeOfDay) {
+        aiTickPhase = (aiTickPhase + 1) & (AI_TICK_STRIDE - 1);
+        Vector3f pp = player != null ? player.getPosition() : null;
         for (Villager v : villagers) {
+            if (pp != null && !entityShouldTick(v, pp)) continue;
             v.update(dt, player, timeOfDay);
         }
         villagers.removeIf(Villager::isDead);
@@ -1864,7 +1961,10 @@ public class World {
      * never despawn вЂ” the player farms them.
      */
     public void updateAnimals(float dt, Player player) {
+        aiTickPhase = (aiTickPhase + 1) & (AI_TICK_STRIDE - 1);
+        Vector3f pp = player != null ? player.getPosition() : null;
         for (Animal a : animals) {
+            if (pp != null && !entityShouldTick(a, pp)) continue;
             a.update(dt, player);
         }
         animals.removeIf(a -> {
@@ -1975,6 +2075,8 @@ public class World {
      * primed). Water and bedrock are immune.
      */
     public void explode(int cx, int cy, int cz, int radius) {
+        // [PERF] Сотни setBlock за кадр: свет считаем одним проходом после взрыва
+        beginBatchEdits();
         int r2 = radius * radius;
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dy = -radius; dy <= radius; dy++) {
@@ -2011,6 +2113,7 @@ public class World {
                 }
             }
         }
+        endBatchEdits();
 
         // [GP-032] The blast reaches the player too: damage falls off with
         // distance from the centre, and the push shoves the player away.
@@ -2044,6 +2147,8 @@ public class World {
      * with distance. Bedrock and water are immune, like TNT.
      */
     public void makeCrater(int cx, int cy, int cz, int radius) {
+        // [PERF] Как и взрыв ТНТ: свет одним проходом после всех правок
+        beginBatchEdits();
         int r2 = radius * radius;
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dy = -radius; dy <= radius; dy++) {
@@ -2105,6 +2210,7 @@ public class World {
         if (getBlock(cx, fy + 1, cz) == BlockType.AIR.id) {
             igniteFire(cx, fy + 1, cz);
         }
+        endBatchEdits();
 
         // Blast damage: player, mobs and villagers, falling off with distance
         float reach = radius + 3.0f;

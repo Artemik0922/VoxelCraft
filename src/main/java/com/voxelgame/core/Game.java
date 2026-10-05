@@ -86,6 +86,20 @@ public class Game {
     private Camera camera;
     private World world;
     private Player player;
+
+    // [PERF] Мир/игрок, для которых уже привязаны хуки команд
+    private World hooksWiredWorld;
+    private Player hooksWiredPlayer;
+
+    /** [STATS] Статистика и ачивки текущего мира (saves/<мир>/stats.json). */
+    private com.voxelgame.stats.WorldStats worldStats;
+    /** [STATS] Последнее известное значение счётчика съеденного. */
+    private int lastEatenCount = 0;
+    /** [FISH] Контроллер рыбалки текущего мира. */
+    private com.voxelgame.world.fishing.FishingController fishingController;
+
+    /** [PERF] Счётчик тиков для кадрового дросселя публикаций чанков. */
+    private int streamFrame = 0;
     private GameHud hud;
     private Renderer renderer;
     private com.voxelgame.render.MobRenderer mobRenderer;
@@ -459,6 +473,9 @@ public class Game {
         // Stop autosaving into a world we are no longer playing
         currentSave = null;
         lastBiomeId = null;
+        if (fishingController != null) {
+            fishingController.clear();
+        }
         
         screens.open(new com.voxelgame.ui2.MainMenuScreen2(
             new com.voxelgame.ui2.MainMenuScreen2.Callbacks() {
@@ -538,6 +555,15 @@ public class Game {
         screens.open(new PauseScreen2(new PauseScreen2.Callbacks() {
             @Override public void onResume() { closeScreens(); }
             @Override public void onOptions() { openOptions(true); }
+            @Override public void onAchievements() {
+                screens.push(new AchievementsScreen2(() -> screens.pop()));
+                applyCursorMode();
+            }
+            @Override public void onStatistics() {
+                screens.push(new StatisticsScreen2(worldStats, currentSave.getMeta(),
+                    () -> screens.pop()));
+                applyCursorMode();
+            }
             @Override public void onQuitToTitle() {
                 saveWorld();
                 settings.save();
@@ -630,10 +656,16 @@ public class Game {
         screens.open(screen);
     }
 
+    /** [STATS] Короткая запись счётчика статистики текущего мира. */
+    private void stat(String key, long amount) {
+        if (worldStats != null) worldStats.add(key, amount);
+    }
+
     /** [0.4] Achievement hooks for crafting: pickaxe / sword / furnace. */
     private void onCrafted(ItemStack stack) {
         if (stack == null || !stack.isItem() || stack.getItem() == null) return;
         Item it = stack.getItem();
+        stat(com.voxelgame.stats.WorldStats.ITEMS_CRAFTED, 1);
         if (it.toolType == ToolType.PICKAXE) {
             AchievementRegistry.trigger("craft_pickaxe");
         } else if (it.toolType == ToolType.SWORD) {
@@ -646,9 +678,15 @@ public class Game {
 
     /** [0.4] Track furnace outputs so smelting an iron ingot unlocks its achievement. */
     private final java.util.Map<Long, Integer> smeltTrack = new java.util.HashMap<>();
+    /** [PERF] Скан печей раз в 0.5 с вместо каждого тика. */
+    private float smeltCheckTimer = 0;
 
-    private void checkSmeltAchievement() {
+    private void checkSmeltAchievement(float dt) {
         if (world == null) return;
+        if (AchievementRegistry.isUnlocked("smelt_iron")) return;
+        smeltCheckTimer -= dt;
+        if (smeltCheckTimer > 0) return;
+        smeltCheckTimer = 0.5f;
         for (java.util.Map.Entry<Long, ContainerData> e :
                 world.getContainerManager().getContainers().entrySet()) {
             ContainerData c = e.getValue();
@@ -656,9 +694,12 @@ public class Game {
             ItemStack out = c.getSlot(ContainerData.FURNACE_OUTPUT);
             int cur = out == null || out.isEmpty() ? 0 : out.getCount();
             Integer prev = smeltTrack.get(e.getKey());
-            if (prev != null && cur > prev && out != null && out.isItem()
-                    && out.getItem() == ItemRegistry.IRON_INGOT) {
-                AchievementRegistry.trigger("smelt_iron");
+            if (prev != null && cur > prev) {
+                // [STATS] Любая выплавка считается; железо дополнительно даёт ачивку
+                stat(com.voxelgame.stats.WorldStats.ITEMS_SMELTED, cur - prev);
+                if (out != null && out.isItem() && out.getItem() == ItemRegistry.IRON_INGOT) {
+                    AchievementRegistry.trigger("smelt_iron");
+                }
             }
             smeltTrack.put(e.getKey(), cur);
         }
@@ -767,6 +808,7 @@ public class Game {
         WorldMeta meta = currentSave.getMeta();
         int before = meta.reputation;
         meta.reputation++;
+        stat(com.voxelgame.stats.WorldStats.TRADES_MADE, 1);
         AchievementRegistry.trigger("first_trade");
         if (Reputation.isHero(meta.reputation) && !Reputation.isHero(before)) {
             // First time the player reaches Hero tier: the village honours them.
@@ -928,6 +970,7 @@ public class Game {
     }
     
     private void handlePlayerDeath(Player.DeathCause cause) {
+        stat(com.voxelgame.stats.WorldStats.DEATHS, 1);
         if (player.isHardcore()) {
             // Mark the world dead РІР‚вЂќ only "Title Screen" will work
             if (currentSave != null) {
@@ -1057,23 +1100,24 @@ public class Game {
     /** Move items toward the player, pick them up when close. */
     private void updateItemEntities(float dt) {
         var items = world.getItemEntities();
-        var toRemove = new java.util.ArrayList<ItemEntity>();
         Vector3f playerPos = player.getPosition();
-        
-        for (ItemEntity item : items) {
+
+        // [PERF] Итератор с удалением вместо new ArrayList + O(n*m) removeAll
+        for (java.util.Iterator<ItemEntity> it = items.iterator(); it.hasNext(); ) {
+            ItemEntity item = it.next();
             item.update(dt);
-            
+
             // Magnet toward player when close
             if (item.canPickup()) {
                 Vector3f itemPos = item.getPosition();
                 float dx = playerPos.x - itemPos.x;
                 float dz = playerPos.z - itemPos.z;
                 float distSq = dx*dx + dz*dz;
-                
+
                 if (distSq < 1.5f * 1.5f) {
                     item.attractTo(playerPos, dt);
                 }
-                
+
                 if (item.isCloseTo(playerPos, 1.0f)) {
                     ItemStack s = item.getStack();
                     boolean picked;
@@ -1086,15 +1130,12 @@ public class Game {
                     }
                     if (picked) {
                         item.markDead();
-                        toRemove.add(item);
                     }
                 }
             }
-            
-            if (item.isDead()) toRemove.add(item);
+
+            if (item.isDead()) it.remove();
         }
-        
-        items.removeAll(toRemove);
     }
 
     /** [ENCH] Update XP orbs: gravity, magnet to player, pickup. */
@@ -1172,7 +1213,12 @@ public class Game {
         // Load biome discovery for this world
         biomeDiscovery = new BiomeDiscovery(currentSave.getDirectory());
         biomeDiscovery.load();
-        
+
+        // [STATS] Per-world statistics + persistent achievements
+        worldStats = new com.voxelgame.stats.WorldStats(currentSave.getDirectory());
+        worldStats.load();
+        com.voxelgame.achievement.AchievementRegistry.restoreFrom(worldStats);
+
         world = new World(meta.seed);
         world.setSave(currentSave);
         world.setRenderDistance(renderDistance);
@@ -1211,6 +1257,17 @@ if (fresh) {
         player.setDeathCallback(cause -> handlePlayerDeath(cause));
         // [GP-032] Explosions need the player to hurt
         world.setPlayer(player);
+
+        // [FISH] Fishing controller for this world; a bite kicks up a splash
+        // and a soft plop before the reel-in window opens
+        fishingController = new com.voxelgame.world.fishing.FishingController(world, worldStats, player);
+        fishingController.onBite = () -> {
+            com.voxelgame.world.entity.FishingBobberEntity b = fishingController.getBobber();
+            if (b != null) {
+                particles.emitSplash(b.getPosition().x, b.getPosition().y, b.getPosition().z);
+            }
+            AudioManager.play("sounds/steps/dirt", 0.7f, 0.55f);
+        };
         
         // Hardcore locks difficulty to hard
         if (meta.gameMode == WorldMeta.GameMode.HARDCORE) {
@@ -1285,6 +1342,12 @@ if (fresh) {
         meta.dayTime = dayNight.getTime();
         meta.inventoryData = serializeInventory(player.getInventory());
 
+        // [STATS] Mirror play time into meta (world list reads meta only)
+        if (worldStats != null) {
+            meta.playTimeMs = worldStats.getPlayTimeMs();
+            worldStats.save();
+        }
+
         // Meta and discovery are small; keep synchronous on the game thread
         currentSave.saveMeta();
         if (biomeDiscovery != null) biomeDiscovery.save();
@@ -1320,6 +1383,12 @@ if (fresh) {
         meta.gameMode = player.getGameMode(); meta.difficulty = settings.difficulty;
         meta.dayTime = dayNight.getTime();
         meta.inventoryData = serializeInventory(player.getInventory());
+
+        // [STATS] Mirror play time into meta (world list reads meta only)
+        if (worldStats != null) {
+            meta.playTimeMs = worldStats.getPlayTimeMs();
+            worldStats.save();
+        }
         currentSave.saveMeta();
         if (biomeDiscovery != null) biomeDiscovery.save();
         int chunks = world.flushToDisk();
@@ -2049,6 +2118,7 @@ if (fresh) {
     
     private void loop() {
         while (!glfwWindowShouldClose(window)) {
+            long frameStartNs = System.nanoTime();
             // Calculate delta time
             double currentFrame = glfwGetTime();
             deltaTime = currentFrame - lastFrame;
@@ -2157,6 +2227,20 @@ if (!paused) {
             // Swap buffers and poll events
             glfwSwapBuffers(window);
             glfwPollEvents();
+
+            // [PERF] Без vsync цикл разгоняется до максимума и сжигает ядро
+            // впустую — мягкий лимит 240 FPS. Физика не страдает: шаг фиксированный.
+            if (!settings.vsync) {
+                long frameBudgetNs = 1_000_000_000L / 240;
+                long workNs = System.nanoTime() - frameStartNs;
+                if (workNs < frameBudgetNs) {
+                    try {
+                        Thread.sleep((frameBudgetNs - workNs) / 1_000_000L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
         }
     }
     
@@ -2225,12 +2309,49 @@ if (!paused) {
     }
     
     private void updateWorld() {
+        // [STATS] Play time and walked distance accrue only while actually playing:
+        // updateWorld runs at the fixed 60 Hz tick and is skipped while paused/loading
+        if (worldStats != null) {
+            worldStats.addPlayTime((float) TICK_RATE);
+            Vector3f vel = player.getVelocity();
+            float hSpeed = (float) java.lang.Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+            if (player.isOnGround() && hSpeed > 0.05f) {
+                worldStats.add(com.voxelgame.stats.WorldStats.DISTANCE_WALKED,
+                    hSpeed * TICK_RATE);
+            }
+            // Еда завершается внутри Player.update — снимаем дельту счётчика
+            int eaten = player.getEatenCount();
+            if (eaten != lastEatenCount) {
+                stat(com.voxelgame.stats.WorldStats.ITEMS_EATEN, eaten - lastEatenCount);
+                lastEatenCount = eaten;
+            }
+            // [FISH] Update fishing bobber
+            if (fishingController != null) {
+                fishingController.update((float) TICK_RATE);
+            }
+        }
+
         // Update world chunks based on camera position
-        world.update(camera.getPosition());
+        // [PERF] Публикация чанка стоит ~5 пересветов + ~5 пермешей соседей.
+        // Пока у рендерера хвост работы, публикуем реже: кадр остаётся целым,
+        // мир заполняется чуть медленнее вместо просадок до 12 FPS.
+        int backlog = renderer.getLightBacklog() + renderer.getMeshBacklog();
+        streamFrame++;
+        int publishBudget;
+        if (backlog > 48) {
+            publishBudget = (streamFrame % 8 == 0) ? 1 : 0;
+        } else if (backlog > 24) {
+            publishBudget = (streamFrame % 4 == 0) ? 1 : 0;
+        } else if (backlog > 12) {
+            publishBudget = (streamFrame % 2 == 0) ? 1 : 0;
+        } else {
+            publishBudget = 2;
+        }
+        world.update(camera.getPosition(), publishBudget);
 
         // Update furnaces (smelting logic)
         world.updateContainers();
-        checkSmeltAchievement();
+        checkSmeltAchievement((float) deltaTime);
 
         // Update player physics
         player.update(deltaTime);
@@ -2320,6 +2441,11 @@ if (!paused) {
         Villager.heroPresent = currentSave != null
             && Reputation.isHero(currentSave.getMeta().reputation);
 
+        // [PERF] Хуки команд зависят только от (мир, игрок) — привязываем
+        // один раз при смене, а не ~8 объектов каждый тик
+        if (hooksWiredWorld != world || hooksWiredPlayer != player) {
+            hooksWiredWorld = world;
+            hooksWiredPlayer = player;
         SpawnCommand.currentWorld = world;
         SpawnCommand.currentPlayerPos = player.getPosition();
         SpawnCommand.currentPlayerFront = camera.getFront();
@@ -2365,6 +2491,7 @@ if (!paused) {
             @Override public String currentWeather() { return currentWeather; }
             @Override public void setWeather(String weather) { currentWeather = weather; }
         };
+        }
 
         // Update loose items and handle pickup
         updateItemEntities((float) deltaTime);
@@ -2600,6 +2727,8 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
 
     // --- Auto-spawn mobs ---
     private float mobSpawnTimer = 0;
+    /** [PERF] Лимит мобов уже залогирован (не спамить консоль каждые 3 с). */
+    private boolean mobCapLogged = false;
     private static final float MOB_SPAWN_INTERVAL = 3.0f; // seconds between spawns
     private static final int MAX_AUTO_MOBS = 70;
 
@@ -2650,10 +2779,14 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         mobSpawnTimer = 0;
 
         if (world.getMobs().size() >= MAX_AUTO_MOBS) {
-            System.out.println("[AutoSpawn] Max mobs reached (" + MAX_AUTO_MOBS
-                + "), skipping. Total: " + world.getMobs().size());
+            // [PERF] Лог только на переходе к лимиту, а не каждые 3 секунды
+            if (!mobCapLogged) {
+                mobCapLogged = true;
+                System.out.println("[AutoSpawn] Max mobs reached (" + MAX_AUTO_MOBS + ")");
+            }
             return;
         }
+        mobCapLogged = false;
 
         Vector3f pos = player.getPosition();
         // 24-48 blocks away: spawns are never visible popping into the world
@@ -2964,13 +3097,11 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         
         // [GP-019] Enforce 5-block interaction distance limit
         if (targetedBlock != null) {
-            Vector3f blockCenter = new Vector3f(
-                targetedBlock.x + 0.5f,
-                targetedBlock.y + 0.5f,
-                targetedBlock.z + 0.5f
-            );
-            float distance = camera.getPosition().distance(blockCenter);
-            if (distance > 5.0f) {
+            // [PERF] Квадрат расстояния без new Vector3f каждый тик
+            float dx = camera.getPosition().x - (targetedBlock.x + 0.5f);
+            float dy = camera.getPosition().y - (targetedBlock.y + 0.5f);
+            float dz = camera.getPosition().z - (targetedBlock.z + 0.5f);
+            if (dx * dx + dy * dy + dz * dz > 25.0f) {
                 targetedBlock = null; // Too far to interact
             }
         }
@@ -3230,6 +3361,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
     
     /** Trigger mining achievements based on block type. */
     private void triggerMiningAchievement(BlockType type) {
+        stat(com.voxelgame.stats.WorldStats.BLOCKS_MINED, 1);
         if (type == BlockType.STONE || type == BlockType.COBBLESTONE) {
             AchievementRegistry.trigger("mine_stone");
         } else if (type == BlockType.IRON_ORE) {
@@ -3527,6 +3659,10 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         renderer.renderFallingBlocks(world, shader, camera, renderer.getTextureAtlas(),
             entityLightLevel());
 
+        // [FISH] Render fishing bobber
+        renderer.renderFishingBobber(world, shader, camera, renderer.getTextureAtlas(),
+            entityLightLevel());
+
         // [AST] Render falling asteroids
         renderer.renderAsteroids(world, shader, camera, renderer.getTextureAtlas());
 
@@ -3734,12 +3870,18 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
         // [POT] Copy active effects for the HUD icons
         debugInfo.activeEffects = player.getActiveEffects();
         debugInfo.gameMode = player.getGameMode();
-        debugInfo.biomeName = world.getBiomeDisplayName((int) pos.x, (int) pos.z);
+        // [PERF] Дорогие строки (шум биома, формат часов) — только при видимом F3
+        if (hud.isDebugVisible()) {
+            debugInfo.biomeName = world.getBiomeDisplayName((int) pos.x, (int) pos.z);
+            debugInfo.clock = dayNight.getClock();
+            debugInfo.particles = particles.getAliveCount();
+        }
+        // [STATS] Наигранное время мира (дешёво: read из памяти)
+        debugInfo.playTime = worldStats != null
+            ? com.voxelgame.world.save.WorldMeta.formatPlayTime(worldStats.getPlayTimeMs())
+            : "";
         debugInfo.guiScale = ui.getScale();
-        debugInfo.clock = dayNight.getClock();
         debugInfo.daylight = dayNight.getDaylight();
-        debugInfo.particles = particles.getAliveCount();
-        debugInfo.biomeName = world.getBiomeDisplayName((int) pos.x, (int) pos.z);
         debugInfo.culled = renderer.getCulledByFrustum();
         debugInfo.pendingChunks = world.getLoader().getPendingCount();
         debugInfo.lightBacklog = renderer.getLightBacklog();
@@ -3918,6 +4060,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             Vector3f from = new Vector3f(hitVillager.getPosition()).sub(player.getPosition());
             hitVillager.takeDamage(dmg, from);
             if (hitVillager.isDead()) {
+                stat(com.voxelgame.stats.WorldStats.MOBS_KILLED, 1);
                 AchievementRegistry.trigger("kill_mob");
                 // [ENCH] Experience for the kill
                 Vector3f vp = hitVillager.getPosition();
@@ -3932,6 +4075,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
             Vector3f from = new Vector3f(hitAnimal.getPosition()).sub(player.getPosition());
             hitAnimal.takeDamage(dmg, from);
             if (hitAnimal.isDead()) {
+                stat(com.voxelgame.stats.WorldStats.MOBS_KILLED, 1);
                 AchievementRegistry.trigger("kill_mob");
                 // [ENCH] Small experience reward for the kill
                 Vector3f ap = hitAnimal.getPosition();
@@ -3948,6 +4092,7 @@ if (targetSwing > 0) limbSwing += hSpeed * (float) deltaTime * 1.4f;
 
             // [GP-026] First kill unlocks the achievement
             if (hitMob.isDead()) {
+                stat(com.voxelgame.stats.WorldStats.MOBS_KILLED, 1);
                 AchievementRegistry.trigger("kill_mob");
                 // [ENCH] Experience for the kill
                 Vector3f mp = hitMob.getPosition();
@@ -4198,6 +4343,30 @@ if (targeted == BlockType.CHEST) {
                     return;
                 }
 
+                // [FISH] Fishing rod: cast or reel in
+                if (heldStack.isItem() && heldStack.getItem() == ItemRegistry.FISHING_ROD) {
+                    if (fishingController.hasBobber()) {
+                        String result = fishingController.reelIn();
+                        if ("fish".equals(result)) {
+                            player.getInventory().addItem(ItemRegistry.RAW_FISH, 1);
+                            int xp = 1 + (int)(java.lang.Math.random() * 3);
+                            for (int i = 0; i < xp; i++) {
+                                world.spawnXpOrb(player.getPosition().x, player.getPosition().y, player.getPosition().z, 1);
+                            }
+                            AudioManager.play("sounds/steps/stone", 1.0f, 0.3f);
+                        } else if ("junk".equals(result)) {
+                            // Junk catch: a stick or a tangle of string
+                            player.getInventory().addItem(
+                                java.lang.Math.random() < 0.5f ? ItemRegistry.STICK : ItemRegistry.STRING, 1);
+                            AudioManager.play("sounds/steps/stone", 1.0f, 0.3f);
+                        }
+                    } else {
+                        fishingController.cast(camera.getPosition(), camera.getFront(), heldStack);
+                        AudioManager.play("sounds/steps/stone", 1.0f, 0.5f);
+                    }
+                    return;
+                }
+
                 // Survival + holding food = start eating (any food item or the apple block)
                 boolean isFood = heldStack.isItem() && heldStack.getItem() != null
                     && heldStack.getItem().isFood();
@@ -4229,6 +4398,7 @@ if (targeted == BlockType.CHEST) {
                                 if (placeBed(targetedBlock.placeX, targetedBlock.placeY,
                                         targetedBlock.placeZ)) {
                                     playPlaceSound(BlockType.BED);
+                                    stat(com.voxelgame.stats.WorldStats.BLOCKS_PLACED, 1);
                                     AchievementRegistry.trigger("place_block");
                                     if (!player.isCreative()) {
                                         player.getInventory().removeSelectedItem();
@@ -4248,6 +4418,7 @@ if (targeted == BlockType.CHEST) {
                                         blockId, player.getPosition(), 0.6f, 1.8f)) {
                                     world.setBlock(lx, ly + 1, lz, BlockType.OAK_DOOR.id);
                                     playPlaceSound(BlockType.OAK_DOOR);
+                                    stat(com.voxelgame.stats.WorldStats.BLOCKS_PLACED, 1);
                                     AchievementRegistry.trigger("place_block");
                                     if (!player.isCreative()) {
                                         player.getInventory().removeSelectedItem();
@@ -4262,7 +4433,8 @@ if (targeted == BlockType.CHEST) {
                             if (placed) {
                                 playPlaceSound(BlockType.fromId(blockId));
                                 // Trigger building achievement
-                                AchievementRegistry.trigger("place_block");
+                                stat(com.voxelgame.stats.WorldStats.BLOCKS_PLACED, 1);
+                                    AchievementRegistry.trigger("place_block");
                                 // Only survival spends the item
                                 if (!player.isCreative()) {
                                     player.getInventory().removeSelectedItem();
@@ -4608,6 +4780,27 @@ netClient.sendBlockChange(world.getLastPlacedX(),
                 out.accept("biome: " + world.getBiomeDisplayName((int) p.x, (int) p.z));
                 out.accept("world: " + (currentSave != null ? currentSave.getMeta().displayName : "(none)")
                     + " | seed: " + world.getSeed());
+            }
+
+            case "perf" -> {
+                // [PERF] Разбор последнего кадра по проходам + очереди фоновой работы
+                out.accept(String.format(
+                    "fps: %.0f | frame: %.2f ms | chunks: %d (pending gen: %d, light: %d, mesh: %d, inflight: %d, remeshed: %d)",
+                    fps, deltaTime * 1000.0, world.getChunks().size(),
+                    world.getLoader().getPendingCount(),
+                    renderer.getLightBacklog(), renderer.getMeshBacklog(),
+                    renderer.getInFlightBuilds(), renderer.getRemeshGeneration()));
+                out.accept("lastUpload: chunk " + renderer.getLastUploadKey()
+                    + " quads " + renderer.getLastUploadQuads());
+                out.accept(String.format(
+                    "us: world=%d rebuild=%d shadow=%d scene=%d post=%d ui=%d",
+                    FrameTimer.us(FrameTimer.WORLD), FrameTimer.us(FrameTimer.REBUILD),
+                    FrameTimer.us(FrameTimer.SHADOW), FrameTimer.us(FrameTimer.SCENE),
+                    FrameTimer.us(FrameTimer.POST), FrameTimer.us(FrameTimer.UI)));
+                java.lang.Runtime rt = java.lang.Runtime.getRuntime();
+                out.accept(String.format("mem: used %d MB / total %d MB | villagers %d, animals %d, mobs %d",
+                    (rt.totalMemory() - rt.freeMemory()) >> 20, rt.totalMemory() >> 20,
+                    world.getVillagers().size(), world.getAnimals().size(), world.getMobs().size()));
             }
 
             case "screenshot" -> takeScreenshot(t.length > 1 ? t[1] : "debug_shot.png");

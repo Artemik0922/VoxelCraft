@@ -559,6 +559,11 @@ public class TerrainGenerator {
 
         boolean isMountain = isMountainBiome(biome);
 
+        // [PERF] Колонные кэши: aquifer (2D-шум) и вход в пещеру не зависят от y,
+        // раньше пересчитывались на каждую ячейку
+        int aquiferLevel = caveGenerator.getAquiferLevel(wx, wz);
+        int entranceSize = height >= 40 ? caveGenerator.isCaveEntrance(wx, wz, height) : 0;
+
         for (int y = 0; y < Chunk.HEIGHT; y++) {
             int block;
 
@@ -588,19 +593,19 @@ public class TerrainGenerator {
             // Cave entrances: carve opening from cave to surface
             if (block != BlockType.AIR.id && block != BlockType.WATER.id
                 && block != BlockType.BEDROCK.id && y >= height - 4) {
-                int entranceSize = caveGenerator.isCaveEntrance(wx, wz, height);
                 if (entranceSize > 0 && y >= height - entranceSize) {
                     block = BlockType.AIR.id;
                 }
             }
 
             // Aquifer water fills caves below water level
-            if (block == BlockType.AIR.id && caveGenerator.isWater(wx, y, wz, height)) {
+            if (y <= height && block == BlockType.AIR.id
+                && caveGenerator.isWater(wx, y, wz, height, aquiferLevel)) {
                 block = BlockType.WATER.id;
             }
 
             // Lava at very bottom
-            if (block == BlockType.AIR.id && caveGenerator.isLava(y)) {
+            if (y <= height && block == BlockType.AIR.id && caveGenerator.isLava(y)) {
                 block = BlockType.LAVA.id;
             }
 
@@ -613,7 +618,7 @@ public class TerrainGenerator {
             }
 
             // Underground biome decorations
-            if (block == BlockType.AIR.id || block == BlockType.WATER.id) {
+            if (y <= height && (block == BlockType.AIR.id || block == BlockType.WATER.id)) {
                 UndergroundBiomeGenerator.UndergroundBiome ugBiome =
                     undergroundBiomeGenerator.getBiome(wx, y, wz, block == BlockType.AIR.id);
                 // Lush cave: moss on ceiling

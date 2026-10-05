@@ -220,6 +220,15 @@ public final class ItemRegistry {
     public static final Item APPLE_ITEM = Item.builder(186, "apple")
             .displayName("Apple").food(4, 0.3f).sprite("apple").build();
 
+    // --- [FISH] Fishing ---
+    public static final Item FISHING_ROD = Item.builder(223, "fishing_rod")
+            .displayName("Fishing Rod").stackSize(1).durability(64)
+            .sprite("fishing_rod").build();
+    public static final Item RAW_FISH = Item.builder(224, "raw_fish")
+            .displayName("Raw Fish").food(2, 0.3f).sprite("raw_fish").build();
+    public static final Item COOKED_FISH = Item.builder(225, "cooked_fish")
+            .displayName("Cooked Fish").food(5, 0.6f).sprite("cooked_fish").build();
+
     // --- Misc ---
     public static final Item BOW = Item.builder(187, "bow")
             .displayName("Bow").stackSize(1).attackSpeed(1.0f)
@@ -367,7 +376,8 @@ public final class ItemRegistry {
             POTION_STRENGTH, POTION_FIRE_RESISTANCE, SUGAR,
             EMERALD, METEORITE_INGOT,
             METEORITE_PICKAXE, METEORITE_AXE, METEORITE_SHOVEL, METEORITE_SWORD, METEORITE_HOE,
-            METEORITE_HELMET, METEORITE_CHESTPLATE, METEORITE_LEGGINGS, METEORITE_BOOTS
+            METEORITE_HELMET, METEORITE_CHESTPLATE, METEORITE_LEGGINGS, METEORITE_BOOTS,
+            FISHING_ROD, RAW_FISH, COOKED_FISH
         }) {
             if (item != null) {
                 BY_ID[item.id & 0xFF] = item;

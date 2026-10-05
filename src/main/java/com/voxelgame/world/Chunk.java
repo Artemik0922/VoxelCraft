@@ -43,7 +43,7 @@ public class Chunk {
      * no entry: it links to the bottom half through this map. Survives world
      * reloads because it is saved with the chunk.
      */
-    private final java.util.Map<Integer, Byte> doorMeta = new java.util.HashMap<>();
+    private final java.util.Map<Integer, Byte> doorMeta = new java.util.concurrent.ConcurrentHashMap<>(); // [PERF-ASYNC] воркер меша читает мету параллельно с главным потоком
 
     /**
      * [CR] Crop growth stages, keyed by the cell's local index.
@@ -51,7 +51,7 @@ public class Chunk {
      * position-hash default get an entry, so untouched world-gen fields stay
      * sparse. Survives world reloads because it is saved with the chunk.
      */
-    private final java.util.Map<Integer, Byte> cropMeta = new java.util.HashMap<>();
+    private final java.util.Map<Integer, Byte> cropMeta = new java.util.concurrent.ConcurrentHashMap<>(); // [PERF-ASYNC]
     
     public Chunk(int chunkX, int chunkZ) {
         this.chunkX = chunkX;
@@ -91,6 +91,7 @@ public class Chunk {
         blocks[index(x, y, z)] = (short) id;
         dirty = true;
         lightDirty = true;
+        meshVersion++; // [PERF-ASYNC] блок читается асинхронным мешером
         
         // Keep the heightmap current instead of rescanning the column later
         int hi = x * SIZE + z;
@@ -110,6 +111,18 @@ public class Chunk {
     public boolean isModified() { return modified; }
     public void markModified() { modified = true; }
     public void clearModified() { modified = false; }
+
+    /** [PERF] Чанк восстановлен с диска (а не сгенерирован заново). */
+    private boolean restoredFromDisk = false;
+    public boolean isRestoredFromDisk() { return restoredFromDisk; }
+    public void setRestoredFromDisk(boolean v) { restoredFromDisk = v; }
+
+    // [PERF-ASYNC] Счётчик мутаций данных, из которых мешер строит геометрию
+    // (блоки, свет, мета). Асинхронная сборка геометрии в Renderer сверяет
+    // счётчик до и после построения: изменился — результат выбрасывается.
+    private volatile long meshVersion = 0;
+    public long getMeshVersion() { return meshVersion; }
+    public void bumpMeshVersion() { meshVersion++; }
     
     /** Restore blocks from a save (format 6: short ids). */
     public void loadBlocks(short[] data) {
@@ -123,10 +136,16 @@ public class Chunk {
             } else {
                 blocks[i] = data[i];
             }
+            // [PERF] Спавнеры собираем в этом же проходе — отдельный
+            // 65 536-ячеечный скан на главном потоке больше не нужен
+            if (v == BlockType.MOB_SPAWNER.id) {
+                addSpawner(i % SIZE, i / (SIZE * SIZE), (i / SIZE) % SIZE);
+            }
         }
         java.util.Arrays.fill(heightMap, (short) -1);
         dirty = true;
         lightDirty = true;
+        meshVersion++; // [PERF-ASYNC]
         modified = true;
     }
 
@@ -134,10 +153,15 @@ public class Chunk {
     public void loadBlocks(byte[] data) {
         for (int i = 0; i < Math.min(data.length, blocks.length); i++) {
             blocks[i] = (short) (data[i] & 0xFF);
+            // [PERF] Спавнеры собираем в этом же проходе
+            if (blocks[i] == BlockType.MOB_SPAWNER.id) {
+                addSpawner(i % SIZE, i / (SIZE * SIZE), (i / SIZE) % SIZE);
+            }
         }
         java.util.Arrays.fill(heightMap, (short) -1);
         dirty = true;
         lightDirty = true;
+        meshVersion++; // [PERF-ASYNC]
         modified = true;
     }
     
@@ -320,6 +344,7 @@ public class Chunk {
     /** Store door meta; 0 clears the entry. Chunk NOT marked modified here. */
     public void setDoorMeta(int x, int y, int z, byte meta) {
         if (x < 0 || x >= SIZE || y < 0 || y >= HEIGHT || z < 0 || z >= SIZE) return;
+        meshVersion++; // [PERF-ASYNC]
         if (meta == 0) {
             doorMeta.remove(index(x, y, z));
         } else {
@@ -361,6 +386,7 @@ public class Chunk {
      */
     public void setCropStage(int x, int y, int z, int stage) {
         if (x < 0 || x >= SIZE || y < 0 || y >= HEIGHT || z < 0 || z >= SIZE) return;
+        meshVersion++; // [PERF-ASYNC]
         if (stage < 0 || stage > 7) {
             cropMeta.remove(index(x, y, z));
         } else {
@@ -395,7 +421,7 @@ public class Chunk {
      * away from a source, so untouched oceans stay sparse. Survives world
      * reloads because it is saved with the chunk.
      */
-    private final java.util.Map<Integer, Byte> waterMeta = new java.util.HashMap<>();
+    private final java.util.Map<Integer, Byte> waterMeta = new java.util.concurrent.ConcurrentHashMap<>(); // [PERF-ASYNC]
 
     /** Water level (0-7) of a cell, 0 = source / static water. */
     public int getWaterLevel(int x, int y, int z) {
@@ -417,6 +443,7 @@ public class Chunk {
      */
     public void setWaterLevel(int x, int y, int z, int level) {
         if (x < 0 || x >= SIZE || y < 0 || y >= HEIGHT || z < 0 || z >= SIZE) return;
+        meshVersion++; // [PERF-ASYNC]
         if (level < 1 || level > 7) {
             waterMeta.remove(index(x, y, z));
         } else {

@@ -52,3 +52,6 @@ tools/hand_preview_*.png
 tools/item_preview.png
 v_worlds
 lily_*
+
+# container-screen debug shots (screenshot cmd writes without .png)
+ui_*

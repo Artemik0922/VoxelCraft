@@ -42,7 +42,23 @@ public class WorldSave {
     }
 
     private static final Path ROOT = Paths.get("saves");
-    private static final int FORMAT_VERSION = 6;
+    private static final int FORMAT_VERSION = 7;
+
+    // [PERF] Фоновая запись выгружаемых чанков: снапшот делается на главном
+    // потоке (копия массива), gzip+диск уходят сюда.
+    private static final java.util.concurrent.ExecutorService IO_EXECUTOR =
+        java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "worldsave-io");
+            t.setDaemon(true);
+            return t;
+        });
+
+    /** [PERF] Записать снапшоты на фоновом потоке ввода-вывода. */
+    public static void writeSnapshotsAsync(WorldSave save,
+            java.util.List<ChunkSnapshot> snapshots) {
+        if (snapshots == null || snapshots.isEmpty()) return;
+        IO_EXECUTOR.execute(() -> save.writeSnapshots(snapshots));
+    }
 
     private final Path dir;
     private final WorldMeta meta;
@@ -250,7 +266,7 @@ public class WorldSave {
         try {
             Files.createDirectories(p.getParent());
 
-            Path tmp = p.resolveSibling(p.getFileName() + ".tmp");
+            Path tmp = p.resolveSibling(p.getFileName() + "." + System.nanoTime() + ".tmp");
             try (DataOutputStream out = new DataOutputStream(
                     new BufferedOutputStream(
                         new GZIPOutputStream(Files.newOutputStream(tmp))))) {
@@ -259,12 +275,10 @@ public class WorldSave {
                 out.writeInt(chunk.getChunkX());
                 out.writeInt(chunk.getChunkZ());
 
-                // [BASE] Format 6 stores blocks as 16-bit ids (0..511).
+                // [BASE] Format 7 stores blocks RLE-encoded (typical terrain
+                // collapses to a handful of runs); format 6 was flat shorts.
                 short[] blocks = chunk.getBlocks();
-                out.writeInt(blocks.length);
-                for (short s : blocks) {
-                    out.writeShort(s);
-                }
+                writeBlocksRLE(out, blocks);
 
                 // [SD] Sliding-door state, keyed by the bottom cell.
                 java.util.List<int[]> doors = chunk.doorMetaEntries();
@@ -353,7 +367,11 @@ public class WorldSave {
                 return null;
             }
             Chunk chunk = new Chunk(cx, cz);
-            if (version >= 6) {
+            if (version >= 7) {
+                // [BASE] Format 7: RLE-encoded 16-bit ids
+                short[] blocks = readBlocksRLE(in, length);
+                chunk.loadBlocks(blocks);
+            } else if (version == 6) {
                 // [BASE] Format 6: 16-bit block ids (extended base blocks)
                 short[] blocks = new short[length];
                 for (int i = 0; i < length; i++) {
@@ -434,6 +452,41 @@ public class WorldSave {
         }
     }
 
+    // ------------------------------------------------------------------
+    // [PERF] RLE-кодирование блоков (формат 7): природный чанк из 65 536
+    // ячеек сжимается до считанных десятков прогонов вместо 65 536
+    // writeShort + тяжёлого gzip.
+    // ------------------------------------------------------------------
+
+    private static void writeBlocksRLE(DataOutputStream out, short[] blocks) throws IOException {
+        out.writeInt(blocks.length);
+        int i = 0;
+        final int n = blocks.length;
+        while (i < n) {
+            short v = blocks[i];
+            int run = 1;
+            while (i + run < n && blocks[i + run] == v) run++;
+            out.writeShort(v);
+            out.writeInt(run);
+            i += run;
+        }
+    }
+
+    private static short[] readBlocksRLE(DataInputStream in, int length) throws IOException {
+        short[] blocks = new short[length];
+        int i = 0;
+        while (i < length) {
+            short v = in.readShort();
+            int run = in.readInt();
+            if (run <= 0 || i + run > length) {
+                throw new IOException("corrupt RLE run at " + i);
+            }
+            java.util.Arrays.fill(blocks, i, i + run, v);
+            i += run;
+        }
+        return blocks;
+    }
+
     /**
      * Write a list of chunk snapshots to disk atomically.
      * Called from the background save thread.
@@ -446,15 +499,14 @@ public class WorldSave {
             Path p = chunkPath(snap.cx, snap.cz);
             try {
                 Files.createDirectories(p.getParent());
-                Path tmp = p.resolveSibling(p.getFileName() + ".tmp");
+                Path tmp = p.resolveSibling(p.getFileName() + "." + System.nanoTime() + ".tmp");
                 try (DataOutputStream out = new DataOutputStream(
                         new BufferedOutputStream(
                             new GZIPOutputStream(Files.newOutputStream(tmp))))) {
                     out.writeInt(FORMAT_VERSION);
                     out.writeInt(snap.cx);
                     out.writeInt(snap.cz);
-                    out.writeInt(snap.blocks.length);
-                    for (short b : snap.blocks) out.writeShort(b);
+                    writeBlocksRLE(out, snap.blocks);
                     out.writeInt(snap.doors.length);
                     for (int[] d : snap.doors) { out.writeByte(d[0]); out.writeByte(d[1]); out.writeByte(d[2]); out.writeByte(d[3]); }
                     out.writeInt(snap.crops.length);

@@ -569,6 +569,9 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
         public int leafChunks;
         /** Non-null while the view model is being tuned. */
         public String[] tuningLines;
+        /** [STATS] Форматированное наигранное время мира ("3 ч 05 мин"). */
+        public String playTime = "";
+
         /** [ENCH] Player experience for the HUD bar. */
         public int xpLevel;
         public int xpProgress;
@@ -598,6 +601,7 @@ private void drawCrosshair(UIRenderer ui, GuiAssets gui, int w, int h) {
             String.format(java.util.Locale.ROOT, "Time: %s  (daylight %.2f)", d.clock, d.daylight),
             String.format(java.util.Locale.ROOT, "Particles: %d", d.particles),
             String.format(java.util.Locale.ROOT, "Biome: %s", d.biomeName),
+            String.format(java.util.Locale.ROOT, "Played: %s", d.playTime),
             String.format(java.util.Locale.ROOT, "Pass ms: rebuild %.2f shadow %.2f world %.2f",
                 d.rebuildUs / 1000.0, d.shadowUs / 1000.0, d.worldUs / 1000.0),
             String.format(java.util.Locale.ROOT, "Pass ms: scene %.2f post %.2f ui %.2f",

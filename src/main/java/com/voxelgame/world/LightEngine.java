@@ -191,6 +191,7 @@ public class LightEngine {
         spread(w, false);
 
         chunk.setLightDirty(false);
+        chunk.bumpMeshVersion(); // [PERF-ASYNC] свет читается асинхронным мешером
     }
 
     /**

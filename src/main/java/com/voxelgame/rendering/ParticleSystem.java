@@ -339,6 +339,19 @@ public class ParticleSystem {
         }
     }
 
+    /**
+     * Fishing bite: droplets burst up around the bobber.
+     */
+    public void emitSplash(float x, float y, float z) {
+        for (int i = 0; i < 12; i++) {
+            spawn(x + (random.nextFloat() - 0.5f) * 0.5f, y + 0.05f, z + (random.nextFloat() - 0.5f) * 0.5f,
+                (random.nextFloat() - 0.5f) * 3.0f,
+                2.0f + random.nextFloat() * 3.0f,
+                (random.nextFloat() - 0.5f) * 3.0f,
+                -1, 0.04f, 0.4f + random.nextFloat() * 0.3f);
+        }
+    }
+
     private void spawn(float x, float y, float z, float vx, float vy, float vz,
                        int layer, float size, float life) {
         Particle p = findFree();

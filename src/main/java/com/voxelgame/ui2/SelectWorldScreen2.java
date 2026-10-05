@@ -300,7 +300,8 @@ public class SelectWorldScreen2 extends Scene {
             int nameColor = w.dead ? UiTheme.fade(UiTheme.INK, 0.55f) : UiTheme.INK;
             d.text(name, textX, y + 6, nameColor);
 
-            String sub = tr(w.gameMode.key) + " \u00B7 " + w.formattedLastPlayed();
+            String sub = tr(w.gameMode.key) + " \u00B7 " + w.formattedPlayTime()
+                + " \u00B7 " + w.formattedLastPlayed();
             sub = d.font.trimToWidth(sub, textW);
             d.text(sub, textX, y + 19, UiTheme.fade(UiTheme.INK_SOFT, w.dead ? 0.5f : 0.95f));
         }
@@ -333,6 +334,8 @@ public class SelectWorldScreen2 extends Scene {
         d.brassLine(x, y, maxW);
         y += 4;
         d.text(tr(w.gameMode.key), x, y, UiTheme.INK_SOFT);
+        y += FontRenderer.LINE_HEIGHT;
+        d.text(w.formattedPlayTime(), x, y, UiTheme.INK_SOFT);
         y += FontRenderer.LINE_HEIGHT;
         d.text(w.formattedLastPlayed(), x, y, UiTheme.INK_SOFT);
     }

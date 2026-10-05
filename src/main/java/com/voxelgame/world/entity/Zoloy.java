@@ -31,6 +31,9 @@ import java.util.Set;
  */
 public class Zoloy {
 
+    // [PERF] Скретч-AABB для физики (без аллокаций на тик)
+    private final float[] bbScratch = new float[6];
+
     public enum State { PATROL, CHASE, ATTACK }
 
     // Stats
@@ -461,7 +464,7 @@ public class Zoloy {
 
         // [GP-002] Collide against per-block AABBs, so slabs only block
         // their lower half.
-        float[] bb = new float[6];
+        float[] bb = bbScratch;
         float blockMin = Float.MAX_VALUE;
         float blockMax = -Float.MAX_VALUE;
         float blockTop = -Float.MAX_VALUE;
@@ -559,7 +562,7 @@ public class Zoloy {
 
         // [GP-002] AABB-aware: land on slab tops (y+0.5), bump heads on
         // the lowest AABB bottom.
-        float[] bb = new float[6];
+        float[] bb = bbScratch;
         if (velocity.y <= 0) {
             // Falling: land on the highest AABB top the body overlaps
             float landY = -Float.MAX_VALUE;

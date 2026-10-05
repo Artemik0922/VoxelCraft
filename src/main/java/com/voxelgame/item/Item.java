@@ -38,6 +38,9 @@ public class Item {
     // Sprite index for rendering
     public final String spriteName;
 
+    // Durability override for non-tool items
+    public final int durabilityOverride;
+
     private Item(Builder b) {
         this.id = b.id;
         this.name = b.name;
@@ -54,6 +57,7 @@ public class Item {
         this.blockType = b.blockType;
         this.potionEffect = b.potionEffect;
         this.spriteName = b.spriteName;
+        this.durabilityOverride = b.getDurabilityOverride();
     }
 
     public boolean isTool() { return toolType != ToolType.NONE && tier != null; }
@@ -63,7 +67,8 @@ public class Item {
     public boolean isPotion() { return potionEffect != null; }
 
     public int getMaxDurability() {
-        return isTool() ? tier.maxDurability : 0;
+        if (isTool()) return tier.maxDurability;
+        return durabilityOverride;
     }
 
     public float getAttackDamage() {
@@ -90,6 +95,9 @@ public class Item {
         private BlockType blockType;
         private StatusEffect potionEffect;
         private String spriteName;
+        public int durabilityOverride;
+
+        public int getDurabilityOverride() { return durabilityOverride; }
 
         Builder(int id, String name) {
             this.id = id;
@@ -109,6 +117,8 @@ public class Item {
         public Builder block(BlockType b) { this.blockType = b; return this; }
         public Builder potion(StatusEffect e) { this.potionEffect = e; return this; }
         public Builder sprite(String s) { this.spriteName = s; return this; }
+        /** [FISH] Durability for non-tool items (e.g. the fishing rod). */
+        public Builder durability(int d) { this.durabilityOverride = d; return this; }
 
         public Item build() { return new Item(this); }
     }

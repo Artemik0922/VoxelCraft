@@ -111,7 +111,14 @@ public final class CaveGenerator {
      * Determine if a block should be water (aquifer or underground lake).
      */
     public boolean isWater(int x, int y, int z, int surfaceHeight) {
-        int aquiferLevel = getAquiferLevel(x, z);
+        return isWater(x, y, z, surfaceHeight, getAquiferLevel(x, z));
+    }
+
+    /**
+     * [PERF] Same as {@link #isWater} with a precomputed aquifer level
+     * (2D noise — cache it per column instead of 2 noise evals per cell).
+     */
+    public boolean isWater(int x, int y, int z, int surfaceHeight, int aquiferLevel) {
         if (aquiferLevel != -100) {
             // Water fills below aquifer level and above lava floor
             if (y <= aquiferLevel && y > 5) return true;

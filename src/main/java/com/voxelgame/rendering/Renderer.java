@@ -7,6 +7,7 @@ import com.voxelgame.rendering.model.ItemModel3D;
 import com.voxelgame.world.*;
 import com.voxelgame.world.entity.AsteroidEntity;
 import com.voxelgame.world.entity.FallingBlockEntity;
+import com.voxelgame.world.entity.FishingBobberEntity;
 import com.voxelgame.world.entity.ItemEntity;
 import com.voxelgame.world.entity.TntEntity;
 import org.joml.*;
@@ -345,6 +346,61 @@ public class Renderer {
     }
 
     /**
+     * [FISH] Draw the fishing bobber: a small red-and-white cube that bobs
+     * on the water surface and darts when a fish bites.
+     */
+    public void renderFishingBobber(World world, Shader shader, Camera camera,
+                                     com.voxelgame.rendering.TextureAtlas atlas,
+                                     float lightLevel) {
+        if (world.getFishingBobber() == null) return;
+
+        FishingBobberEntity bobber = world.getFishingBobber();
+        if (bobber.isDead()) return;
+
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glDisable(GL_BLEND);
+
+        shader.bind();
+        shader.setUniformMat4("projection", camera.getProjectionMatrix());
+        shader.setUniformMat4("view", camera.getViewMatrix());
+        shader.setUniform1i("blockTextures", 0);
+        shader.setUniform1f("lightLevel", lightLevel);
+        shader.setUniform3f("sunColor", new Vector3f(1.0f, 1.0f, 1.0f));
+        shader.setUniform1f("fadeAlpha", 1.0f);
+
+        glActiveTexture(GL_TEXTURE0);
+        atlas.bindArray();
+
+        Vector3f pos = bobber.getPosition();
+        org.joml.Matrix4f model = new org.joml.Matrix4f();
+        model.identity();
+        model.translate(pos.x, pos.y + 0.1f, pos.z);
+
+        // Bobbing animation
+        float bob = (float) java.lang.Math.sin(System.nanoTime() / 500_000_000.0) * 0.05f;
+        model.translate(0, bob, 0);
+
+        // Flash red when fish is biting
+        if (bobber.getState() == FishingBobberEntity.State.BITE) {
+            float flash = (float) java.lang.Math.sin(System.nanoTime() / 100_000_000.0);
+            if (flash > 0) {
+                shader.setUniform3f("sunColor", new Vector3f(2.0f, 0.5f, 0.5f));
+            }
+        }
+
+        model.scale(0.15f);
+        shader.setUniformMat4("model", model);
+
+        heldItemCube.render(atlas, BlockType.REDSTONE_ORE, shader);
+
+        shader.setUniform3f("sunColor", new Vector3f(1.0f, 1.0f, 1.0f));
+        atlas.unbindArray();
+        shader.unbind();
+    }
+
+    /**
      * [GP-022] Draw tumbling sand/gravel. Same cube pass as TNT, but the
      * block keeps its own texture and stays axis-aligned while falling.
      */
@@ -506,13 +562,133 @@ public class Renderer {
             // Never mesh a chunk whose light is still pending
             if (chunk.isLightDirty()) { meshBacklog++; continue; }
 
-            if (System.nanoTime() > deadline) { meshBacklog++; continue; }
+            // [PERF-ASYNC] Геометрия уже строится в воркере — дождёмся заливки
+            if (inFlightBuilds.containsKey(entry.getKey())) { meshBacklog++; continue; }
 
-            RenderChunk rc = renderChunks.computeIfAbsent(entry.getKey(), k -> new RenderChunk());
-            rc.rebuild(chunk, world, textureAtlas);
-            chunk.setDirty(false);
-            remeshGeneration++;
+            // Очередь воркеров заполнена — остаток переносится на следующие кадры
+            if (inFlightBuilds.size() >= MAX_IN_FLIGHT_BUILDS) { meshBacklog++; continue; }
+
+            submitGeometryBuild(entry.getKey(), chunk, world);
+            meshBacklog++;
         }
+
+        processFinishedBuilds(world);
+    }
+
+    // ------------------------------------------------------------------
+    // [PERF-ASYNC] Асинхронная сборка геометрии чанков.
+    //
+    // Раньше ChunkMeshBuilder.build (чистый CPU, 20-70 мс на сложный чанк)
+    // выполнялся прямо в кадре: бюджет 6 мс проверялся только перед началом
+    // работы над чанком, поэтому один тяжёлый чанк раздувал кадр до 50-80 мс
+    // и FPS при полёте падал до 12-20. Теперь геометрию строят фоновые
+    // потоки, а главный поток только заливает готовые меши в GL
+    // (не больше UPLOAD_BUDGET_PER_FRAME за кадр).
+    //
+    // Корректность: геометрия зависит от данных чанка и 8 соседей. Перед
+    // стартом запоминаются их meshVersion; результат принимается, только
+    // если ни один счётчик не изменился, чанк по-прежнему в мире, грязен
+    // и его свет уже пересчитан. Иначе результат выбрасывается, и чанк
+    // перестраивается в следующем кадре. Все GL-вызовы, как и раньше,
+    // только на главном потоке.
+    // ------------------------------------------------------------------
+
+    /** Готовые меши, заливаемые в GPU за один кадр. */
+    private static final int UPLOAD_BUDGET_PER_FRAME = 3;
+    /** Одновременно строящихся геометрий не больше этого числа. */
+    private static final int MAX_IN_FLIGHT_BUILDS = 8;
+
+    private final java.util.concurrent.ExecutorService meshWorkers =
+        java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+            Thread t = new Thread(r, "mesh-worker");
+            t.setDaemon(true);
+            t.setPriority(Thread.NORM_PRIORITY - 1);
+            return t;
+        });
+
+    private final Map<Long, PendingGeom> inFlightBuilds = new HashMap<>();
+
+    private static final class PendingGeom {
+        long key;
+        Chunk chunk;
+        World world;
+        Chunk[] neighbors;
+        long[] versions;
+        java.util.concurrent.Future<ChunkMeshBuilder.ChunkGeom> future;
+    }
+
+    private void submitGeometryBuild(long key, Chunk chunk, World world) {
+        PendingGeom p = new PendingGeom();
+        p.key = key;
+        p.chunk = chunk;
+        p.world = world;
+        p.neighbors = new Chunk[9];
+        p.versions = new long[9];
+        int cx = chunk.getChunkX();
+        int cz = chunk.getChunkZ();
+        int i = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                Chunk n = world.getChunk(cx + dx, cz + dz);
+                p.neighbors[i] = n;
+                p.versions[i] = n != null ? n.getMeshVersion() : 0L;
+                i++;
+            }
+        }
+        try {
+            p.future = meshWorkers.submit(() -> ChunkMeshBuilder.build(chunk, world, textureAtlas));
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            return; // пул уже выключен; чанк остаётся грязным
+        }
+        inFlightBuilds.put(key, p);
+    }
+
+    private void processFinishedBuilds(World world) {
+        if (inFlightBuilds.isEmpty()) return;
+        int uploads = 0;
+        java.util.Iterator<Map.Entry<Long, PendingGeom>> it =
+            inFlightBuilds.entrySet().iterator();
+        while (it.hasNext() && uploads < UPLOAD_BUDGET_PER_FRAME) {
+            Map.Entry<Long, PendingGeom> e = it.next();
+            PendingGeom p = e.getValue();
+            if (!p.future.isDone()) continue;
+            it.remove();
+
+            boolean valid = p.world == world
+                && world.getChunks().get(p.key) == p.chunk
+                && p.chunk.isDirty()
+                && !p.chunk.isLightDirty()
+                && versionsUnchanged(p);
+            if (!valid) continue; // данные изменились — чанк перестроится позже
+
+            ChunkMeshBuilder.ChunkGeom geom;
+            try {
+                geom = p.future.get();
+            } catch (Exception ex) {
+                // Синхронный путь как до оптимизации — гарантия результата
+                System.err.println("Async mesh build failed, rebuilding sync: " + ex);
+                RenderChunk rc = renderChunks.computeIfAbsent(p.key, k -> new RenderChunk());
+                rc.rebuild(p.chunk, p.world, textureAtlas);
+                p.chunk.setDirty(false);
+                remeshGeneration++;
+                uploads++;
+                continue;
+            }
+
+            RenderChunk rc = renderChunks.computeIfAbsent(p.key, k -> new RenderChunk());
+            rc.applyGeometry(p.chunk, geom);
+            p.chunk.setDirty(false);
+            remeshGeneration++;
+            uploads++;
+        }
+    }
+
+    private boolean versionsUnchanged(PendingGeom p) {
+        for (int i = 0; i < p.neighbors.length; i++) {
+            Chunk n = p.neighbors[i];
+            if (n != null && n.getMeshVersion() != p.versions[i]) return false;
+        }
+        return true;
     }
 
     /** How many chunk meshes have been rebuilt; drives shadow-map invalidation. */
@@ -540,6 +716,13 @@ public class Renderer {
 
     /** [UI-009] Chunks still waiting for a mesh rebuild this frame. */
     public int getMeshBacklog() { return meshBacklog; }
+    /** [PERF] Сколько геометрий прямо сейчас строится в воркерах. */
+    public int getInFlightBuilds() { return inFlightBuilds.size(); }
+    /** [PERF-ASYNC] Диагностика последней заливки геометрии. */
+    private static volatile String lastUploadKey = "-";
+    private static volatile int lastUploadQuads = -1;
+    public String getLastUploadKey() { return lastUploadKey; }
+    public int getLastUploadQuads() { return lastUploadQuads; }
 
     /**
      * Frustum test against the chunk's full column. Using the real vertical
@@ -899,6 +1082,9 @@ public class Renderer {
     public TextureAtlas getTextureAtlas() { return textureAtlas; }
 
     public void cleanup() {
+        // [PERF-ASYNC] Остановить воркеры геометрии и забыть незавершённые сборки
+        meshWorkers.shutdownNow();
+        inFlightBuilds.clear();
         for (RenderChunk rc : renderChunks.values()) rc.cleanup();
         renderChunks.clear();
         if (slidingDoorMesh != null) slidingDoorMesh.cleanup();
@@ -930,16 +1116,27 @@ public class Renderer {
         }
 
         void rebuild(Chunk chunk, World world, TextureAtlas atlas) {
+            applyGeometry(chunk, ChunkMeshBuilder.build(chunk, world, atlas));
+        }
+
+        /**
+         * [PERF-ASYNC] Заливка готовой геометрии в GL (только главный поток).
+         * CPU-часть вынесена в воркеры, здесь остался строго GL + состояние.
+         */
+        void applyGeometry(Chunk chunk, ChunkMeshBuilder.ChunkGeom geom) {
             // Only the very first build fades in; an edit-triggered rebuild
             // would otherwise flash every time a block is placed nearby.
             boolean firstBuild = opaque == null && transparent == null && leaves == null;
 
             modelMatrix = new Matrix4f().translate(chunk.getWorldX(), 0, chunk.getWorldZ());
 
-            ChunkMeshBuilder.ChunkGeom geom = ChunkMeshBuilder.build(chunk, world, atlas);
             opaque = Mesh.rebind(opaque, geom.opaque);
             transparent = Mesh.rebind(transparent, geom.transparent);
             leaves = Mesh.rebind(leaves, geom.leaves);
+
+            // [PERF-ASYNC] Диагностика: что именно залили
+            lastUploadKey = chunk.getChunkX() + "," + chunk.getChunkZ();
+            lastUploadQuads = geom.opaque == null ? 0 : geom.opaque.indices.size() / 6;
 
             if (firstBuild) {
                 bornNs = System.nanoTime();

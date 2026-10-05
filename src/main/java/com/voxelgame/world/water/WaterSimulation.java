@@ -85,10 +85,16 @@ public class WaterSimulation {
      * Process all pending water spreading (reflow runs synchronously).
      */
     public void processSpread() {
-        int budget = UPDATE_LIMIT;
-        while (!spreadQueue.isEmpty() && budget-- > 0) {
-            WaterNode node = spreadQueue.poll();
-            spreadFrom(node.x, node.y, node.z, node.level);
+        // [PERF] Массовый залив: сотни setBlock — свет одним проходом в конце
+        world.beginBatchEdits();
+        try {
+            int budget = UPDATE_LIMIT;
+            while (!spreadQueue.isEmpty() && budget-- > 0) {
+                WaterNode node = spreadQueue.poll();
+                spreadFrom(node.x, node.y, node.z, node.level);
+            }
+        } finally {
+            world.endBatchEdits();
         }
     }
 
@@ -173,6 +179,16 @@ public class WaterSimulation {
      * within MAX_LEVEL.
      */
     private void reflow(int x, int y, int z) {
+        // [PERF] Рефлоу правит до 4096 ячеек — свет одним проходом в конце
+        world.beginBatchEdits();
+        try {
+            reflowInner(x, y, z);
+        } finally {
+            world.endBatchEdits();
+        }
+    }
+
+    private void reflowInner(int x, int y, int z) {
         // --- Gather the component and mark its static anchors ---
         Map<Long, Integer> index = new HashMap<>();
         java.util.List<int[]> component = new java.util.ArrayList<>();

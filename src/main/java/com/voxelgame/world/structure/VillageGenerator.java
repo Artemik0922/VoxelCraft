@@ -152,13 +152,15 @@ public class VillageGenerator {
 
         // === РЎС‚СЂРѕРёРј Р·РґР°РЅРёСЏ ===
         List<Villager> newVillagers = new ArrayList<>();
+        // [PERF] Все грядки деревни (фермы + сады) — фермерам вместо скана мира
+        List<int[]> villageCrops = new ArrayList<>();
         for (BuildingPlacement bp : buildings) {
             generateBuilding(chunks, bp, materials, rng);
 
             // РЎР°РґРёРє Сѓ Р¶РёР»С‹С… РґРѕРјРѕРІ (С‚РѕР»СЊРєРѕ РЅРµР±РѕР»СЊС€РёС… вЂ” Сѓ Р±РѕР»СЊС€РёС… СЃР°Рґ
             // РјРѕРі Р±С‹ РЅР°Р»РµР·С‚СЊ РЅР° СЃРѕСЃРµРґРЅРµРµ Р·РґР°РЅРёРµ)
             if (bp.type == BuildingType.SMALL_HOUSE || bp.type == BuildingType.BAKERY) {
-                generateGarden(chunks, bp.wx, flatY, bp.wz, materials, rng);
+                generateGarden(chunks, bp.wx, flatY, bp.wz, materials, rng, villageCrops);
             }
 
             // РЎРїР°РІРЅРёРј Р¶РёС‚РµР»РµР№ РїРµСЂРµРґ РІС…РѕРґРѕРј Р·РґР°РЅРёСЏ (РґРІРµСЂСЊ РІСЃРµРіРґР° СЃ -Z СЃС‚РѕСЂРѕРЅС‹)
@@ -192,7 +194,16 @@ public class VillageGenerator {
         generateLamps(chunks, centerX, flatY, centerZ, buildings, materials, rng);
 
         // === Р¤РµСЂРјС‹ ===
-        generateFarms(chunks, centerX, flatY, centerZ, buildings, materials, rng, biome);
+        generateFarms(chunks, centerX, flatY, centerZ, buildings, materials, rng, biome, villageCrops);
+
+        // [PERF] Фермы сгенерированы после спавна жителей — раздаём список грядок фермерам
+        if (world != null && !villageCrops.isEmpty()) {
+            for (Villager v : newVillagers) {
+                if (v.getProfession() == Villager.Profession.FARMER) {
+                    v.setFarmCrops(villageCrops);
+                }
+            }
+        }
 
         // === Р”РµРєРѕСЂ РїР»РѕС‰Р°РґРё ===
         generateSquareDecor(chunks, centerX, flatY, centerZ, materials, rng, biome);
@@ -1232,7 +1243,7 @@ public class VillageGenerator {
 
     /** РћРіРѕСЂРѕРґ Сѓ РґРѕРјР°: РёР·РіРѕСЂРѕРґСЊ + РіСЂСЏРґРєРё + С†РІРµС‚С‹. */
     private void generateGarden(Map<Long, Chunk> chunks, int hx, int hy, int hz,
-                                 VillageMaterials mat, Random rng) {
+                                 VillageMaterials mat, Random rng, List<int[]> cropSink) {
         // РЎР°Рґ СЃ +X СЃС‚РѕСЂРѕРЅС‹ РґРѕРјР° (РґРІРµСЂСЊ СЃ -Z); СЃС‚РµРЅР° РґРѕРјР° РјР°РєСЃРёРјСѓРј РЅР°
         // halfW <= 3, РїРѕСЌС‚РѕРјСѓ СЃР°Рґ РЅР°С‡РёРЅР°РµС‚СЃСЏ СЃ hx + 4
         int gx = hx + 6;
@@ -1255,6 +1266,7 @@ public class VillageGenerator {
                           : r < 0.72f ? BlockType.CARROT.id
                           : BlockType.POTATO.id;
                 setBlock(chunks, gx + dx, hy + 1, gz + dz, crop);
+                cropSink.add(new int[]{gx + dx, hy + 1, gz + dz});
             }
         }
 
@@ -1374,7 +1386,7 @@ public class VillageGenerator {
     private void generateFarms(Map<Long, Chunk> chunks, int cx, int cy, int cz,
                                 List<BuildingPlacement> buildings,
                                 VillageMaterials mat, Random rng,
-                                BiomeSelector.MCBiome biome) {
+                                BiomeSelector.MCBiome biome, List<int[]> cropSink) {
         int farmCount = 2;
         if (buildings.size() > 10) farmCount = 3;
 
@@ -1397,12 +1409,12 @@ public class VillageGenerator {
             }
             if (tooClose) continue;
 
-            generateFarm(chunks, farmX, cy, farmZ, mat, rng);
+            generateFarm(chunks, farmX, cy, farmZ, mat, rng, cropSink);
         }
     }
 
     private void generateFarm(Map<Long, Chunk> chunks, int fx, int fy, int fz,
-                              VillageMaterials mat, Random rng) {
+                              VillageMaterials mat, Random rng, List<int[]> cropSink) {
         int farmW = 9 + rng.nextInt(5); // 9-13
         int farmD = 9 + rng.nextInt(5);
         int halfW = farmW / 2;
@@ -1421,6 +1433,7 @@ public class VillageGenerator {
                               : r < 0.75f ? BlockType.CARROT.id
                               : BlockType.POTATO.id;
                     setBlock(chunks, fx + dx, fy + 1, fz + dz, crop);
+                    cropSink.add(new int[]{fx + dx, fy + 1, fz + dz});
                 }
             }
         }

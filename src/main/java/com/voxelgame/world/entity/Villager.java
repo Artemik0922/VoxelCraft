@@ -9,6 +9,8 @@ import com.voxelgame.world.BlockType;
 import com.voxelgame.world.World;
 import org.joml.Vector3f;
 
+import java.util.List;
+
 /**
  * Villager (Р¶РёС‚РµР»СЊ РґРµСЂРµРІРЅРё) вЂ” РјРёСЂРЅС‹Р№ РјРѕР± СЃ СЂР°СЃРїРёСЃР°РЅРёРµРј РґРЅСЏ РєР°Рє РІ Minecraft.
  *
@@ -26,6 +28,9 @@ import org.joml.Vector3f;
  *   - РџР»Р°РІРЅС‹Рµ РїРѕРІРѕСЂРѕС‚С‹, РЅРµ РїР°РґР°СЋС‚ СЃ РѕР±СЂС‹РІРѕРІ, РЅРµ Р·Р°СЃС‚СЂРµРІР°СЋС‚ Сѓ СЃС‚РµРЅ
  */
 public class Villager {
+
+    // [PERF] Скретч-AABB для физики: раньше new float[6] дважды за тик на сущность
+    private final float[] bbScratch = new float[6];
 
     /** РџСЂРѕС„РµСЃСЃРёСЏ Р¶РёС‚РµР»СЏ (РїРѕСЂСЏРґРѕРє = РїРѕСЂСЏРґРѕРє С‚Р°Р№Р»РѕРІ РІ Р°С‚Р»Р°СЃРµ!). */
     public enum Profession {
@@ -179,6 +184,13 @@ public class Villager {
     private boolean hasStorage = false;
     /** РўР°Р№РјРµСЂ РІС‹РіСЂСѓР·РєРё СѓСЂРѕР¶Р°СЏ РЅР° СЃРєР»Р°РґРµ. */
     private float storeTimer = 0;
+    /** [PERF] Грядки деревни (x,y,z), собранные при генерации, — вместо тяжёлого скана мира. */
+    private List<int[]> farmCrops = null;
+    /** Кулдаун резервного скана мира, когда по списку ничего не нашлось. */
+    private float wideScanCooldown = 0;
+    /** [PERF] Кэш сканирования угроз — раз в 0.25 с вместо каждого тика. */
+    private float threatScanTimer = 0;
+    private Zoloy cachedThreat = null;
 
     /** РРЅРґРµРєСЃ С‚РµРєСЃС‚СѓСЂС‹ РІ Р°С‚Р»Р°СЃРµ (0-15 РґР»СЏ РїСЂРѕС„РµСЃСЃРёР№). */
     private final int textureIndex;
@@ -244,6 +256,7 @@ public class Villager {
             if (talkTimer <= 0) isTalking = false;
         }
         if (fleeTimer > 0) fleeTimer -= dt;
+        if (wideScanCooldown > 0) wideScanCooldown -= dt;
 
         // === [ECO] РџРѕРїРѕР»РЅРµРЅРёРµ Р°СЃСЃРѕСЂС‚РёРјРµРЅС‚Р° Р¶РёС‚РµР»СЏ ===
         if (restockCooldown > 0) {
@@ -255,7 +268,16 @@ public class Villager {
         }
 
         // === РЈРіСЂРѕР·Р°: РјРѕРЅСЃС‚СЂС‹ СЂСЏРґРѕРј ===
-        Zoloy threat = findNearestMob(MOB_FLEE_RANGE);
+        // [PERF] Скан всех мобов не каждый тик — кэш на 0.25 с (мёртвый кэш сбрасывается)
+        Zoloy threat;
+        if (threatScanTimer > 0) {
+            threatScanTimer -= dt;
+            threat = (cachedThreat != null && !cachedThreat.isDead()) ? cachedThreat : null;
+        } else {
+            threatScanTimer = 0.25f;
+            threat = findNearestMob(MOB_FLEE_RANGE);
+            cachedThreat = threat;
+        }
         boolean mobThreat = threat != null;
 
         // === РњР°С€РёРЅР° СЃРѕСЃС‚РѕСЏРЅРёР№ ===
@@ -584,15 +606,58 @@ public class Villager {
     /** РљСѓРґР° РёРґС‚Рё: СЃРЅР°С‡Р°Р»Р° СЃРїРµР»С‹Рµ РіСЂСЏРґРєРё, РїРѕС‚РѕРј РјРѕР»РѕРґС‹Рµ, РёРЅР°С‡Рµ СЂР°Р±РѕС‡РµРµ РјРµСЃС‚Рѕ. */
     private void findFarmerWorkTarget() {
         hasWorkTarget = true;
-        int[] pos = scanCrop(true);
-        if (pos == null) pos = scanCrop(false);
+        // [PERF] Основной путь — список грядок деревни (~сотни проверок вместо ~20 тысяч)
+        int[] pos = scanCropList(true);
+        if (pos == null) pos = scanCropList(false);
         if (pos != null) {
             workTarget.set(pos[0] + 0.5f, position.y, pos[2] + 0.5f);
             workTargetBlockY = pos[1];
             return;
         }
+        // Резервный скан мира — не чаще раза в 8 секунд (чужие/игроковые грядки)
+        if (wideScanCooldown <= 0) {
+            wideScanCooldown = 8.0f;
+            pos = scanCrop(true);
+            if (pos == null) pos = scanCrop(false);
+            if (pos != null) {
+                workTarget.set(pos[0] + 0.5f, position.y, pos[2] + 0.5f);
+                workTargetBlockY = pos[1];
+                return;
+            }
+        }
         workTarget.set(workPos);
         workTargetBlockY = -1;
+    }
+
+    /**
+     * [PERF] Ближайшая грядка нужной зрелости по списку деревни из VillageGenerator.
+     * Снесённые игроком культуры просто пропускаются — список не требует обслуживания.
+     */
+    private int[] scanCropList(boolean mature) {
+        if (farmCrops == null) return null;
+        float bestSq = FARM_SCAN_RANGE * FARM_SCAN_RANGE;
+        int[] best = null;
+        for (int i = 0, n = farmCrops.size(); i < n; i++) {
+            int[] p = farmCrops.get(i);
+            int id = world.getBlock(p[0], p[1], p[2]);
+            boolean crop = id == BlockType.WHEAT.id
+                        || id == BlockType.CARROT.id
+                        || id == BlockType.POTATO.id;
+            if (!crop) continue;
+            int stage = world.getCropStage(p[0], p[1], p[2]);
+            if (stage < 0) {
+                stage = com.voxelgame.rendering.TextureAtlas.stageOf(id, p[0], p[1], p[2]);
+            }
+            if ((stage >= 7) != mature) continue;
+            float dx = p[0] - position.x;
+            float dz = p[2] - position.z;
+            float d = dx * dx + dz * dz;
+            if (d < bestSq) {
+                bestSq = d;
+                best = p;
+            }
+        }
+        return best;
     }
 
     /** Р‘Р»РёР¶Р°Р№С€Р°СЏ РіСЂСЏРґРєР° РЅСѓР¶РЅРѕР№ Р·СЂРµР»РѕСЃС‚Рё (СЃРїРµР»Р°СЏ/РЅРµСЃРїРµР»Р°СЏ) РІ СЂР°РґРёСѓСЃРµ С„РµСЂРјС‹. */
@@ -781,6 +846,11 @@ public class Villager {
     public void setStorage(float x, float y, float z) {
         storagePos.set(x, y, z);
         hasStorage = true;
+    }
+
+    /** [PERF] Назначить фермеру список грядок деревни (собирает VillageGenerator). */
+    public void setFarmCrops(List<int[]> crops) {
+        this.farmCrops = (crops == null || crops.isEmpty()) ? null : crops;
     }
 
     /** [CR] РЎРєРѕР»СЊРєРѕ РІСЃРµРіРѕ РµРґРёРЅРёС† СѓСЂРѕР¶Р°СЏ Сѓ С„РµСЂРјРµСЂР° РІ РёРЅРІРµРЅС‚Р°СЂРµ. */
@@ -1259,7 +1329,7 @@ float baseZ = escort
         int z0 = (int) Math.floor(minZ), z1 = (int) Math.floor(maxZ);
         int y0 = (int) Math.floor(minY), y1 = (int) Math.floor(maxY);
 
-        float[] bb = new float[6];
+        float[] bb = bbScratch;
         float blockMin = Float.MAX_VALUE;
         float blockMax = -Float.MAX_VALUE;
         float blockTop = -Float.MAX_VALUE;
@@ -1363,7 +1433,7 @@ float baseZ = escort
         int y0 = (int) Math.floor(position.y);
         int y1 = (int) Math.floor(position.y + HEIGHT);
 
-        float[] bb = new float[6];
+        float[] bb = bbScratch;
         if (velocity.y <= 0) {
             // Falling: land on the highest AABB top the body overlaps
             float landY = -Float.MAX_VALUE;

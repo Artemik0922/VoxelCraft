@@ -40,6 +40,10 @@ public final class HeadlessTestRunner {
 
     private HeadlessTestRunner() {}
 
+    public static void main(String[] args) {
+        System.exit(run(args));
+    }
+
     public static int run(String[] args) {
         long seed = 424242L;
         for (int i = 1; i < args.length - 1; i++) {
@@ -94,6 +98,8 @@ public final class HeadlessTestRunner {
             testWeather();
             testTransparency(world);
             testWorldList(meta);
+            testStatistics(save, meta);
+            testFishing(world, save, meta);
         } finally {
             if (world != null) {
                 try { world.cleanup(); } catch (Throwable ignored) {}
@@ -1061,6 +1067,117 @@ public final class HeadlessTestRunner {
         boolean listed = WorldSave.listWorlds().stream()
             .anyMatch(m -> meta.folderName.equals(m.folderName));
         check(listed, "new world appears in saves list", "folder=" + meta.folderName);
+    }
+
+    private static void testStatistics(WorldSave save, WorldMeta meta) throws Exception {
+        log("-- test: statistics roundtrip");
+        Path dir = save.getDirectory();
+        com.voxelgame.stats.WorldStats stats = new com.voxelgame.stats.WorldStats(dir);
+        stats.load();
+
+        stats.add(com.voxelgame.stats.WorldStats.BLOCKS_MINED, 42);
+        stats.add(com.voxelgame.stats.WorldStats.FISH_CAUGHT, 3);
+        stats.addPlayTime(120.0f);
+        stats.getAchievements().add("first_fish");
+        stats.save();
+
+        com.voxelgame.stats.WorldStats loaded = new com.voxelgame.stats.WorldStats(dir);
+        loaded.load();
+        check(loaded.get(com.voxelgame.stats.WorldStats.BLOCKS_MINED) == 42, "blocksMined persists", "");
+        check(loaded.get(com.voxelgame.stats.WorldStats.FISH_CAUGHT) == 3, "fishCaught persists", "");
+        check(loaded.getPlayTimeMs() == 120000, "playTimeMs persists", "ms=" + loaded.getPlayTimeMs());
+        check(loaded.isAchievementUnlocked("first_fish"), "achievement persists", "");
+    }
+
+    private static void testFishing(World world, WorldSave save, WorldMeta meta) throws Exception {
+        log("-- test: fishing mechanics");
+        com.voxelgame.stats.WorldStats stats = new com.voxelgame.stats.WorldStats(save.getDirectory());
+        stats.load();
+        com.voxelgame.achievement.AchievementRegistry.restoreFrom(stats);
+
+        // A 3x3 pond at surface level so the bobber has somewhere to land
+        check(waitForChunks(world, new Vector3f(8, 70, 8), 20000), "pond area chunks loaded", "");
+        int gy = world.getGroundHeight(8, 8);
+        for (int dx = 7; dx <= 9; dx++) {
+            for (int dz = 7; dz <= 9; dz++) {
+                world.setBlock(dx, gy + 1, dz, BlockType.WATER.id);
+            }
+        }
+
+        com.voxelgame.world.fishing.FishingController fc =
+            new com.voxelgame.world.fishing.FishingController(world, stats, null);
+        int[] biteFx = {0};
+        fc.onBite = () -> biteFx[0]++;
+
+        com.voxelgame.item.ItemStack rod = new com.voxelgame.item.ItemStack(
+            com.voxelgame.item.ItemRegistry.FISHING_ROD, 1);
+        int dur0 = rod.getDurability();
+
+        // Cast straight down into the pond
+        boolean cast = fc.cast(new Vector3f(8.5f, gy + 3.5f, 8.5f),
+            new Vector3f(0, -1, 0), rod);
+        check(cast, "fishing rod casts", "");
+        check(fc.hasBobber(), "bobber exists after cast", "");
+
+        com.voxelgame.world.entity.FishingBobberEntity bobber = fc.getBobber();
+        // Pump up to ~15 s of sim time: the random bite delay is 5..15 s
+        int ticks = 0;
+        while (bobber.getState() != com.voxelgame.world.entity.FishingBobberEntity.State.BITE
+                && ticks < 1000) {
+            bobber.update(0.05f);
+            ticks++;
+        }
+        check(bobber.getState() == com.voxelgame.world.entity.FishingBobberEntity.State.BITE,
+            "bobber bites within 15 s", "ticks=" + ticks);
+        check(biteFx[0] == 1, "onBite fired once", "fired=" + biteFx[0]);
+
+        long fish0 = stats.get(com.voxelgame.stats.WorldStats.FISH_CAUGHT);
+        String result = fc.reelIn();
+        check("fish".equals(result) || "junk".equals(result),
+            "bite reels in loot", "result=" + result);
+        check(stats.get(com.voxelgame.stats.WorldStats.FISH_CAUGHT) == fish0 + 1,
+            "fishCaught incremented", "");
+        check(com.voxelgame.achievement.AchievementRegistry.isUnlocked("first_fish"),
+            "first_fish unlocks on catch", "");
+        check(rod.getDurability() < dur0, "rod durability spent on catch", "");
+        check(!fc.hasBobber(), "bobber cleared after reel in", "");
+
+        // Reeling with no bobber in the water is a no-op
+        check(fc.reelIn() == null, "reel without bobber is a no-op", "");
+
+        // The rod recipe: 3 sticks + 2 string (vanilla layout)
+        boolean rodRecipe = false;
+        for (com.voxelgame.item.Recipe r : RecipeRegistry.RECIPES) {
+            if (r.getResult().isItem()
+                    && r.getResult().getItem() == com.voxelgame.item.ItemRegistry.FISHING_ROD) {
+                int sticks = 0, strings = 0;
+                for (ItemStack in : r.getInputs()) {
+                    if (in == null) continue;
+                    if (in.isItem() && in.getItem() == com.voxelgame.item.ItemRegistry.STICK) sticks++;
+                    if (in.isItem() && in.getItem() == com.voxelgame.item.ItemRegistry.STRING) strings++;
+                }
+                rodRecipe = sticks == 3 && strings == 2;
+            }
+        }
+        check(rodRecipe, "fishing rod recipe is 3 sticks + 2 string", "");
+
+        // Raw fish smelts into cooked fish
+        world.setBlock(12, gy + 1, 12, BlockType.FURNACE.id);
+        ContainerData fishSmelt = world.getContainerManager()
+            .getOrCreate(12, gy + 1, 12, ContainerData.Type.FURNACE);
+        fishSmelt.setSlot(ContainerData.FURNACE_INPUT,
+            new ItemStack(com.voxelgame.item.ItemRegistry.RAW_FISH, 1));
+        fishSmelt.setSlot(ContainerData.FURNACE_FUEL,
+            new ItemStack(com.voxelgame.item.ItemRegistry.COAL, 1));
+        for (int i = 0; i < 400; i++) {
+            world.updateContainers();
+        }
+        ItemStack fishOut = fishSmelt.getSlot(ContainerData.FURNACE_OUTPUT);
+        check(fishOut != null && fishOut.isItem()
+                && fishOut.getItem() == com.voxelgame.item.ItemRegistry.COOKED_FISH,
+            "raw fish smelts into cooked fish",
+            "out=" + (fishOut == null ? "null" : fishOut.getCount()));
+        world.getContainerManager().remove(12, gy + 1, 12);
     }
 
     // ------------------------------------------------------------------

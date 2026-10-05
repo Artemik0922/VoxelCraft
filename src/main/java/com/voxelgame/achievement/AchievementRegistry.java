@@ -16,6 +16,8 @@ public class AchievementRegistry {
     private static final Map<String, Achievement> achievements = new HashMap<>();
     private static final Set<String> unlocked = new HashSet<>();
     private static ToastManager toastManager;
+    /** [STATS] Мир, в который пишутся разблокировки (null = не сохранять). */
+    private static com.voxelgame.stats.WorldStats store;
 
     // Register all achievements
     static {
@@ -46,6 +48,10 @@ public class AchievementRegistry {
         register(new Achievement("first_trade", "achievement.first_trade", "achievement.first_trade.desc", BlockType.EMERALD_BLOCK.id));
         register(new Achievement("village_hero", "achievement.village_hero", "achievement.village_hero.desc", BlockType.EMERALD_BLOCK.id, 0xFFAAFFAA));
         register(new Achievement("meteorite", "achievement.meteorite", "achievement.meteorite.desc", BlockType.METEORITE_ORE.id));
+
+        // [FISH] Fishing
+        register(new Achievement("first_fish", "achievement.first_fish", "achievement.first_fish.desc", -1));
+        register(new Achievement("fish_10", "achievement.fish_10", "achievement.fish_10.desc", -1));
     }
 
     public static void register(Achievement ach) {
@@ -66,6 +72,7 @@ public class AchievementRegistry {
         if (ach == null) return;
 
         unlocked.add(id);
+        if (store != null) store.getAchievements().add(id);
 
         if (toastManager != null) {
             String title = Language.tr(ach.titleKey);
@@ -74,6 +81,13 @@ public class AchievementRegistry {
         }
 
         System.out.println("[Achievement] Unlocked: " + ach.id + " - " + ach.titleKey);
+    }
+
+    /** [STATS] Bind persistence to a world's stats file and restore its unlocks. */
+    public static void restoreFrom(com.voxelgame.stats.WorldStats stats) {
+        store = stats;
+        unlocked.clear();
+        unlocked.addAll(stats.getAchievements());
     }
 
     public static boolean isUnlocked(String id) {

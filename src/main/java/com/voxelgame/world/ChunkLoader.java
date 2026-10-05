@@ -58,6 +58,16 @@ public class ChunkLoader {
      * Queue a chunk for generation unless it is already loaded or in flight.
      */
     public void request(int cx, int cz, com.voxelgame.world.generator.TerrainGenerator generator) {
+        request(cx, cz, generator, null);
+    }
+
+    /**
+     * [PERF] Queue a chunk, preferring a disk restore over regeneration.
+     * The gzip read happens on the worker thread, so walking through
+     * previously-modified terrain no longer hitches the main thread.
+     */
+    public void request(int cx, int cz, com.voxelgame.world.generator.TerrainGenerator generator,
+                        com.voxelgame.world.save.WorldSave save) {
         if (!running) return;
 
         long key = Chunk.key(cx, cz);
@@ -65,11 +75,18 @@ public class ChunkLoader {
 
         pool.execute(() -> {
             try {
-                Chunk chunk = new Chunk(cx, cz);
-                generator.generate(chunk);
-                generator.generateStructures(chunk);
+                Chunk chunk = null;
+                if (save != null) {
+                    chunk = save.loadChunk(cx, cz);
+                    if (chunk != null) chunk.setRestoredFromDisk(true);
+                }
+                if (chunk == null) {
+                    chunk = new Chunk(cx, cz);
+                    generator.generate(chunk);
+                    generator.generateStructures(chunk);
+                    generatedTotal.incrementAndGet();
+                }
                 completed.add(chunk);
-                generatedTotal.incrementAndGet();
             } catch (Throwable t) {
                 System.err.println("Chunk generation failed at " + cx + "," + cz + ": " + t);
                 inFlight.remove(key);
@@ -83,9 +100,18 @@ public class ChunkLoader {
      * @return chunks published this frame
      */
     public List<Chunk> collect(Map<Long, Chunk> target) {
-        List<Chunk> published = new ArrayList<>(PUBLISH_BUDGET);
+        return collect(target, PUBLISH_BUDGET);
+    }
 
-        for (int i = 0; i < PUBLISH_BUDGET; i++) {
+    /**
+     * [PERF] Вариант с адаптивным бюджетом: когда у рендерера накопился
+     * хвост пересветов/пермешей, публикуем меньше чанков за кадр, чтобы
+     * кадр не раздувался релайтом всех соседей каждого нового чанка.
+     */
+    public List<Chunk> collect(Map<Long, Chunk> target, int budget) {
+        List<Chunk> published = new ArrayList<>(Math.max(1, budget));
+
+        for (int i = 0; i < budget; i++) {
             Chunk chunk = completed.poll();
             if (chunk == null) break;
 

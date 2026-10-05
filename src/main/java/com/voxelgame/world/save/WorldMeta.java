@@ -52,6 +52,9 @@ public class WorldMeta {
     public long created = System.currentTimeMillis();
     public long lastPlayed = System.currentTimeMillis();
 
+    /** Total time played in this world, mirrored from stats.json on save. */
+    public long playTimeMs = 0;
+
     // Where the player was standing
     public float playerX, playerY = 70, playerZ;
     public float playerYaw = -90, playerPitch = 0;
@@ -88,6 +91,20 @@ public class WorldMeta {
         return new SimpleDateFormat("dd.MM.yyyy HH:mm").format(new Date(lastPlayed));
     }
 
+    /** "3 ч 05 мин" / "45 мин" / "0 мин", for the world list and pause menu. */
+    public String formattedPlayTime() {
+        return formatPlayTime(playTimeMs);
+    }
+
+    /** Same formatting for a raw millisecond value (live F3 read-out). */
+    public static String formatPlayTime(long ms) {
+        long totalMin = ms / 60000L;
+        long h = totalMin / 60L;
+        long m = totalMin % 60L;
+        if (h > 0) return h + " ч " + String.format("%02d", m) + " мин";
+        return m + " мин";
+    }
+
     // ------------------------------------------------------------------
 
     public void write(Path file) throws IOException {
@@ -102,6 +119,7 @@ public class WorldMeta {
         m.put("difficulty", Integer.toString(difficulty));
         m.put("created", Long.toString(created));
         m.put("lastPlayed", Long.toString(lastPlayed));
+        m.put("playTimeMs", Long.toString(playTimeMs));
         m.put("playerX", Float.toString(playerX));
         m.put("playerY", Float.toString(playerY));
         m.put("playerZ", Float.toString(playerZ));
@@ -153,6 +171,7 @@ public class WorldMeta {
             w.difficulty = (int) parseFloat(m.get("difficulty"), 2);
             w.created = parseLong(m.get("created"), System.currentTimeMillis());
             w.lastPlayed = parseLong(m.get("lastPlayed"), w.created);
+            w.playTimeMs = parseLong(m.get("playTimeMs"), 0);
             w.playerX = parseFloat(m.get("playerX"), 0);
             w.playerY = parseFloat(m.get("playerY"), 70);
             w.playerZ = parseFloat(m.get("playerZ"), 0);
